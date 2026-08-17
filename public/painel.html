@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Chamada — CS Monte Serrat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --fundo:#F2F4F8; --sup:#FFFFFF; --borda:#E9EBF2; --borda-int:#EEF0F4;
+    --tinta:#303952; --tinta-suave:#596275; --placeholder:#A2A9BB;
+    --azul:#546de5; --azul-hover:#3a52c4; --azul-suave:#778beb14;
+    --avisos:#f8a5c2; --chat:#63cdda; --ata:#f7d794;
+    --alerta:#e15f41; --alerta-texto:#a83c25; --alerta-suave:#e15f411f;
+    --positivo:#3dc1d3; --positivo-texto:#177f8b; --positivo-suave:#3dc1d31f;
+    --atencao:#f7d794; --atencao-texto:#8a6d13;
+    --sombra:0 2px 14px rgba(48,57,82,0.06);
+    --sombra-leve:0 2px 10px rgba(48,57,82,0.05);
+    --raio:20px; --raio-medio:16px; --raio-campo:12px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{
+    font-family:Inter,-apple-system,sans-serif; background:var(--fundo); color:var(--tinta);
+    height:100vh; overflow:hidden; -webkit-font-smoothing:antialiased;
+  }
+  .shell{display:flex; height:100vh}
+
+  /* ---------- barra vertical de ícones ---------- */
+  .rail{
+    width:72px; flex:none; background:var(--sup); border-right:1px solid var(--borda);
+    display:flex; flex-direction:column; align-items:center; padding:14px 0 12px;
+  }
+  .logo{
+    width:36px; height:36px; border-radius:10px; background:var(--azul-suave);
+    display:flex; align-items:center; justify-content:center;
+    font-size:13.5px; font-weight:700; color:var(--azul); margin-bottom:18px; flex:none;
+  }
+  .rail-btn{
+    position:relative; width:56px; padding:8px 0 6px; margin-bottom:4px; border:0;
+    background:transparent; border-radius:12px; cursor:pointer; color:var(--tinta-suave);
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    font:inherit; font-size:11.5px; font-weight:600; line-height:1.15; text-align:center;
+  }
+  .rail-btn:hover{background:var(--fundo)}
+  .rail-btn.ativa{background:var(--azul); color:#fff}
+  .rail-btn svg{width:20px; height:20px; flex:none}
+  .rail-btn .selo{
+    display:none; position:absolute; top:4px; right:6px; min-width:17px; height:17px;
+    padding:0 4px; border-radius:9px; background:var(--alerta); color:#fff;
+    border:1.5px solid var(--sup); font-size:11.5px; font-weight:700; line-height:14px;
+  }
+  .rail-btn .selo.visivel{display:block}
+  .rail-fim{margin-top:auto; display:flex; flex-direction:column; align-items:center}
+  #btnEmergencia{color:var(--alerta)}
+  #btnEmergencia:hover, #btnEmergencia.armado{background:var(--alerta-suave); color:var(--alerta)}
+  #btnEmergencia.acionado{background:var(--alerta); color:#fff; animation:pulsaEmerg 1s ease-out 3}
+  @keyframes pulsaEmerg{0%{box-shadow:0 0 0 0 rgba(225,95,65,.5)} 100%{box-shadow:0 0 0 1rem rgba(225,95,65,0)}}
+
+  /* ---------- cabeçalho ---------- */
+  .col{flex:1; display:flex; flex-direction:column; min-width:0}
+  header{
+    height:68px; flex:none; background:var(--sup); border-bottom:1px solid var(--borda);
+    display:flex; align-items:center; gap:16px; padding:0 24px;
+  }
+  .turno b{display:block; font-size:14.5px; font-weight:600; line-height:1.25}
+  .turno small{display:block; font-size:11.5px; color:var(--tinta-suave); font-weight:500}
+  .h-dir{margin-left:auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+  #conexao{
+    display:flex; align-items:center; gap:7px; background:var(--fundo); border-radius:20px;
+    padding:7px 13px; font-size:12.5px; font-weight:600; color:var(--tinta-suave);
+  }
+  #conexao .bolinha{width:9px; height:9px; border-radius:50%; background:var(--atencao)}
+  #conexao.online .bolinha{background:#20bf6b}
+  #conexao.offline .bolinha{background:var(--alerta)}
+  .eu{display:flex; align-items:center; gap:10px; padding-left:12px; border-left:1px solid var(--borda)}
+  .avatar{
+    width:36px; height:36px; border-radius:50%; background:var(--azul-suave); color:var(--azul);
+    font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; flex:none;
+  }
+  .eu b{display:block; font-size:13.5px; font-weight:600; line-height:1.25; max-width:16ch;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .eu small{display:block; font-size:11.5px; color:var(--tinta-suave); font-weight:500;
+    max-width:22ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+  /* ---------- conteúdo ---------- */
+  .conteudo{flex:1; overflow-y:auto; padding:28px}
+  main{display:grid; grid-template-columns:minmax(0,380px) minmax(0,1fr); gap:20px; align-items:start;
+    max-width:1240px; margin:0 auto}
+  main#telaAvisos{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))}
+  main#telaEquipe{grid-template-columns:300px minmax(0,1fr)}
+  main.oculta{display:none}
+  @media(max-width:980px){
+    main, main#telaAvisos, main#telaEquipe{grid-template-columns:minmax(0,1fr)}
+  }
+  .pilha{display:flex; flex-direction:column; gap:20px}
+  h2.pagina{font-size:22px; font-weight:700}
+  .sub-pagina{font-size:13px; color:var(--tinta-suave); margin-top:4px}
+  .topo-pagina{grid-column:1/-1; display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap}
+  .topo-pagina .acoes{margin-left:auto; display:flex; gap:8px; flex-wrap:wrap}
+
+  .cartao{
+    background:var(--sup); border:1px solid var(--borda); border-radius:var(--raio);
+    padding:20px 22px; box-shadow:var(--sombra);
+  }
+  .cartao h2{font-size:14.5px; font-weight:600; margin-bottom:14px}
+  .cabecalho-historico{display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap}
+  .cabecalho-historico h2{margin-bottom:0}
+
+  label{display:block; font-size:13.5px; font-weight:600; margin:14px 0 6px}
+  input,select,textarea{
+    width:100%; padding:11px 13px; font:inherit; font-size:14px; border:1px solid var(--borda);
+    border-radius:var(--raio-campo); background:var(--sup); color:var(--tinta);
+    box-shadow:var(--sombra-leve);
+  }
+  input::placeholder,textarea::placeholder{color:var(--placeholder)}
+  input:focus,select:focus,textarea:focus,button:focus-visible{
+    outline:2px solid var(--azul); outline-offset:1px; border-color:var(--azul);
+  }
+
+  .seg{display:flex; gap:6px; background:var(--fundo); padding:4px; border-radius:var(--raio-campo)}
+  .seg button{
+    flex:1; padding:9px; font:inherit; font-size:13.5px; font-weight:600; border:0;
+    border-radius:9px; background:transparent; color:var(--tinta-suave); cursor:pointer;
+  }
+  .seg button.ativo{background:var(--sup); color:var(--azul); box-shadow:var(--sombra-leve)}
+
+  .mini, .botao-claro{
+    font:inherit; font-size:12.5px; font-weight:600; padding:8px 13px; border-radius:10px;
+    border:1px solid var(--borda); background:var(--sup); color:var(--tinta); cursor:pointer;
+  }
+  .mini:hover, .botao-claro:hover{background:var(--fundo)}
+  .mini.suave{background:var(--azul-suave); border-color:transparent; color:var(--azul)}
+  .mini.perigo, .botao-claro.perigo{color:var(--alerta-texto); border-color:#f3c8bf}
+  .mini.perigo:hover{background:var(--alerta-suave)}
+  #btnChamar{
+    width:100%; margin-top:18px; padding:16px; font:inherit; font-size:16px; font-weight:700;
+    background:var(--azul); color:#fff; border:0; border-radius:var(--raio-campo); cursor:pointer;
+  }
+  #btnChamar:hover{background:var(--azul-hover)}
+  #btnRechamar{
+    width:100%; margin-top:10px; padding:11px; font:inherit; font-size:14px; font-weight:600;
+    background:var(--sup); color:var(--tinta); border:1px solid var(--borda);
+    border-radius:var(--raio-campo); cursor:pointer; box-shadow:var(--sombra-leve);
+  }
+  #btnRechamar:hover:not(:disabled){background:var(--fundo)}
+  #btnRechamar:disabled{color:var(--placeholder); cursor:default; box-shadow:none}
+  .linha-senha{display:flex; gap:8px; align-items:center}
+  .linha-senha input{font-size:22px; font-weight:700; text-align:center; letter-spacing:.08em; max-width:7rem}
+  .linha-add{display:flex; gap:8px; margin-top:14px}
+  .linha-add input{flex:1}
+  .nota{font-size:12.5px; color:var(--tinta-suave); line-height:1.55}
+
+  /* ---------- números do turno ---------- */
+  .resumo{grid-column:1/-1; display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px}
+  .resumo > div{
+    background:var(--sup); border:1px solid var(--borda); border-radius:var(--raio-medio);
+    padding:14px 16px; box-shadow:var(--sombra);
+  }
+  .resumo b{display:block; font-size:24px; font-weight:700; line-height:1.1}
+  .resumo span{
+    display:block; font-size:11.5px; font-weight:700; letter-spacing:.03em;
+    text-transform:uppercase; color:var(--tinta-suave); margin-top:5px;
+  }
+  .resumo .r-at b{color:var(--azul)}
+  .resumo .r-ok b{color:var(--positivo-texto)}
+  .resumo .r-falta b{color:var(--alerta-texto)}
+
+  /* ---------- filtros ---------- */
+  .filtro{display:flex; gap:6px; margin-left:auto; flex-wrap:wrap}
+  .filtro button{
+    font:inherit; font-size:12.5px; font-weight:600; padding:6px 13px; border-radius:20px;
+    border:1px solid var(--borda); background:var(--sup); color:var(--tinta-suave); cursor:pointer;
+  }
+  .filtro button:hover{background:var(--fundo)}
+  .filtro button.ativo{background:var(--azul); border-color:var(--azul); color:#fff}
+  .filtro button.perigo{color:var(--alerta-texto); border-color:#f3c8bf}
+
+  /* ---------- lista de chamadas ---------- */
+  #historico{list-style:none; max-height:58vh; overflow-y:auto}
+  .chamada{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:13px 4px; border-bottom:1px solid var(--borda-int);
+  }
+  .chamada:last-child{border-bottom:0}
+  .chamada .hora{font-size:12.5px; font-weight:600; color:var(--tinta-suave);
+    font-variant-numeric:tabular-nums; width:44px; flex:none}
+  .chamada .quem{flex:1; min-width:12rem}
+  .chamada .quem b{display:block; font-size:14.5px; font-weight:600}
+  .chamada .quem small{display:block; font-size:11.5px; color:var(--tinta-suave); font-weight:500; margin-top:2px}
+  .marca-status{
+    font-size:11.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+    padding:5px 11px; border-radius:20px; white-space:nowrap;
+    background:var(--fundo); color:var(--tinta-suave);
+  }
+  .st-atendimento .marca-status{background:var(--azul-suave); color:var(--azul)}
+  .st-atendido .marca-status{background:var(--positivo-suave); color:var(--positivo-texto)}
+  .st-faltante .marca-status{background:var(--alerta-suave); color:var(--alerta-texto)}
+  .vezes{font-size:11.5px; font-weight:600; color:var(--tinta-suave); white-space:nowrap}
+  .alerta .vezes{background:var(--atencao); color:var(--atencao-texto); padding:4px 10px; border-radius:20px; font-weight:700}
+  .acoes{display:flex; gap:6px; flex-wrap:wrap}
+  .acoes button{
+    font:inherit; font-size:12px; font-weight:600; padding:7px 11px; border-radius:10px;
+    border:1px solid var(--borda); background:var(--sup); color:var(--tinta-suave); cursor:pointer;
+  }
+  .acoes button:hover{background:var(--fundo); color:var(--tinta)}
+  .acoes .b-at.ligado{background:var(--azul-suave); border-color:transparent; color:var(--azul)}
+  .acoes .b-ok.ligado{background:var(--positivo-suave); border-color:transparent; color:var(--positivo-texto)}
+  .acoes .b-falta.ligado{background:var(--alerta-suave); border-color:transparent; color:var(--alerta-texto)}
+  .alerta .b-falta{border-color:#f3c8bf; color:var(--alerta-texto)}
+  .vazio{color:var(--tinta-suave); font-size:13px; padding:24px 8px; text-align:center; list-style:none}
+
+  #avisoFila{
+    display:none; margin-top:14px; padding:11px 13px; border-radius:var(--raio-campo);
+    background:#f7d79433; font-size:12.5px; font-weight:600; color:var(--atencao-texto);
+  }
+  #avisoFarmacia{
+    display:none; margin-top:12px; padding:12px 14px; border-radius:var(--raio-campo);
+    background:var(--fundo); font-size:12.5px; color:var(--tinta-suave); font-weight:500; line-height:1.5;
+  }
+  #avisoRestaurado{
+    display:none; grid-column:1/-1; padding:12px 16px; border-radius:var(--raio-campo);
+    background:var(--positivo-suave); font-size:12.5px; font-weight:600; color:var(--positivo-texto);
+  }
+  #retornoEmergencia{
+    position:fixed; left:84px; bottom:16px; z-index:60; display:none;
+    background:var(--alerta); color:#fff; font-size:12.5px; font-weight:600;
+    padding:11px 14px; border-radius:var(--raio-campo); max-width:16rem; box-shadow:var(--sombra);
+  }
+
+  /* ---------- avisos da TV ---------- */
+  .aviso{
+    background:var(--sup); border:1px solid var(--borda); border-left:4px solid var(--borda);
+    border-radius:0; padding:14px 16px; margin-bottom:12px;
+  }
+  .aviso.ligado{border-left-color:var(--avisos)}
+  .aviso p{font-size:14px; line-height:1.5; margin-bottom:10px}
+  .aviso .rodape{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .aviso .freq{
+    font-size:11.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+    color:var(--tinta-suave); margin-right:auto;
+  }
+  .aviso button{
+    font:inherit; font-size:12px; font-weight:600; padding:7px 11px; border-radius:10px;
+    border:1px solid var(--borda); background:var(--sup); color:var(--tinta-suave); cursor:pointer;
+  }
+  .aviso button:hover{background:var(--fundo); color:var(--tinta)}
+  .aviso.ligado .b-lig{background:var(--azul-suave); border-color:transparent; color:var(--azul)}
+  .aviso .b-del{color:var(--alerta-texto); border-color:#f3c8bf}
+  #textoAviso{min-height:5rem; resize:vertical}
+
+  .lista-simples{list-style:none}
+  .lista-simples li{
+    display:flex; align-items:center; gap:12px; padding:11px 4px;
+    border-bottom:1px solid var(--borda-int); font-size:14px;
+  }
+  .lista-simples li:last-child{border-bottom:0}
+  .lista-simples li span{flex:1}
+  .lista-simples li.desligada span{color:var(--placeholder)}
+  .lista-simples button{
+    font:inherit; font-size:12px; font-weight:600; padding:7px 11px; border-radius:10px;
+    border:1px solid var(--borda); background:var(--sup); color:var(--tinta-suave); cursor:pointer;
+  }
+  .lista-simples button:hover{background:var(--fundo); color:var(--tinta)}
+  .lista-simples li:not(.desligada) .b-on{background:var(--azul-suave); border-color:transparent; color:var(--azul)}
+  .lista-simples .b-x{color:var(--alerta-texto); border-color:#f3c8bf}
+
+  /* ---------- chat da equipe ---------- */
+  #listaOnline{list-style:none}
+  #listaOnline li{
+    display:flex; align-items:center; gap:11px; padding:11px 4px;
+    border-bottom:1px solid var(--borda-int);
+  }
+  #listaOnline li:last-child{border-bottom:0}
+  #listaOnline .pt{width:9px; height:9px; border-radius:50%; background:#20bf6b; flex:none}
+  #listaOnline .quem{flex:1; min-width:0}
+  #listaOnline .quem b{display:block; font-size:13.5px; font-weight:600;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  #listaOnline .quem small{display:block; font-size:11.5px; color:var(--tinta-suave); font-weight:500}
+  #listaOnline button{
+    font:inherit; font-size:12px; font-weight:600; padding:7px 11px; border-radius:10px;
+    border:1px solid var(--borda); background:var(--sup); color:var(--azul); cursor:pointer; flex:none;
+  }
+  #listaOnline button:hover{background:var(--azul-suave); border-color:transparent}
+
+  #destinoBarra{display:flex; align-items:center; gap:10px; margin-bottom:16px; flex-wrap:wrap}
+  #destinoBarra .rotulo{font-size:12.5px; font-weight:600; color:var(--tinta-suave)}
+  #destinoAtual{
+    font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:20px;
+    background:var(--azul-suave); color:var(--azul);
+  }
+  #destinoAtual.direto{background:#f7d79433; color:var(--atencao-texto)}
+  #btnMural{margin-left:auto}
+
+  #mensagens{
+    list-style:none; display:flex; flex-direction:column; gap:12px;
+    height:50vh; min-height:16rem; overflow-y:auto; padding:4px;
+  }
+  #mensagens li{max-width:80%; padding:11px 14px; border-radius:var(--raio-medio);
+    background:var(--fundo); align-self:flex-start}
+  #mensagens li.minha{align-self:flex-end; background:var(--azul-suave)}
+  #mensagens li.direta{background:#f7d79426}
+  #mensagens .cab{display:flex; gap:8px; align-items:baseline; margin-bottom:4px; flex-wrap:wrap}
+  #mensagens .cab b{font-size:13px; font-weight:600}
+  #mensagens .cab .meta{font-size:11.5px; color:var(--tinta-suave); font-weight:500}
+  #mensagens .cab .etiqueta{
+    font-size:11.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+    color:var(--atencao-texto);
+  }
+  #mensagens .texto{font-size:14px; line-height:1.5; white-space:pre-wrap; word-break:break-word}
+  #mensagens .vazio-chat{
+    align-self:center; max-width:100%; background:transparent; color:var(--tinta-suave);
+    font-size:13px; text-align:center; padding:2rem 1rem;
+  }
+  #linhaEnviar{display:flex; gap:10px; margin-top:16px; padding-top:16px;
+    border-top:1px solid var(--borda-int); align-items:flex-end}
+  #textoMensagem{flex:1; min-height:2.9rem; max-height:8rem; resize:vertical}
+  #btnEnviar{
+    font:inherit; font-size:14px; font-weight:600; padding:12px 18px; border:0;
+    border-radius:var(--raio-campo); background:var(--azul); color:#fff; cursor:pointer;
+  }
+  #btnEnviar:hover:not(:disabled){background:var(--azul-hover)}
+  #btnEnviar:disabled{background:var(--borda); color:var(--placeholder); cursor:default}
+  #chatSemNome{
+    display:none; padding:12px 14px; border-radius:var(--raio-campo); margin-bottom:16px;
+    background:#f7d79433; font-size:12.5px; font-weight:600; color:var(--atencao-texto);
+  }
+
+  /* ---------- diálogos e código de acesso ---------- */
+  dialog{border:0; border-radius:24px; padding:26px; max-width:28rem; font:inherit; box-shadow:var(--sombra)}
+  dialog::backdrop{background:rgba(48,57,82,.5)}
+  dialog h3{font-size:16px; font-weight:600; margin-bottom:10px}
+  dialog p{font-size:13px; color:var(--tinta-suave); margin-bottom:18px; line-height:1.6}
+  dialog .fila-botoes{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end}
+  dialog button{
+    font:inherit; font-size:13.5px; font-weight:600; padding:11px 16px; border-radius:var(--raio-campo);
+    border:1px solid var(--borda); background:var(--sup); color:var(--tinta); cursor:pointer;
+  }
+  dialog button:hover{background:var(--fundo)}
+  dialog .perigo{background:var(--alerta); border-color:var(--alerta); color:#fff}
+  dialog .perigo:hover{background:#c94e33}
+
+  #telaCodigo{
+    position:fixed; inset:0; z-index:99; background:var(--fundo); display:none;
+    flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:32px; text-align:center;
+  }
+  #telaCodigo.visivel{display:flex}
+  #telaCodigo .logo{width:48px; height:48px; border-radius:14px; font-size:16px; margin-bottom:4px}
+  #telaCodigo h2{font-size:22px; font-weight:700}
+  #telaCodigo p{font-size:13px; color:var(--tinta-suave); max-width:24rem; line-height:1.6}
+  #campoCodigo{
+    font-size:26px; font-weight:700; letter-spacing:.4em; text-align:center; max-width:14rem;
+    padding:14px; border-radius:var(--raio-campo);
+  }
+  #btnEntrar{
+    font:inherit; font-size:14px; font-weight:600; padding:13px 32px; border-radius:var(--raio-campo);
+    border:0; background:var(--azul); color:#fff; cursor:pointer;
+  }
+  #btnEntrar:hover{background:var(--azul-hover)}
+  #codigoErro{color:var(--alerta-texto); font-size:12.5px; font-weight:600; min-height:1.2rem}
+</style>
+</head>
+<body>
+
+<div id="telaCodigo">
+  <div class="logo">MS</div>
+  <h2>Painel de Chamada</h2>
+  <p>Digite o código de acesso de 6 números fornecido pela coordenação da unidade.</p>
+  <input id="campoCodigo" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="······">
+  <div id="codigoErro"></div>
+  <button id="btnEntrar">Entrar</button>
+</div>
+
+<div class="shell">
+  <nav class="rail">
+    <div class="logo">MS</div>
+
+    <button class="rail-btn ativa" id="abaChamadas" title="Chamada de pacientes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10v4h3l5 4V6L6 10H3z"/><path d="M16 8.5a4 4 0 010 7"/><path d="M19 6a7 7 0 010 12"/></svg>
+      Chamadas
+    </button>
+
+    <button class="rail-btn" id="abaAvisos" title="Avisos e conteúdo da TV">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+      Avisos
+    </button>
+
+    <button class="rail-btn" id="abaEquipe" title="Conversa da equipe">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 01-.9 3.8A8.5 8.5 0 0112.5 20a8.4 8.4 0 01-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 014 11.5 8.5 8.5 0 018.7 3.9a8.4 8.4 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+      Equipe
+      <span class="selo" id="seloEquipe">0</span>
+    </button>
+
+    <div class="rail-fim">
+      <button class="rail-btn" id="btnFlutuante" title="Abrir o botão de emergência numa janela flutuante, que fica visível mesmo com esta aba minimizada">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/></svg>
+        Flutuante
+      </button>
+      <button class="rail-btn" id="btnEmergencia" title="Emergência: aciona o código de segurança na recepção">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.6L1.9 18a2 2 0 001.7 3h16.8a2 2 0 001.7-3L13.7 3.6a2 2 0 00-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        Emergência
+      </button>
+    </div>
+  </nav>
+
+  <div class="col">
+    <header>
+      <div class="turno">
+        <b id="resumoTurno">Turno sem chamadas ainda</b>
+        <small id="subTurno">0 pessoas aguardando</small>
+      </div>
+      <div class="h-dir">
+        <button class="botao-claro" id="btnPrivacidade" title="Alterna entre nome completo e nome abreviado na TV"></button>
+        <button class="botao-claro perigo" id="btnEncerrar">Encerrar turno</button>
+        <div id="conexao"><span class="bolinha"></span><span id="conexaoTexto">Conectando…</span></div>
+        <div class="eu">
+          <div class="avatar" id="euIniciais">--</div>
+          <div>
+            <b id="euNome">Sem identificação</b>
+            <small id="euCargo">Preencha o plantão</small>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="conteudo">
+
+      <main id="telaChamadas">
+        <div class="resumo">
+          <div><b id="rTotal">0</b><span>Chamadas</span></div>
+          <div class="r-at"><b id="rEmAtendimento">0</b><span>Em atendimento</span></div>
+          <div class="r-ok"><b id="rAtendidos">0</b><span>Compareceram</span></div>
+          <div class="r-falta"><b id="rFaltantes">0</b><span>Faltantes</span></div>
+        </div>
+
+        <div class="pilha">
+          <div class="cartao">
+            <h2>Plantão</h2>
+            <div id="blocoIdentificacao">
+              <label for="profissional">Nome do profissional</label>
+              <input id="profissional" placeholder="Ana Souza" autocomplete="off">
+              <label for="categoria">Categoria profissional</label>
+              <select id="categoria"></select>
+              <input id="categoriaOutra" placeholder="Qual categoria?" style="margin-top:8px; display:none" autocomplete="off">
+            </div>
+            <div id="avisoFarmacia">
+              Modo Farmácia: a chamada é por senha e não identifica profissional.
+              <button id="btnSairFarmacia" class="mini" style="margin-top:10px; width:100%">
+                Sair do modo Farmácia
+              </button>
+            </div>
+            <label for="sala">Sala</label>
+            <select id="sala"></select>
+            <input id="salaOutra" placeholder="Escreva a sala" style="margin-top:8px; display:none" autocomplete="off">
+          </div>
+
+          <div class="cartao">
+            <h2>Chamar paciente</h2>
+            <div class="seg" role="tablist">
+              <button id="modoNome" class="ativo">Por nome</button>
+              <button id="modoSenha">Por senha</button>
+            </div>
+
+            <div id="blocoNome">
+              <label for="paciente">Nome do paciente</label>
+              <input id="paciente" placeholder="Nome de quem será chamado" autocomplete="off">
+            </div>
+
+            <div id="blocoSenha" style="display:none">
+              <label for="senha">Senha</label>
+              <div class="linha-senha">
+                <input id="senha" inputmode="numeric" pattern="[0-9]*" value="01">
+                <button class="mini" id="btnZerar" title="Volta o contador para 01">Zerar</button>
+              </div>
+              <p class="nota" style="margin-top:8px">O número avança sozinho a cada chamada. Você pode digitar outro valor quando precisar.</p>
+            </div>
+
+            <button id="btnChamar">Chamar</button>
+            <button id="btnRechamar" disabled>Rechamar última chamada</button>
+            <div id="avisoFila"></div>
+          </div>
+        </div>
+
+        <section class="cartao">
+          <div class="cabecalho-historico">
+            <h2>Histórico do turno</h2>
+            <div class="filtro">
+              <button id="filtroTodas" class="ativo">Todas</button>
+              <button id="filtroMinhas">Minhas</button>
+              <button id="btnExportarDia" title="Baixa o CSV do turno atual, sem nomes de pacientes">Exportar dia</button>
+              <button id="btnExportarMes" title="Baixa o CSV dos últimos 31 dias, sem nomes de pacientes">Exportar mês</button>
+              <button id="btnLimparHistorico" class="perigo" title="Apaga as chamadas da tela e da TV, sem encerrar o turno">Limpar histórico</button>
+            </div>
+          </div>
+          <ul id="historico"></ul>
+        </section>
+      </main>
+
+      <main id="telaAvisos" class="oculta">
+        <div class="topo-pagina">
+          <div>
+            <h2 class="pagina">Avisos e conteúdo da TV</h2>
+            <div class="sub-pagina">O que a sala de espera vê e ouve enquanto aguarda</div>
+          </div>
+        </div>
+        <div id="avisoRestaurado"></div>
+
+        <div class="pilha">
+          <div class="cartao">
+            <h2>Conteúdo da tela</h2>
+            <div class="seg" id="modosTela">
+              <button id="modoTelaVideo">Vídeos educativos</button>
+              <button id="modoTelaAvisos">Avisos e mensagens</button>
+            </div>
+            <p class="nota" style="margin-top:14px">
+              No modo "Avisos e mensagens", o lado esquerdo da TV passa os avisos ativos em rodízio,
+              entremeados por frases de orientação para quem espera. As chamadas funcionam igual nos dois.
+            </p>
+          </div>
+
+          <div class="cartao">
+            <h2>Avisos na TV</h2>
+            <div id="listaAvisos"></div>
+            <label for="textoAviso">Novo aviso</label>
+            <textarea id="textoAviso" maxlength="300"
+              placeholder="Hoje teremos reunião de equipe e o funcionamento será diferente, das 7 às 15 horas."></textarea>
+            <label for="tipoAviso">Tipo de aviso</label>
+            <select id="tipoAviso">
+              <option value="audio" selected>Falado em voz alta e escrito na faixa</option>
+              <option value="estatico">Somente escrito na faixa, sem áudio</option>
+            </select>
+            <div id="blocoFreq">
+              <label for="freqAviso">Falar a cada</label>
+              <select id="freqAviso">
+                <option value="10">10 minutos</option>
+                <option value="15">15 minutos</option>
+                <option value="20" selected>20 minutos</option>
+                <option value="30">30 minutos</option>
+                <option value="60">1 hora</option>
+                <option value="120">2 horas</option>
+              </select>
+            </div>
+            <button id="btnAddAviso" class="mini suave" style="margin-top:14px; width:100%; padding:12px">
+              Adicionar aviso
+            </button>
+          </div>
+        </div>
+
+        <div class="pilha">
+          <div class="cartao">
+            <h2>Frases de orientação</h2>
+            <p class="nota" style="margin-bottom:14px">
+              Passam na TV em rodízio, alternadas com os avisos da unidade, quando o conteúdo está
+              em "Avisos e mensagens". Desativar deixa a frase guardada sem aparecer.
+            </p>
+            <ul class="lista-simples" id="listaFrases"></ul>
+            <div class="linha-add">
+              <input id="novaFrase" maxlength="160" placeholder="Nova frase de orientação" autocomplete="off">
+              <button class="mini" id="btnAddFrase">Adicionar</button>
+            </div>
+          </div>
+
+          <div class="cartao">
+            <h2>Farmácia — medicamentos em falta</h2>
+            <p class="nota" style="margin-bottom:14px">
+              A lista aparece na TV como um quadro próprio, sem áudio, para as pessoas verem antes de
+              chegar ao balcão. Some da tela quando não houver nenhum item ou quando estiver desativada.
+            </p>
+            <ul class="lista-simples" id="listaFarmacia"></ul>
+            <div class="linha-add">
+              <input id="novoMedicamento" maxlength="80" placeholder="Losartana 50mg" autocomplete="off">
+              <button class="mini" id="btnAddMedicamento">Adicionar</button>
+            </div>
+            <div class="linha-add">
+              <button class="mini" id="btnFarmaciaAtivo" style="flex:1"></button>
+              <button class="mini perigo" id="btnFarmaciaLimpar">Limpar tudo</button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <main id="telaEquipe" class="oculta">
+        <div class="topo-pagina">
+          <div>
+            <h2 class="pagina">Equipe</h2>
+            <div class="sub-pagina">Mural do turno e mensagens diretas, apagadas depois de 24 horas</div>
+          </div>
+          <div class="acoes">
+            <button class="mini" id="btnSomChat"></button>
+          </div>
+        </div>
+
+        <div class="pilha">
+          <div class="cartao">
+            <h2>Quem está online</h2>
+            <ul id="listaOnline"></ul>
+            <p class="nota" style="margin-top:14px">
+              Aparece quem tem o painel aberto agora, com a sala escolhida na tela de Chamadas.
+              Toque em "Direto" para falar só com aquela pessoa.
+            </p>
+          </div>
+
+          <div class="cartao">
+            <h2>Sobre este espaço</h2>
+            <p class="nota">
+              As conversas ficam só entre os painéis dos profissionais. Nada daqui aparece
+              na TV da recepção em nenhuma situação.
+            </p>
+            <p class="nota" style="margin-top:10px">
+              As mensagens são apagadas sozinhas depois de 24 horas. Por isso, evite escrever
+              nome, endereço ou dados clínicos de pacientes — prefira a sala ou a senha da chamada.
+            </p>
+          </div>
+        </div>
+
+        <section class="cartao">
+          <div id="chatSemNome">
+            Preencha o "Nome do profissional" na tela de Chamadas para poder enviar mensagens.
+            Até lá você só consegue ler o mural.
+          </div>
+          <div id="destinoBarra">
+            <span class="rotulo">Enviando para</span>
+            <span id="destinoAtual">Mural da equipe</span>
+            <button class="mini" id="btnMural" style="display:none">Voltar ao mural</button>
+          </div>
+          <ul id="mensagens"></ul>
+          <div id="linhaEnviar">
+            <textarea id="textoMensagem" maxlength="500" rows="1"
+              placeholder="Escreva sua mensagem e aperte Enter"></textarea>
+            <button id="btnEnviar">Enviar</button>
+          </div>
+        </section>
+      </main>
+
+    </div>
+  </div>
+</div>
+
+<div id="retornoEmergencia"></div>
+
+<dialog id="dlgEncerrar">
+  <h3>Encerrar o turno?</h3>
+  <p>O histórico com os nomes dos pacientes será apagado de todos os dispositivos, como prevê a LGPD. Um registro sem nomes (horário, sala, categoria e status) fica guardado por 31 dias e pode ser baixado no botão "Exportar mês".</p>
+  <div class="fila-botoes">
+    <button id="dlgCancelar">Cancelar</button>
+    <button id="dlgCsv">Baixar CSV</button>
+    <button id="dlgConfirmar" class="perigo">Encerrar e apagar</button>
+  </div>
+</dialog>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  /* ---------- código de acesso ---------- */
+  const CHAVE_CODIGO = "codigo-acesso-monte-serrat";
+  let socket = null;
+
+  function pedirCodigo(mensagem){
+    $("codigoErro").textContent = mensagem || "";
+    $("telaCodigo").classList.add("visivel");
+    $("campoCodigo").value = "";
+    $("campoCodigo").focus();
+  }
+
+  function conectar(codigo){
+    if(socket) socket.disconnect();
+    socket = io({ auth: { codigo } });
+    ligarEventos();
+    socket.on("connect", () => {
+      localStorage.setItem(CHAVE_CODIGO, codigo);
+      $("telaCodigo").classList.remove("visivel");
+    });
+    socket.on("connect_error", (err) => {
+      if(err && err.message === "codigo-invalido"){
+        localStorage.removeItem(CHAVE_CODIGO);
+        pedirCodigo("Código incorreto. Tente novamente.");
+      }
+    });
+  }
+
+  $("btnEntrar").onclick = () => {
+    const c = $("campoCodigo").value.trim();
+    if(c.length === 6) conectar(c);
+    else $("codigoErro").textContent = "O código tem 6 números.";
+  };
+  $("campoCodigo").addEventListener("keydown", e => { if(e.key === "Enter") $("btnEntrar").click(); });
+
+  const CATEGORIAS = [
+    "Cirurgião-Dentista","Médico","Enfermeiro","Técnico de Enfermagem",
+    "Auxiliar de Saúde Bucal","Psicólogo","Assistente Social","Nutricionista",
+    "Farmacêutico","Fisioterapeuta","Agente Comunitário de Saúde",
+    "Coordenadora da Unidade","Farmácia","Outro"
+  ];
+  // Ordem alfabética, com "Outro" sempre no fim da lista
+  const ordenar = (lista) => {
+    const especiais = lista.filter(x => x === "Outro");
+    return lista.filter(x => x !== "Outro")
+      .sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true, sensitivity: "base" }))
+      .concat(especiais);
+  };
+
+  // Salas do Centro de Saúde Monte Serrat
+  const SALAS = [
+    ...Array.from({length: 12}, (_, i) => `Consultório ${String(i + 1).padStart(2, "0")}`),
+    "Consultório Odontológico 01",
+    "Consultório Odontológico 02",
+    "Curativos",
+    "Recepção 01",
+    "Recepção 02",
+    "Procedimentos",
+    "Farmácia",
+    "Coordenação",
+    "Sala de Vacina",
+    "Outro",
+  ];
+  const selSala = $("sala");
+  selSala.appendChild(new Option("Selecione a sala", ""));
+  ordenar(SALAS).forEach(s => selSala.appendChild(new Option(s, s)));
+
+  function aoMudarSala(){
+    const outra = selSala.value === "Outro";
+    $("salaOutra").style.display = outra ? "" : "none";
+    if(outra) $("salaOutra").focus();
+  }
+  selSala.addEventListener("change", () => { aoMudarSala(); aplicarModoFarmacia(); salvarPlantao(); });
+
+  // Valor efetivo da sala (o que vai para a TV e o histórico)
+  function salaAtual(){
+    if(!selSala.value) return "";
+    return selSala.value === "Outro" ? $("salaOutra").value.trim() : selSala.value;
+  }
+
+  const selCategoria = $("categoria");
+  selCategoria.appendChild(new Option("Selecione a categoria", ""));
+  ordenar(CATEGORIAS).forEach(c => selCategoria.appendChild(new Option(c, c)));
+
+  /* ---------- plantão salvo no navegador ---------- */
+  const CHAVE = "plantao-monte-serrat";
+  function salvarPlantao(){
+    localStorage.setItem(CHAVE, JSON.stringify({
+      profissional: $("profissional").value,
+      categoria: selCategoria.value,
+      categoriaOutra: $("categoriaOutra").value,
+      sala: selSala.value,
+      salaOutra: $("salaOutra").value,
+      modo: modo,
+      senha: $("senha").value,
+    }));
+    // nome, categoria ou sala mudaram: atualiza a lista de quem está online
+    identificarNoChat();
+    atualizarCabecalho();
+  }
+  function carregarPlantao(){
+    try{
+      const d = JSON.parse(localStorage.getItem(CHAVE) || "{}");
+      if(d.profissional) $("profissional").value = d.profissional;
+      if(d.categoria) selCategoria.value = d.categoria;
+      if(d.categoriaOutra) $("categoriaOutra").value = d.categoriaOutra;
+      if(d.sala) selSala.value = d.sala;
+      if(d.salaOutra) $("salaOutra").value = d.salaOutra;
+      aoMudarSala();
+      if(d.senha) $("senha").value = d.senha;
+      aoMudarCategoria();
+      definirModo(d.modo === "senha" ? "senha" : "nome");
+      aplicarModoFarmacia();
+    }catch(e){}
+  }
+  ["profissional","salaOutra","categoriaOutra","senha"].forEach(id =>
+    $(id).addEventListener("input", salvarPlantao));
+
+  /* ---------- modo de chamada ---------- */
+  let modo = "nome";
+  function definirModo(novo){
+    modo = novo;
+    $("modoNome").classList.toggle("ativo", modo === "nome");
+    $("modoSenha").classList.toggle("ativo", modo === "senha");
+    $("blocoNome").style.display = modo === "nome" ? "" : "none";
+    $("blocoSenha").style.display = modo === "senha" ? "" : "none";
+    salvarPlantao();
+  }
+  $("modoNome").onclick = () => definirModo("nome");
+  $("modoSenha").onclick = () => definirModo("senha");
+
+  function aoMudarCategoria(){
+    const outra = selCategoria.value === "Outro";
+    $("categoriaOutra").style.display = outra ? "" : "none";
+    // a troca para o modo senha fica por conta de aplicarModoFarmacia(),
+    // que também lembra o modo anterior para restaurar na saída
+  }
+  selCategoria.addEventListener("change", () => { aoMudarCategoria(); aplicarModoFarmacia(); salvarPlantao(); });
+
+  const doisDigitos = (n) => String(Math.max(0, parseInt(n,10) || 0)).padStart(2,"0");
+  $("btnZerar").onclick = () => { $("senha").value = "01"; salvarPlantao(); };
+  $("senha").addEventListener("blur", () => { $("senha").value = doisDigitos($("senha").value); salvarPlantao(); });
+
+  /* ---------- chamar ---------- */
+  let ultimaMinhaChamadaId = null;
+
+  function categoriaAtual(){
+    if(ehFarmacia()) return "Farmácia";
+    return selCategoria.value === "Outro"
+      ? ($("categoriaOutra").value.trim() || "Outro")
+      : selCategoria.value;
+  }
+
+  // Na Farmácia a chamada é por senha e não identifica profissional:
+  // basta o setor, então nome e categoria deixam de ser obrigatórios.
+  function ehFarmacia(){
+    return selSala.value === "Farmácia" || selCategoria.value === "Farmácia";
+  }
+
+  $("btnSairFarmacia").onclick = () => {
+    // Sem isto o modo ficava sem saída: ao escolher a categoria Farmácia,
+    // o próprio seletor de categoria ficava escondido junto do bloco.
+    if(selCategoria.value === "Farmácia") selCategoria.value = "";
+    if(selSala.value === "Farmácia") selSala.value = "";
+    aoMudarCategoria();
+    aoMudarSala();
+    aplicarModoFarmacia();
+    salvarPlantao();
+    $("profissional").focus();
+  };
+
+  let modoAntesFarmacia = null;
+  function aplicarModoFarmacia(){
+    const farmacia = ehFarmacia();
+    $("blocoIdentificacao").style.display = farmacia ? "none" : "";
+    $("avisoFarmacia").style.display = farmacia ? "" : "none";
+    if(farmacia){
+      if(modoAntesFarmacia === null) modoAntesFarmacia = modo;
+      definirModo("senha");
+    }else if(modoAntesFarmacia !== null){
+      definirModo(modoAntesFarmacia);
+      modoAntesFarmacia = null;
+    }
+  }
+
+  function chamar(){
+    const farmacia = ehFarmacia();
+    const profissional = farmacia ? "Farmácia" : $("profissional").value.trim();
+    const sala = salaAtual();
+    if(!sala){
+      alert("Escolha a sala antes de chamar.");
+      return;
+    }
+    if(!farmacia && !profissional){
+      alert("Preencha o nome do profissional antes de chamar.");
+      return;
+    }
+    if(modo === "nome"){
+      const paciente = $("paciente").value.trim();
+      if(!paciente){ $("paciente").focus(); return; }
+      socket.emit("chamar", { modo, paciente, profissional, categoria: categoriaAtual(), sala });
+      $("paciente").value = "";
+      $("paciente").focus();
+    }else{
+      const senha = doisDigitos($("senha").value);
+      socket.emit("chamar", { modo, senha, profissional, categoria: categoriaAtual(), sala });
+      $("senha").value = doisDigitos(parseInt(senha,10) + 1);
+      salvarPlantao();
+    }
+  }
+  $("btnChamar").onclick = chamar;
+  $("paciente").addEventListener("keydown", e => { if(e.key === "Enter") chamar(); });
+  $("senha").addEventListener("keydown", e => { if(e.key === "Enter") chamar(); });
+
+  $("btnRechamar").onclick = () => {
+    if(ultimaMinhaChamadaId) socket.emit("rechamar", ultimaMinhaChamadaId);
+  };
+
+  /* ---------- estado / histórico ---------- */
+  let estado = { chamadas: [], privacidade: "completo" };
+  let filtro = "todas";
+  $("filtroTodas").onclick = () => {
+    filtro = "todas";
+    $("filtroTodas").classList.add("ativo");
+    $("filtroMinhas").classList.remove("ativo");
+    render();
+  };
+  $("filtroMinhas").onclick = () => {
+    filtro = "minhas";
+    $("filtroMinhas").classList.add("ativo");
+    $("filtroTodas").classList.remove("ativo");
+    render();
+  };
+
+  function ligarEventos(){
+    socket.on("estado", (e) => { estado = e; render(); });
+    ligarEventosChat();
+    socket.on("anunciar", ({chamada, rechamada, espera}) => {
+      const minha = chamada.profissional === (ehFarmacia() ? "Farmácia" : $("profissional").value.trim())
+        && chamada.sala === salaAtual();
+      if(!rechamada && minha){
+        ultimaMinhaChamadaId = chamada.id;
+        $("btnRechamar").disabled = false;
+      }
+      if(minha) mostrarEspera(espera);
+    });
+    socket.on("turno-encerrado", () => { ultimaMinhaChamadaId = null; $("btnRechamar").disabled = true; });
+    socket.on("historico-limpo", () => { ultimaMinhaChamadaId = null; $("btnRechamar").disabled = true; });
+    socket.on("connect", () => {
+      caixaConexao.classList.remove("offline");
+      caixaConexao.classList.add("online");
+      $("conexaoTexto").textContent = "Online";
+      identificarNoChat(); // avisa quem entrou e recebe o histórico do chat
+    });
+    socket.on("disconnect", () => {
+      caixaConexao.classList.remove("online");
+      caixaConexao.classList.add("offline");
+      $("conexaoTexto").textContent = "Sem conexão";
+    });
+  }
+
+  const horaLocal = (iso) => new Date(iso).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+
+  // Cabeçalho: identidade de quem está no plantão e resumo do turno.
+  function atualizarCabecalho(){
+    const nome = meuNomeChat() || "Sem identificação";
+    const cargo = [categoriaAtual(), salaAtual()].filter(Boolean).join(" · ") || "Preencha o plantão";
+    $("euNome").textContent = nome;
+    $("euCargo").textContent = cargo;
+    const partes = nome.split(/\s+/).filter(Boolean);
+    const iniciais = partes.length > 1
+      ? (partes[0][0] + partes[partes.length - 1][0])
+      : (partes[0] ? partes[0].slice(0, 2) : "--");
+    $("euIniciais").textContent = iniciais.toUpperCase();
+  }
+
+  function render(){
+    atualizarCabecalho();
+    const nAguardando = (estado.chamadas || []).filter(c => c.status === "aguardando").length;
+    $("resumoTurno").textContent = (estado.chamadas || []).length
+      ? `${estado.chamadas.length} chamada(s) neste turno`
+      : "Turno sem chamadas ainda";
+    $("subTurno").textContent = nAguardando === 1
+      ? "1 pessoa aguardando"
+      : `${nAguardando} pessoas aguardando`;
+    // privacidade
+    $("btnPrivacidade").textContent = estado.privacidade === "completo"
+      ? "Nome na TV: completo" : "Nome na TV: abreviado";
+
+    // resumo
+    const total = estado.chamadas.length;
+    const atendidos = estado.chamadas.filter(c => c.status === "atendido").length;
+    const faltantes = estado.chamadas.filter(c => c.status === "faltante").length;
+    $("rTotal").textContent = total;
+    $("rAtendidos").textContent = atendidos;
+    $("rEmAtendimento").textContent = estado.chamadas.filter(c => c.status === "atendimento").length;
+    $("rFaltantes").textContent = faltantes;
+
+    renderModoTela();
+    renderAvisos();
+    renderFrases();
+    renderFarmacia();
+    talvezRestaurarConteudo();
+    if(estado.conteudoSalvo) guardarConteudo();
+
+    // histórico (com filtro Minhas/Todas)
+    const ul = $("historico");
+    ul.innerHTML = "";
+    if(!total){
+      ul.innerHTML = '<li class="vazio">Nenhuma chamada neste turno ainda. A primeira chamada aparece aqui.</li>';
+      return;
+    }
+    const meuNome = ehFarmacia() ? "Farmácia" : $("profissional").value.trim();
+    const minhaSala = salaAtual();
+    const visiveis = filtro === "minhas"
+      ? estado.chamadas.filter(c => c.profissional === meuNome && c.sala === minhaSala)
+      : estado.chamadas;
+    if(!visiveis.length){
+      ul.innerHTML = '<li class="vazio">Nenhuma chamada sua neste turno ainda. Use o filtro "Todas" para ver as das outras salas.</li>';
+      return;
+    }
+    for(const c of visiveis){
+      const li = document.createElement("li");
+      const emAlerta = c.status === "aguardando" && c.vezes >= 2;
+      li.className = `chamada st-${c.status}` + (emAlerta ? " alerta" : "");
+
+      const rotulo = c.modo === "nome" ? c.paciente : `Senha ${c.senha}`;
+      const statusTexto = {aguardando:"Aguardando", atendimento:"Em atendimento",
+        atendido:"Compareceu", faltante:"Faltante"}[c.status];
+
+      li.innerHTML = `
+        <span class="hora">${horaLocal(c.hora)}</span>
+        <span class="quem">
+          <b>${escapar(rotulo)}</b>
+          <small>${escapar(c.sala)} · ${escapar(c.profissional)} (${escapar(c.categoria)})</small>
+        </span>
+        <span class="marca-status">${statusTexto}</span>
+        <span class="vezes">${c.vezes === 1 ? "1ª chamada" : c.vezes + "ª chamada"}</span>
+        <span class="acoes">
+          <button class="b-at ${c.status==="atendimento"?"ligado":""}" data-acao="atendimento" data-id="${c.id}" title="A pessoa entrou na sala; sai do destaque da TV">Em atendimento</button>
+          <button class="b-ok ${c.status==="atendido"?"ligado":""}" data-acao="atendido" data-id="${c.id}" title="Atendimento concluído">Compareceu</button>
+          <button class="b-re" data-acao="rechamar" data-id="${c.id}" title="Chama de novo na TV, com som">Rechamar</button>
+          <button class="b-falta ${c.status==="faltante"?"ligado":""}" data-acao="faltante" data-id="${c.id}" title="Marcar que a pessoa não compareceu">Faltante</button>
+        </span>`;
+      ul.appendChild(li);
+    }
+  }
+
+  document.getElementById("historico").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-acao]");
+    if(!b) return;
+    const id = Number(b.dataset.id);
+    if(b.dataset.acao === "rechamar"){
+      socket.emit("rechamar", id);
+    }else{
+      const c = estado.chamadas.find(x => x.id === id);
+      // clicar de novo no mesmo status volta para "aguardando"
+      const novo = c && c.status === b.dataset.acao ? "aguardando" : b.dataset.acao;
+      socket.emit("status", { id, status: novo });
+    }
+  });
+
+  function escapar(t){
+    return String(t).replace(/[&<>"']/g, s =>
+      ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[s]));
+  }
+
+  // Quando várias salas chamam ao mesmo tempo, o servidor enfileira os
+  // anúncios em ordem de chegada e informa quanto falta para o seu entrar.
+  let timerAviso = null;
+  function mostrarEspera(espera){
+    const aviso = $("avisoFila");
+    clearTimeout(timerAviso);
+    if(!espera || espera < 1500){
+      aviso.textContent = "Chamada no ar agora.";
+      aviso.style.display = "";
+      timerAviso = setTimeout(() => { aviso.style.display = "none"; }, 4000);
+      return;
+    }
+    const segundos = Math.ceil(espera / 1000);
+    aviso.textContent = `Há outras chamadas na frente. A sua entra na TV em cerca de ${segundos} s.`;
+    aviso.style.display = "";
+    timerAviso = setTimeout(() => { aviso.style.display = "none"; }, espera + 4000);
+  }
+
+  /* ---------- janela flutuante do botão de emergência ---------- */
+  // Document Picture-in-Picture cria uma janelinha que fica por cima de tudo,
+  // inclusive de outras abas e de outros programas. Onde a API não existe,
+  // abre uma janela comum, que o profissional pode fixar no canto da tela.
+  function dispararEmergencia(sala){
+    socket.emit("emergencia", { sala: sala || salaAtual() || "recepção" });
+  }
+
+  async function abrirFlutuante(){
+    const sala = salaAtual() || "recepção";
+    if(window.documentPictureInPicture && documentPictureInPicture.requestWindow){
+      try{
+        const jan = await documentPictureInPicture.requestWindow({ width: 130, height: 130 });
+        montarFlutuante(jan, sala);
+        return;
+      }catch(e){ /* cai para a janela comum */ }
+    }
+    window.open(
+      "/emergencia?sala=" + encodeURIComponent(sala),
+      "emergencia-monte-serrat",
+      "width=170,height=190,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
+    );
+  }
+
+  function montarFlutuante(jan, sala){
+    const doc = jan.document;
+    doc.body.style.cssText =
+      "margin:0;height:100vh;display:flex;align-items:center;justify-content:center;" +
+      "user-select:none;background:#0B2136;" +
+      "font-family:Inter,'Segoe UI',Roboto,system-ui,sans-serif";
+
+    const botao = doc.createElement("button");
+    botao.textContent = "⚠";
+    botao.title = `Emergência — ${sala}. Clique duas vezes para acionar.`;
+    const estilo = (fundo, cor, borda) => {
+      botao.style.cssText =
+        "width:82%;aspect-ratio:1;border-radius:50%;cursor:pointer;font:inherit;" +
+        "font-size:2.6rem;font-weight:900;line-height:1;display:flex;align-items:center;" +
+        "justify-content:center;transition:background .2s,color .2s,border-color .2s;" +
+        `background:${fundo};color:${cor};border:3px solid ${borda}`;
+    };
+    const repouso = () => estilo("#16334D", "#FF8A8D", "#FF5A5F");
+    repouso();
+
+    let armado = false, timer = null;
+    botao.onclick = () => {
+      if(!armado){
+        armado = true;
+        estilo("#E3A008", "#231A02", "#E3A008");
+        botao.style.fontSize = "1rem";
+        botao.textContent = "Confirmar?";
+        botao.title = "Clique de novo para acionar a emergência";
+        // 12 segundos para confirmar; sem confirmação, volta ao repouso
+        timer = setTimeout(() => {
+          armado = false;
+          repouso();
+          botao.textContent = "⚠";
+          botao.title = `Emergência — ${sala}. Clique duas vezes para acionar.`;
+        }, 12000);
+        return;
+      }
+      clearTimeout(timer);
+      armado = false;
+      dispararEmergencia(sala);
+      estilo("#D6383E", "#fff", "#D6383E");
+      botao.textContent = "✓";
+      botao.title = "Código anunciado na recepção";
+      setTimeout(() => {
+        repouso();
+        botao.textContent = "⚠";
+        botao.title = `Emergência — ${sala}. Clique duas vezes para acionar.`;
+      }, 12000);
+    };
+
+    doc.body.append(botao);
+  }
+
+  $("btnFlutuante").onclick = abrirFlutuante;
+
+  /* ---------- botão de emergência (código Senhor Verde) ---------- */
+  // Acionamento imediato, sem caixa de confirmação: em situação de violência
+  // contra o profissional, cada segundo conta e uma janela de confirmação na
+  // tela chamaria atenção. Dois cliques em 5 s evitam disparo acidental.
+  let cliquePendente = false;
+  $("btnEmergencia").onclick = () => {
+    const btn = $("btnEmergencia");
+    const retorno = $("retornoEmergencia");
+    if(!cliquePendente){
+      cliquePendente = true;
+      retorno.textContent = "Toque de novo para acionar a emergência.";
+      retorno.style.display = "block";
+      btn.classList.add("armado");
+      setTimeout(() => {
+        if(cliquePendente){
+          cliquePendente = false;
+          retorno.style.display = "none";
+          btn.classList.remove("armado");
+        }
+      }, 5000);
+      return;
+    }
+    cliquePendente = false;
+    dispararEmergencia();
+    btn.classList.add("acionado");
+    retorno.textContent = "Emergência acionada. O código foi anunciado na recepção.";
+    retorno.style.display = "block";
+    setTimeout(() => {
+      btn.classList.remove("acionado", "armado");
+      retorno.style.display = "none";
+    }, 12000);
+  };
+
+  /* ---------- cópia de segurança do conteúdo da TV ---------- */
+  // Avisos, frases e farmácia ficam guardados também no navegador. Se o
+  // servidor perder o arquivo (o disco do Render é temporário e some a
+  // cada deploy), a cópia daqui é devolvida sozinha na próxima conexão.
+  const CHAVE_CONTEUDO = "conteudo-tv-monte-serrat";
+  let jaRestaurou = false;
+
+  function guardarConteudo(){
+    try{
+      localStorage.setItem(CHAVE_CONTEUDO, JSON.stringify({
+        avisos: estado.avisos || [],
+        frases: estado.frases || [],
+        farmacia: estado.farmacia || { ativo:false, itens:[] },
+        modoTela: estado.modoTela || "avisos",
+        salvoEm: new Date().toISOString(),
+      }));
+    }catch(e){}
+  }
+
+  function talvezRestaurarConteudo(){
+    if(jaRestaurou || estado.conteudoSalvo) return;
+    let copia = null;
+    try{ copia = JSON.parse(localStorage.getItem(CHAVE_CONTEUDO) || "null"); }catch(e){}
+    if(!copia) return;
+    const temAlgo = (copia.avisos || []).length || (copia.frases || []).length
+      || ((copia.farmacia || {}).itens || []).length;
+    if(!temAlgo) return;
+    jaRestaurou = true;
+    socket.emit("restaurar-conteudo", copia);
+    const aviso = $("avisoRestaurado");
+    if(aviso){
+      aviso.textContent = "Avisos e frases foram restaurados da cópia deste navegador.";
+      aviso.style.display = "block";
+      setTimeout(() => { aviso.style.display = "none"; }, 8000);
+    }
+  }
+
+  /* ---------- abas ---------- */
+  let abaAtual = "chamadas";
+  function trocarAba(qual){
+    abaAtual = qual;
+    const telas = { chamadas:"telaChamadas", avisos:"telaAvisos", equipe:"telaEquipe" };
+    const botoes = { chamadas:"abaChamadas", avisos:"abaAvisos", equipe:"abaEquipe" };
+    for(const k in telas){
+      $(telas[k]).classList.toggle("oculta", k !== qual);
+      $(botoes[k]).classList.toggle("ativa", k === qual);
+    }
+    if(qual === "equipe"){
+      zerarNaoLidas();
+      rolarChat();
+      if(!$("textoMensagem").disabled) $("textoMensagem").focus();
+    }
+  }
+  $("abaChamadas").onclick = () => trocarAba("chamadas");
+  $("abaAvisos").onclick = () => trocarAba("avisos");
+  $("abaEquipe").onclick = () => trocarAba("equipe");
+
+  /* ---------- chat da equipe ---------- */
+  // Mural coletivo e mensagens diretas entre os painéis. Nada disto trafega
+  // para a TV: no servidor, só os painéis entram na sala "equipe".
+  const CHAVE_SOM_CHAT = "som-chat-monte-serrat";
+  let msgs = [];          // mensagens que este profissional pode ver
+  let euChave = "";       // identidade deste painel no chat
+  let destino = null;     // null = mural; { chave, nome } = mensagem direta
+  let naoLidas = 0;
+  let onlineAgora = [];
+  let somLigado = localStorage.getItem(CHAVE_SOM_CHAT) !== "0";
+  const tituloOriginal = document.title;
+
+  // Nome usado no chat: o do plantão. Na Farmácia, onde não há identificação
+  // individual, vale o próprio setor.
+  function meuNomeChat(){
+    const nome = $("profissional").value.trim();
+    if(nome) return nome;
+    return ehFarmacia() ? (salaAtual() || "Farmácia") : "";
+  }
+
+  const semAcento = (t) => String(t||"").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ");
+
+  let timerIdent = null;
+  function identificarNoChat(){
+    clearTimeout(timerIdent);
+    timerIdent = setTimeout(() => {
+      if(!socket || !socket.connected) return;
+      socket.emit("chat-entrar", {
+        nome: meuNomeChat(),
+        categoria: categoriaAtual(),
+        sala: salaAtual(),
+      });
+      atualizarEnvio();
+    }, 400);
+  }
+
+  function atualizarEnvio(){
+    const temNome = !!meuNomeChat();
+    $("textoMensagem").disabled = !temNome;
+    $("btnEnviar").disabled = !temNome;
+    $("chatSemNome").style.display = temNome ? "none" : "block";
+  }
+
+  function botarSelo(){
+    const selo = $("seloEquipe");
+    selo.textContent = naoLidas > 99 ? "99+" : String(naoLidas);
+    selo.classList.toggle("visivel", naoLidas > 0);
+    document.title = naoLidas > 0 ? `(${naoLidas}) ${tituloOriginal}` : tituloOriginal;
+  }
+  function zerarNaoLidas(){ naoLidas = 0; botarSelo(); }
+
+  // Bipe curto e discreto, só neste computador. Fica fora da fila de
+  // anúncios da TV, então nunca atrasa a chamada de um paciente.
+  let audioChat = null;
+  function bipeChat(){
+    if(!somLigado) return;
+    try{
+      audioChat = audioChat || new (window.AudioContext || window.webkitAudioContext)();
+      if(audioChat.state === "suspended") audioChat.resume();
+      const osc = audioChat.createOscillator();
+      const vol = audioChat.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      vol.gain.setValueAtTime(0.0001, audioChat.currentTime);
+      vol.gain.exponentialRampToValueAtTime(0.06, audioChat.currentTime + 0.02);
+      vol.gain.exponentialRampToValueAtTime(0.0001, audioChat.currentTime + 0.22);
+      osc.connect(vol).connect(audioChat.destination);
+      osc.start();
+      osc.stop(audioChat.currentTime + 0.24);
+    }catch(e){}
+  }
+
+  function renderSomChat(){
+    const b = $("btnSomChat");
+    b.textContent = somLigado ? "Aviso sonoro ligado" : "Aviso sonoro desligado";
+    b.classList.toggle("suave", somLigado);
+  }
+  $("btnSomChat").onclick = () => {
+    somLigado = !somLigado;
+    localStorage.setItem(CHAVE_SOM_CHAT, somLigado ? "1" : "0");
+    renderSomChat();
+    if(somLigado) bipeChat();
+  };
+
+  function renderDestino(){
+    const alvo = $("destinoAtual");
+    if(destino){
+      alvo.textContent = "Direto para " + destino.nome;
+      alvo.classList.add("direto");
+      $("btnMural").style.display = "";
+      $("textoMensagem").placeholder = `Mensagem só para ${destino.nome}`;
+    }else{
+      alvo.textContent = "Mural da equipe";
+      alvo.classList.remove("direto");
+      $("btnMural").style.display = "none";
+      $("textoMensagem").placeholder = "Escreva sua mensagem e aperte Enter";
+    }
+  }
+  $("btnMural").onclick = () => { destino = null; renderDestino(); renderMensagens(); };
+
+  function renderOnline(){
+    const ul = $("listaOnline");
+    ul.innerHTML = "";
+    if(!onlineAgora.length){
+      ul.innerHTML = '<li style="border:0; color:var(--tinta-suave)">Ninguém com o painel aberto agora.</li>';
+      return;
+    }
+    onlineAgora.forEach(p => {
+      const li = document.createElement("li");
+      const sou = p.chave === euChave;
+      li.className = sou ? "eu" : "";
+      const detalhe = [p.sala, p.categoria].filter(Boolean).join(" · ");
+      li.innerHTML = `
+        <span class="pt"></span>
+        <span class="quem">
+          <b>${escapar(p.nome)}${sou ? " (você)" : ""}</b>
+          <small>${escapar(detalhe || "sala não informada")}</small>
+        </span>
+        ${sou ? "" : `<button data-direto="${escapar(p.chave)}" data-nome="${escapar(p.nome)}">Direto</button>`}`;
+      ul.appendChild(li);
+    });
+  }
+
+  $("listaOnline").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-direto]");
+    if(!b) return;
+    destino = { chave: b.dataset.direto, nome: b.dataset.nome };
+    renderDestino();
+    renderMensagens();
+    $("textoMensagem").focus();
+  });
+
+  function renderMensagens(){
+    const ul = $("mensagens");
+    // No mural aparecem as mensagens coletivas; ao abrir um direto, só a
+    // conversa com aquela pessoa, para não misturar os assuntos.
+    const visiveis = destino
+      ? msgs.filter(m => m.paraChave && (
+          (m.deChave === euChave && m.paraChave === destino.chave) ||
+          (m.deChave === destino.chave && m.paraChave === euChave)))
+      : msgs.filter(m => !m.paraChave);
+    ul.innerHTML = "";
+    if(!visiveis.length){
+      const li = document.createElement("li");
+      li.className = "vazio-chat";
+      li.textContent = destino
+        ? `Nenhuma mensagem trocada com ${destino.nome} nas últimas 24 horas.`
+        : "Nenhuma mensagem no mural. Escreva a primeira — ela aparece no painel de todos os colegas.";
+      ul.appendChild(li);
+      return;
+    }
+    visiveis.forEach(m => {
+      const li = document.createElement("li");
+      const minha = m.deChave === euChave;
+      li.className = (minha ? "minha" : "") + (m.paraChave ? " direta" : "");
+      const detalhe = [m.sala, m.categoria].filter(Boolean).join(" · ");
+      const etiqueta = m.paraChave
+        ? (minha ? `Direto para ${escapar(m.paraNome || "")}` : "Direto para você")
+        : "";
+      li.innerHTML = `
+        <div class="cab">
+          <b>${minha ? "Você" : escapar(m.de)}</b>
+          <span class="meta">${horaLocal(m.hora)}${detalhe && !minha ? " · " + escapar(detalhe) : ""}</span>
+          ${etiqueta ? `<span class="etiqueta">${etiqueta}</span>` : ""}
+        </div>
+        <div class="texto">${escapar(m.texto)}</div>`;
+      ul.appendChild(li);
+    });
+  }
+
+  function rolarChat(){
+    const ul = $("mensagens");
+    ul.scrollTop = ul.scrollHeight;
+  }
+
+  function enviarMensagem(){
+    const texto = $("textoMensagem").value.trim();
+    if(!texto || !meuNomeChat()) return;
+    socket.emit("chat-mensagem", {
+      texto,
+      para: destino ? destino.chave : "",
+      paraNome: destino ? destino.nome : "",
+    });
+    $("textoMensagem").value = "";
+    $("textoMensagem").focus();
+  }
+  $("btnEnviar").onclick = enviarMensagem;
+  $("textoMensagem").addEventListener("keydown", (e) => {
+    // Enter envia; Shift+Enter pula linha
+    if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); enviarMensagem(); }
+  });
+
+  function ligarEventosChat(){
+    socket.on("chat-historico", ({ mensagens, eu }) => {
+      msgs = Array.isArray(mensagens) ? mensagens : [];
+      euChave = eu || "";
+      // se a pessoa com quem eu conversava saiu, o direto continua aberto
+      renderDestino();
+      renderMensagens();
+      renderOnline();
+      rolarChat();
+    });
+    socket.on("chat-presenca", (lista) => {
+      onlineAgora = Array.isArray(lista) ? lista : [];
+      renderOnline();
+    });
+    socket.on("chat-mensagem", (m) => {
+      msgs.push(m);
+      const minha = m.deChave === euChave;
+      const noAssunto = destino
+        ? (m.paraChave && (m.deChave === destino.chave || m.paraChave === destino.chave))
+        : !m.paraChave;
+      if(noAssunto) renderMensagens();
+      if(minha){ if(noAssunto) rolarChat(); return; }
+      const perdida = abaAtual !== "equipe" || document.hidden;
+      if(perdida){
+        naoLidas += 1;
+        botarSelo();
+        bipeChat();
+      }else{
+        rolarChat();
+        if(!noAssunto) bipeChat(); // chegou noutro assunto que não o aberto
+      }
+    });
+  }
+
+  /* ---------- frases de orientação ---------- */
+  function renderFrases(){
+    const ul = $("listaFrases");
+    ul.innerHTML = "";
+    (estado.frases || []).forEach(f => {
+      const li = document.createElement("li");
+      li.className = f.ativo ? "" : "desligada";
+      li.innerHTML = `
+        <span>${escapar(f.texto)}</span>
+        <button class="b-on" data-frase="alternar" data-id="${f.id}">${f.ativo ? "Ativa" : "Ativar"}</button>
+        <button class="b-x" data-frase="remover" data-id="${f.id}">Excluir</button>`;
+      ul.appendChild(li);
+    });
+    if(!(estado.frases || []).length){
+      ul.innerHTML = '<li style="border:0; color:var(--tinta-suave)">Nenhuma frase cadastrada.</li>';
+    }
+  }
+
+  $("listaFrases").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-frase]");
+    if(!b) return;
+    const id = Number(b.dataset.id);
+    if(b.dataset.frase === "alternar") socket.emit("frase-alternar", id);
+    else if(confirm("Excluir esta frase?")) socket.emit("frase-remover", id);
+  });
+
+  function addFrase(){
+    const t = $("novaFrase").value.trim();
+    if(!t){ $("novaFrase").focus(); return; }
+    socket.emit("frase-adicionar", t);
+    $("novaFrase").value = "";
+  }
+  $("btnAddFrase").onclick = addFrase;
+  $("novaFrase").addEventListener("keydown", e => { if(e.key === "Enter") addFrase(); });
+
+  /* ---------- farmácia: medicamentos em falta ---------- */
+  function renderFarmacia(){
+    const f = estado.farmacia || { ativo:false, itens:[] };
+    const ul = $("listaFarmacia");
+    ul.innerHTML = "";
+    f.itens.forEach(item => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <span>${escapar(item.nome)}</span>
+        <button class="b-x" data-med="remover" data-id="${item.id}">Excluir</button>`;
+      ul.appendChild(li);
+    });
+    if(!f.itens.length){
+      ul.innerHTML = '<li style="border:0; color:var(--tinta-suave)">Nenhum medicamento na lista.</li>';
+    }
+    const btn = $("btnFarmaciaAtivo");
+    btn.textContent = f.ativo ? "Exibindo na TV" : "Não está na TV";
+    btn.classList.toggle("suave", f.ativo);
+  }
+
+  $("listaFarmacia").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-med]");
+    if(b) socket.emit("farmacia-remover", Number(b.dataset.id));
+  });
+
+  function addMedicamento(){
+    const t = $("novoMedicamento").value.trim();
+    if(!t){ $("novoMedicamento").focus(); return; }
+    socket.emit("farmacia-adicionar", t);
+    $("novoMedicamento").value = "";
+    $("novoMedicamento").focus();
+  }
+  $("btnAddMedicamento").onclick = addMedicamento;
+  $("novoMedicamento").addEventListener("keydown", e => { if(e.key === "Enter") addMedicamento(); });
+  $("btnFarmaciaAtivo").onclick = () => socket.emit("farmacia-alternar");
+  $("btnFarmaciaLimpar").onclick = () => {
+    if(confirm("Limpar toda a lista de medicamentos em falta?")) socket.emit("farmacia-limpar");
+  };
+
+  /* ---------- conteúdo da TV ---------- */
+  $("modoTelaVideo").onclick = () => socket.emit("modo-tela", "video");
+  $("modoTelaAvisos").onclick = () => socket.emit("modo-tela", "avisos");
+
+  function renderModoTela(){
+    const modo = estado.modoTela || "video";
+    $("modoTelaVideo").classList.toggle("ativo", modo === "video");
+    $("modoTelaAvisos").classList.toggle("ativo", modo === "avisos");
+  }
+
+  /* ---------- avisos da TV ---------- */
+  function renderAvisos(){
+    const lista = $("listaAvisos");
+    lista.innerHTML = "";
+    const avisos = estado.avisos || [];
+    if(!avisos.length){
+      lista.innerHTML = '<p style="font-size:.82rem; color:var(--tinta-suave); margin-bottom:.6rem">' +
+        'Nenhum aviso cadastrado. Avisos ativos aparecem na faixa da TV; os que têm áudio também são lidos em voz alta, entre as chamadas.</p>';
+      return;
+    }
+    avisos.forEach(a => {
+      const div = document.createElement("div");
+      div.className = "aviso" + (a.ativo ? " ligado" : "");
+      div.innerHTML = `
+        <p>${escapar(a.texto)}</p>
+        <div class="rodape">
+          <span class="freq">${a.ativo
+            ? (a.falar === false ? "Somente na faixa" : "Falado a cada " + a.minutos + " min")
+            : "Desativado"}</span>
+          <button class="b-lig" data-aviso="alternar" data-id="${a.id}">${a.ativo ? "Ativo" : "Ativar"}</button>
+          <button data-aviso="audio" data-id="${a.id}">${a.falar === false ? "Sem áudio" : "Com áudio"}</button>
+          ${a.falar === false ? "" : `<button data-aviso="ler" data-id="${a.id}">Ler agora</button>`}
+          <button class="b-del" data-aviso="remover" data-id="${a.id}">Excluir</button>
+        </div>`;
+      lista.appendChild(div);
+    });
+  }
+
+  $("listaAvisos").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-aviso]");
+    if(!b) return;
+    const id = Number(b.dataset.id);
+    if(b.dataset.aviso === "alternar") socket.emit("aviso-alternar", id);
+    else if(b.dataset.aviso === "audio") socket.emit("aviso-alternar-audio", id);
+    else if(b.dataset.aviso === "ler") socket.emit("aviso-ler-agora", id);
+    else if(b.dataset.aviso === "remover"){
+      if(confirm("Excluir este aviso?")) socket.emit("aviso-remover", id);
+    }
+  });
+
+  $("tipoAviso").onchange = () => {
+    $("blocoFreq").style.display = $("tipoAviso").value === "estatico" ? "none" : "";
+  };
+
+  $("btnAddAviso").onclick = () => {
+    const texto = $("textoAviso").value.trim();
+    if(!texto){ $("textoAviso").focus(); return; }
+    socket.emit("aviso-adicionar", {
+      texto,
+      minutos: Number($("freqAviso").value),
+      falar: $("tipoAviso").value !== "estatico",
+    });
+    $("textoAviso").value = "";
+  };
+
+  /* ---------- privacidade ---------- */
+  $("btnPrivacidade").onclick = () => {
+    socket.emit("privacidade", estado.privacidade === "completo" ? "abreviado" : "completo");
+  };
+
+  /* ---------- encerrar turno ---------- */
+  const dlg = $("dlgEncerrar");
+  $("btnEncerrar").onclick = () => dlg.showModal();
+  $("dlgCancelar").onclick = () => dlg.close();
+
+  function baixarCsvDoTurno(){
+    const linhas = ["horario;sala;categoria;vezes_chamado;status"];
+    [...estado.chamadas].reverse().forEach(c => {
+      linhas.push([horaLocal(c.hora), c.sala, c.categoria, c.vezes, c.status]
+        .map(v => String(v).replace(/;/g,",")).join(";"));
+    });
+    const blob = new Blob(["\uFEFF" + linhas.join("\n")], {type:"text/csv;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `turno-monte-serrat-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  $("dlgCsv").onclick = baixarCsvDoTurno;
+  $("btnExportarDia").onclick = baixarCsvDoTurno;
+  $("btnExportarMes").onclick = () => {
+    const codigo = localStorage.getItem(CHAVE_CODIGO) || "";
+    window.open(`/exportar-mes?codigo=${encodeURIComponent(codigo)}`, "_blank");
+  };
+  $("dlgConfirmar").onclick = () => { socket.emit("encerrar-turno"); dlg.close(); };
+
+  // Limpar histórico: tira as chamadas da tela e da TV sem encerrar o turno.
+  // Os registros sem nomes continuam guardados no histórico mensal.
+  $("btnLimparHistorico").onclick = () => {
+    const total = (estado.chamadas || []).length;
+    if(!total){ alert("Não há chamadas para limpar."); return; }
+    const msg = `Limpar as ${total} chamada(s) da tela e da TV?\n\n`
+      + "O turno continua aberto e o registro sem nomes segue no histórico mensal. "
+      + "Se quiser o CSV do dia, cancele e use \"Exportar dia\" antes.";
+    if(confirm(msg)) socket.emit("limpar-historico");
+  };
+
+  /* ---------- conexão ---------- */
+  const caixaConexao = $("conexao");
+
+  carregarPlantao();
+  atualizarCabecalho();
+  renderSomChat();
+  renderDestino();
+  renderOnline();
+  renderMensagens();
+  atualizarEnvio();
+
+  const codigoSalvo = localStorage.getItem(CHAVE_CODIGO);
+  if(codigoSalvo) conectar(codigoSalvo);
+  else pedirCodigo();
+})();
+</script>
+</body>
+</html>
