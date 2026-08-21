@@ -12,7 +12,7 @@ const { Server } = require("socket.io");
 
 const PORT = process.env.PORT || 3000;
 const ARQUIVO_ESTADO = path.join(__dirname, "estado-turno.json");
-// Avisos, frases e farmácia ficam num arquivo separado do turno: eles não
+// Avisos e frases ficam num arquivo separado do turno: eles não
 // são apagados ao encerrar o turno e sobrevivem a reinicializações.
 const ARQUIVO_CONTEUDO = path.join(__dirname, "conteudo-tv.json");
 
@@ -82,42 +82,61 @@ async function vozOnline(texto) {
   return { buffer: buf, tipo: "audio/mpeg" };
 }
 
-// Gera o áudio da frase: espeak local, senão voz online.
-function gerarAudio(texto, vel) {
+// Qual voz usar. A do Google soa natural; a do espeak é robótica, mas roda
+// dentro do próprio servidor e nunca depende da internet. Por padrão tenta a
+// natural e, se ela falhar, cai no espeak sem ninguém perceber.
+// Para inverter, defina VOZ=espeak nas variáveis de ambiente do Render.
+const VOZ_PREFERIDA = (process.env.VOZ || "online").toLowerCase();
+
+function vozEspeak(texto, vel) {
   return new Promise((resolve, reject) => {
     detectarMotorTts((motor) => {
-      if (motor) {
-        return execFile(motor, ["-v", "pt-br", "-s", String(vel), "--stdout", texto],
-          { encoding: "buffer", maxBuffer: 10 * 1024 * 1024 },
-          (err, stdout) => {
-            if (!err && stdout && stdout.length > 100) {
-              return resolve({ buffer: stdout, tipo: "audio/wav" });
-            }
-            vozOnline(texto).then(resolve).catch(reject);
-          });
-      }
-      vozOnline(texto).then(resolve).catch(reject);
+      if (!motor) return reject(new Error("espeak não instalado"));
+      execFile(motor, ["-v", "pt-br", "-s", String(vel), "--stdout", texto],
+        { encoding: "buffer", maxBuffer: 10 * 1024 * 1024 },
+        (err, stdout) => {
+          if (!err && stdout && stdout.length > 100) {
+            return resolve({ buffer: stdout, tipo: "audio/wav" });
+          }
+          reject(new Error("espeak falhou"));
+        });
     });
   });
+}
+
+// Gera o áudio da frase, com a segunda opção como rede de segurança.
+async function gerarAudio(texto, vel) {
+  const primeira = VOZ_PREFERIDA === "espeak" ? vozEspeak : vozOnline;
+  const segunda = VOZ_PREFERIDA === "espeak" ? vozOnline : vozEspeak;
+  try {
+    return await primeira(texto, vel);
+  } catch (e) {
+    return await segunda(texto, vel);
+  }
 }
 
 // Diagnóstico: informa se o servidor consegue gerar voz (útil para a TV
 // mostrar no menu e para conferir se o deploy usou o runtime Docker)
 app.get("/tts-status", (_req, res) => {
   detectarMotorTts(async (motor) => {
-    if (motor) return res.json({ disponivel: true, motor });
-    // sem espeak: testa a voz online
+    const info = {
+      preferida: VOZ_PREFERIDA === "espeak" ? "espeak (robótica)" : "online (Google, natural)",
+      espeakInstalado: motor || false,
+    };
     try {
       await vozOnline("teste");
-      res.json({ disponivel: true, motor: "voz online (Google)" });
+      info.vozOnline = "funcionando";
     } catch (e) {
-      res.json({
-        disponivel: false,
-        motor: null,
-        erro: String(e.message || e).slice(0, 80),
-        dica: "Sem espeak local e a voz online falhou. Recrie o serviço no Render com o runtime Docker.",
-      });
+      info.vozOnline = "falhou: " + String(e.message || e).slice(0, 60);
     }
+    const temAlguma = !!motor || info.vozOnline === "funcionando";
+    info.disponivel = temAlguma;
+    info.usandoAgora = VOZ_PREFERIDA === "espeak"
+      ? (motor ? "espeak" : (info.vozOnline === "funcionando" ? "online (reserva)" : "nenhuma"))
+      : (info.vozOnline === "funcionando" ? "online (Google)" : (motor ? "espeak (reserva)" : "nenhuma"));
+    if (!temAlguma) info.dica = "Nenhum motor de voz disponível. Verifique a rede do servidor "
+      + "ou recrie o serviço no Render com o runtime Docker.";
+    res.json(info);
   });
 });
 
@@ -247,23 +266,100 @@ function mensagensVisiveis(chave) {
 
 // Quem está com o painel aberto agora. Vários aparelhos da mesma pessoa
 // contam como uma só entrada na lista.
-const presentes = new Map(); // socket.id -> { nome, categoria, sala, chave, desde }
+const presentes = new Map(); // socket.id -> { nome, categoria, sala, chave, status, desde, visto }
+
+const STATUS_VALIDOS = ["online", "intervalo", "offline"];
+// Rede de segurança, não o mecanismo principal. Quem de fato detecta conexão
+// morta é o ping/pong do próprio Socket.IO, que roda no nível do transporte e
+// não depende de temporizador do navegador. Este limite só existe para o caso
+// raro de um socket ficar pendurado sem disparar "disconnect", e por isso é
+// generoso: navegador em segundo plano estrangula timers para 1 por minuto, e
+// um limite curto derrubava gente que estava ali, só com a aba atrás de outra.
+const LIMITE_SILENCIO = 10 * 60 * 1000; // 10 minutos
+
+// Primeiro nome, usado na TV e na lista do chat. Quando duas pessoas presentes
+// têm o mesmo primeiro nome, acrescenta a inicial do sobrenome.
+function primeiroNome(nome) {
+  return String(nome || "").trim().split(/\s+/)[0] || "";
+}
+
+function nomeCurto(nome, outros) {
+  const partes = String(nome || "").trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return "";
+  const primeiro = partes[0];
+  const baixo = (t) => String(t || "").toLowerCase();
+
+  // Quem mais está usando o mesmo primeiro nome agora
+  const rivais = (outros || [])
+    .filter((o) => o && o !== nome && baixo(primeiroNome(o)) === baixo(primeiro))
+    .map((o) => String(o).trim().split(/\s+/).filter(Boolean));
+  if (!rivais.length || partes.length < 2) return primeiro;
+
+  // 1º desempate: inicial do sobrenome ("Gabriela M.")
+  const ultimo = partes[partes.length - 1];
+  const iniciaisRivais = rivais.map((p) => baixo(p[p.length - 1][0]));
+  if (!iniciaisRivais.includes(baixo(ultimo[0]))) return primeiro + " " + ultimo[0] + ".";
+
+  // 2º desempate: sobrenome inteiro ("Gabriela Medeiros")
+  const ultimosRivais = rivais.map((p) => baixo(p[p.length - 1]));
+  if (!ultimosRivais.includes(baixo(ultimo))) return primeiro + " " + ultimo;
+
+  // Caso raro de xará com o mesmo sobrenome: aí vale o nome completo
+  return String(nome).trim();
+}
+
+// Nomes completos que o sistema conhece agora: quem está presente e quem já
+// chamou alguém neste turno. É o universo onde a ambiguidade pode aparecer.
+function nomesConhecidos() {
+  const nomes = new Set();
+  for (const p of presentes.values()) if (p.nome) nomes.add(p.nome);
+  for (const c of estado.chamadas || []) if (c.profissional) nomes.add(c.profissional);
+  return [...nomes];
+}
+
+// Ordem alfabética pelo primeiro nome, como pedido na lista do chat.
+function ordemPrimeiroNome(a, b) {
+  const pa = primeiroNome(a.nome), pb = primeiroNome(b.nome);
+  const r = pa.localeCompare(pb, "pt-BR", { sensitivity: "base" });
+  return r !== 0 ? r : a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" });
+}
 
 function listaPresentes() {
   const porPessoa = new Map();
   for (const p of presentes.values()) {
-    if (!p.chave) continue;
+    if (!p.chave || p.status === "offline") continue;
     const atual = porPessoa.get(p.chave);
-    if (!atual || p.desde < atual.desde) porPessoa.set(p.chave, p);
+    // entre vários aparelhos da mesma pessoa vale o mais "presente":
+    // online ganha de intervalo, e em empate fica o que entrou primeiro
+    if (!atual
+      || (atual.status === "intervalo" && p.status === "online")
+      || (atual.status === p.status && p.desde < atual.desde)) {
+      porPessoa.set(p.chave, p);
+    }
   }
-  return [...porPessoa.values()]
-    .map(({ chave, nome, categoria, sala, desde }) => ({ chave, nome, categoria, sala, desde }))
-    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" }));
+  const lista = [...porPessoa.values()];
+  const nomes = lista.map((p) => p.nome);
+  return lista
+    .map(({ chave, nome, categoria, sala, status, desde }) => ({
+      chave, nome, categoria, sala, status, desde, curto: nomeCurto(nome, nomes),
+    }))
+    .sort(ordemPrimeiroNome);
 }
 
 function difundirPresenca() {
   io.to("equipe").emit("chat-presenca", listaPresentes());
 }
+
+// Um computador que perde a rede sem fechar a aba continuaria "online" para
+// sempre. A varredura tira da lista quem parou de dar sinal de vida.
+setInterval(() => {
+  const limite = Date.now() - LIMITE_SILENCIO;
+  let mudou = false;
+  for (const [id, p] of presentes) {
+    if ((p.visto || 0) < limite) { presentes.delete(id); mudou = true; }
+  }
+  if (mudou) difundirPresenca();
+}, 30 * 1000);
 
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/painel", (_req, res) =>
@@ -288,7 +384,6 @@ let estado = {
   avisos: [], // recados lidos na TV de tempos em tempos
   modoTela: "avisos", // "video" | "avisos" — o que ocupa o lado esquerdo da TV
   frases: [],        // frases de orientação que passam em rodízio na TV
-  farmacia: { ativo: false, itens: [] }, // medicamentos em falta
 };
 
 // Recupera o turno após reinicialização do servidor
@@ -300,7 +395,6 @@ try {
       if (!Array.isArray(estado.avisos)) estado.avisos = [];
       if (!estado.modoTela) estado.modoTela = "avisos";
       if (!Array.isArray(estado.frases)) estado.frases = [];
-      if (!estado.farmacia) estado.farmacia = { ativo: false, itens: [] };
     }
     console.log(`Turno recuperado: ${estado.chamadas.length} chamada(s).`);
   }
@@ -312,7 +406,10 @@ let timerGravacao = null;
 function persistir() {
   clearTimeout(timerGravacao);
   timerGravacao = setTimeout(() => {
-    fs.writeFile(ARQUIVO_ESTADO, JSON.stringify(estado), (err) => {
+    // A grafia fonética serve ao momento da chamada e não vira registro:
+    // fica na memória enquanto o turno corre e some quando o servidor reinicia.
+    const semFala = JSON.stringify(estado, (chave, valor) => chave === "fala" ? undefined : valor);
+    fs.writeFile(ARQUIVO_ESTADO, semFala, (err) => {
       if (err) console.error("Falha ao gravar estado:", err.message);
     });
   }, 300);
@@ -353,11 +450,10 @@ try {
     if (c && typeof c === "object") {
       if (Array.isArray(c.avisos)) estado.avisos = c.avisos;
       if (Array.isArray(c.frases) && c.frases.length) estado.frases = c.frases;
-      if (c.farmacia) estado.farmacia = c.farmacia;
       if (c.modoTela) estado.modoTela = c.modoTela;
       conteudoSalvo = true;
       console.log(`Conteúdo da TV recuperado: ${estado.avisos.length} aviso(s), ` +
-        `${estado.frases.length} frase(s), ${estado.farmacia.itens.length} medicamento(s).`);
+        `${estado.frases.length} frase(s).`);
     }
   }
 } catch (e) {
@@ -372,7 +468,6 @@ function persistirConteudo() {
     const dados = {
       avisos: estado.avisos,
       frases: estado.frases,
-      farmacia: estado.farmacia,
       modoTela: estado.modoTela,
       atualizadoEm: new Date().toISOString(),
     };
@@ -383,7 +478,6 @@ function persistirConteudo() {
 }
 
 let proximoIdFrase = Math.max(0, ...estado.frases.map((f) => f.id)) + 1;
-let proximoIdItem = Math.max(0, ...estado.farmacia.itens.map((i) => i.id || 0)) + 1;
 
 let proximoId = Date.now();
 let proximoIdAviso = Math.max(1, ...estado.avisos.map((a) => a.id)) + 1;
@@ -435,13 +529,26 @@ io.on("connection", (socket) => {
       socket.leave("u:" + anterior.chave);
     }
     if (chave) {
+      const pedido = String((perfil && perfil.status) || "").trim();
       socket.join("u:" + chave);
+      // Qualquer pacote que chegue por este socket — inclusive o "pong"
+      // automático do Socket.IO — conta como sinal de vida. É isso que mantém
+      // a pessoa online com a aba em segundo plano, sem depender de timer.
+      if (!socket.data.contandoPacotes) {
+        socket.data.contandoPacotes = true;
+        socket.conn.on("packet", () => {
+          const p = presentes.get(socket.id);
+          if (p) p.visto = Date.now();
+        });
+      }
       presentes.set(socket.id, {
         nome,
         chave,
         categoria: String((perfil && perfil.categoria) || "").trim().slice(0, 60),
         sala: String((perfil && perfil.sala) || "").trim().slice(0, 60),
+        status: STATUS_VALIDOS.includes(pedido) ? pedido : "online",
         desde: (anterior && anterior.chave === chave) ? anterior.desde : Date.now(),
+        visto: Date.now(),
       });
     } else {
       presentes.delete(socket.id);
@@ -455,6 +562,21 @@ io.on("connection", (socket) => {
       retencaoHoras: RETENCAO_CHAT / 3600000,
     });
     difundirPresenca();
+  });
+
+  // O profissional muda o próprio status; todos veem na hora.
+  socket.on("chat-status", (novo) => {
+    const p = presentes.get(socket.id);
+    if (!p || !STATUS_VALIDOS.includes(novo)) return;
+    p.status = novo;
+    p.visto = Date.now();
+    difundirPresenca();
+  });
+
+  // Sinal de vida periódico do painel.
+  socket.on("chat-ping", () => {
+    const p = presentes.get(socket.id);
+    if (p) p.visto = Date.now();
   });
 
   // Uma mensagem a cada 1,5 s por aparelho, para um clique preso não
@@ -515,6 +637,9 @@ io.on("connection", (socket) => {
       modo: dados.modo,
       paciente: dados.modo === "nome" ? String(dados.paciente || "").trim() : "",
       senha: dados.modo === "senha" ? String(dados.senha || "").trim() : "",
+      // Grafia fonética opcional, usada só para gerar a voz. Não entra no
+      // histórico mensal (que já não guarda nomes) nem no arquivo de estado.
+      fala: String(dados.fala || "").trim().slice(0, 120),
       profissional: String(dados.profissional || "").trim(),
       categoria: String(dados.categoria || "").trim(),
       sala: String(dados.sala || "").trim(),
@@ -522,6 +647,9 @@ io.on("connection", (socket) => {
       vezes: 1,
       status: "aguardando",
     };
+    // A TV mostra só o primeiro nome do profissional. O nome completo continua
+    // sendo a identificação interna, no campo "profissional".
+    chamada.profissionalCurto = nomeCurto(chamada.profissional, nomesConhecidos());
     if (chamada.modo === "nome" && !chamada.paciente) return;
     if (chamada.modo === "senha" && !chamada.senha) return;
     estado.chamadas.unshift(chamada);
@@ -577,18 +705,16 @@ io.on("connection", (socket) => {
     difundirEstado();
   });
 
-  // Restaura avisos, frases e farmácia a partir da cópia guardada no
+  // Restaura avisos e frases a partir da cópia guardada no
   // navegador do painel. Serve quando o servidor perde o arquivo (por
   // exemplo, num novo deploy do Render, cujo disco é temporário).
   socket.on("restaurar-conteudo", (dados) => {
     if (!dados || conteudoSalvo) return; // nunca sobrescreve o que já existe
     if (Array.isArray(dados.avisos)) estado.avisos = dados.avisos.slice(0, 30);
     if (Array.isArray(dados.frases) && dados.frases.length) estado.frases = dados.frases.slice(0, 40);
-    if (dados.farmacia && Array.isArray(dados.farmacia.itens)) estado.farmacia = dados.farmacia;
     if (dados.modoTela === "video" || dados.modoTela === "avisos") estado.modoTela = dados.modoTela;
     proximoIdAviso = Math.max(0, ...estado.avisos.map((a) => a.id || 0)) + 1;
     proximoIdFrase = Math.max(0, ...estado.frases.map((f) => f.id || 0)) + 1;
-    proximoIdItem = Math.max(0, ...estado.farmacia.itens.map((i) => i.id || 0)) + 1;
     persistirConteudo();
     difundirEstado();
     console.log("Conteúdo da TV restaurado a partir do painel.");
@@ -615,38 +741,6 @@ io.on("connection", (socket) => {
 
   socket.on("frase-remover", (id) => {
     estado.frases = estado.frases.filter((f) => f.id !== id);
-    persistir();
-    persistirConteudo();
-    difundirEstado();
-  });
-
-  // --- Farmácia: medicamentos em falta ---
-  socket.on("farmacia-adicionar", (nome) => {
-    const n = String(nome || "").trim().slice(0, 80);
-    if (!n) return;
-    estado.farmacia.itens.push({ id: proximoIdItem++, nome: n });
-    if (estado.farmacia.itens.length === 1) estado.farmacia.ativo = true;
-    persistir();
-    persistirConteudo();
-    difundirEstado();
-  });
-
-  socket.on("farmacia-remover", (id) => {
-    estado.farmacia.itens = estado.farmacia.itens.filter((i) => i.id !== id);
-    persistir();
-    persistirConteudo();
-    difundirEstado();
-  });
-
-  socket.on("farmacia-alternar", () => {
-    estado.farmacia.ativo = !estado.farmacia.ativo;
-    persistir();
-    persistirConteudo();
-    difundirEstado();
-  });
-
-  socket.on("farmacia-limpar", () => {
-    estado.farmacia = { ativo: false, itens: [] };
     persistir();
     persistirConteudo();
     difundirEstado();

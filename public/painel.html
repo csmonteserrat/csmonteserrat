@@ -72,6 +72,8 @@
     display:flex; align-items:center; gap:7px; background:var(--fundo); border-radius:20px;
     padding:7px 13px; font-size:12.5px; font-weight:600; color:var(--tinta-suave);
   }
+  #conexao:has(#conexaoTexto:empty){padding:9px}
+  #conexao.offline{background:var(--alerta-suave); color:var(--alerta-texto)}
   #conexao .bolinha{width:9px; height:9px; border-radius:50%; background:var(--atencao)}
   #conexao.online .bolinha{background:#20bf6b}
   #conexao.offline .bolinha{background:var(--alerta)}
@@ -89,7 +91,26 @@
   .conteudo{flex:1; overflow-y:auto; padding:28px}
   main{display:grid; grid-template-columns:minmax(0,380px) minmax(0,1fr); gap:20px; align-items:start;
     max-width:1240px; margin:0 auto}
-  main#telaAvisos{grid-template-columns:repeat(auto-fit,minmax(360px,1fr))}
+  /* A aba Avisos empilha blocos de largura inteira; quem divide o espaço em
+     colunas é cada bloco por dentro. Antes o próprio <main> tinha colunas
+     automáticas e os cartões ocupavam só parte delas, deixando o vão à direita. */
+  main#telaAvisos{max-width:1600px; grid-template-columns:minmax(0,1fr)}
+  main#telaAvisos > .larga, main#telaAvisos > .faixa-cartoes{grid-column:1/-1}
+  .faixa-cartoes{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+    gap:20px; align-items:start;
+  }
+  /* auto-fill (e não auto-fit) mantém as colunas: com um aviso só, ele fica
+     do tamanho de um cartão em vez de esticar de ponta a ponta */
+  #listaAvisos{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+    gap:14px; align-items:start;
+  }
+  #listaAvisos > p{grid-column:1/-1; font-size:13px; color:var(--tinta-suave); line-height:1.55}
+  #listaAvisos .aviso{margin-bottom:0; height:100%; display:flex; flex-direction:column}
+  #listaAvisos .aviso p{flex:1}
+  #dicaModoTela{flex:1; min-width:14rem}
+  @media(max-width:700px){ #dicaModoTela{display:none} }
   main#telaEquipe{grid-template-columns:300px minmax(0,1fr)}
   main.oculta{display:none}
   @media(max-width:980px){
@@ -180,37 +201,101 @@
 
   /* ---------- lista de chamadas ---------- */
   #historico{list-style:none; max-height:58vh; overflow-y:auto}
+  /* A linha inteira recebe a cor do status a 12% de opacidade: a leitura de
+     relance volta ("verde já foi atendido") sem escurecer o fundo a ponto de
+     atrapalhar o texto ou os botões. */
   .chamada{
     display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-    padding:13px 4px; border-bottom:1px solid var(--borda-int);
+    padding:13px 12px; border-radius:12px; margin-bottom:4px;
   }
-  .chamada:last-child{border-bottom:0}
+  .chamada:last-child{margin-bottom:0}
+  .st-aguardando{background:#95A5A61f}
+  .st-atendimento{background:#546de51f}
+  .st-atendido{background:#3dc1d31f}
+  .st-faltante{background:#e15f411f}
   .chamada .hora{font-size:12.5px; font-weight:600; color:var(--tinta-suave);
     font-variant-numeric:tabular-nums; width:44px; flex:none}
   .chamada .quem{flex:1; min-width:12rem}
   .chamada .quem b{display:block; font-size:14.5px; font-weight:600}
   .chamada .quem small{display:block; font-size:11.5px; color:var(--tinta-suave); font-weight:500; margin-top:2px}
+  /* Sobre o fundo tingido, a etiqueta usa branco translúcido em vez da cor:
+     duas camadas do mesmo tom se anulariam. */
   .marca-status{
     font-size:11.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
     padding:5px 11px; border-radius:20px; white-space:nowrap;
-    background:var(--fundo); color:var(--tinta-suave);
+    background:rgba(255,255,255,.7); color:var(--tinta-suave);
   }
-  .st-atendimento .marca-status{background:var(--azul-suave); color:var(--azul)}
-  .st-atendido .marca-status{background:var(--positivo-suave); color:var(--positivo-texto)}
-  .st-faltante .marca-status{background:var(--alerta-suave); color:var(--alerta-texto)}
+  .st-atendimento .marca-status{color:var(--azul-hover)}
+  .st-atendido .marca-status{color:var(--positivo-texto)}
+  .st-faltante .marca-status{color:var(--alerta-texto)}
   .vezes{font-size:11.5px; font-weight:600; color:var(--tinta-suave); white-space:nowrap}
   .alerta .vezes{background:var(--atencao); color:var(--atencao-texto); padding:4px 10px; border-radius:20px; font-weight:700}
   .acoes{display:flex; gap:6px; flex-wrap:wrap}
   .acoes button{
     font:inherit; font-size:12px; font-weight:600; padding:7px 11px; border-radius:10px;
-    border:1px solid var(--borda); background:var(--sup); color:var(--tinta-suave); cursor:pointer;
+    border:1px solid var(--borda); background:rgba(255,255,255,.8); color:var(--tinta-suave);
+    cursor:pointer;
   }
-  .acoes button:hover{background:var(--fundo); color:var(--tinta)}
+  .acoes button:hover{background:#fff; color:var(--tinta)}
   .acoes .b-at.ligado{background:var(--azul-suave); border-color:transparent; color:var(--azul)}
   .acoes .b-ok.ligado{background:var(--positivo-suave); border-color:transparent; color:var(--positivo-texto)}
   .acoes .b-falta.ligado{background:var(--alerta-suave); border-color:transparent; color:var(--alerta-texto)}
   .alerta .b-falta{border-color:#f3c8bf; color:var(--alerta-texto)}
   .vazio{color:var(--tinta-suave); font-size:13px; padding:24px 8px; text-align:center; list-style:none}
+
+  /* ---------- campo opcional de pronúncia ---------- */
+  .gatilho-pronuncia{
+    display:inline-flex; align-items:center; gap:6px; margin-top:9px; font:inherit;
+    font-size:12px; font-weight:600; color:var(--azul); background:none; border:0;
+    cursor:pointer; padding:2px;
+  }
+  .gatilho-pronuncia:hover{text-decoration:underline}
+  .gatilho-pronuncia .mais{
+    width:15px; height:15px; border-radius:50%; background:var(--azul-suave);
+    display:flex; align-items:center; justify-content:center; font-size:12px; line-height:1;
+  }
+  .gatilho-pronuncia.oculto{display:none}
+  #blocoPronuncia{display:none; margin-top:12px; padding:13px; border-radius:var(--raio-campo);
+    background:var(--fundo)}
+  #blocoPronuncia.aberto{display:block}
+  .cab-pronuncia{display:flex; align-items:center; gap:8px; margin-bottom:9px}
+  .cab-pronuncia b{font-size:12.5px; font-weight:700; flex:1}
+  .cab-pronuncia button{
+    font:inherit; font-size:16px; line-height:1; color:var(--placeholder);
+    background:none; border:0; cursor:pointer; padding:0 4px;
+  }
+  .cab-pronuncia button:hover{color:var(--tinta)}
+  .linha-ouvir{display:flex; gap:8px}
+  .linha-ouvir input{flex:1}
+  #blocoPronuncia code{
+    background:var(--sup); padding:1px 5px; border-radius:4px; font-size:11px;
+    font-family:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  #comparativoFala{display:none; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px}
+  #comparativoFala.visivel{display:grid}
+  #comparativoFala .lado{background:var(--sup); border-radius:var(--raio-campo); padding:10px 12px}
+  #comparativoFala .rot{
+    font-size:10.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+    color:var(--tinta-suave);
+  }
+  #comparativoFala .valor{font-size:14px; font-weight:700; margin-top:4px; word-break:break-word}
+  #comparativoFala .voz{background:var(--positivo-suave)}
+  #comparativoFala .voz .valor{color:var(--positivo-texto)}
+
+  .opcao-perfil{display:flex; align-items:flex-start; gap:10px; padding:12px;
+    border-radius:var(--raio-campo); background:var(--fundo); margin-top:18px}
+  .interruptor{
+    width:36px; height:21px; border-radius:20px; background:var(--azul); flex:none;
+    position:relative; margin-top:1px; border:0; cursor:pointer; padding:0;
+  }
+  .interruptor.off{background:#C8CEDA}
+  .interruptor i{
+    position:absolute; top:2px; left:17px; width:17px; height:17px; border-radius:50%;
+    background:#fff; box-shadow:var(--sombra-leve); transition:left .15s;
+  }
+  .interruptor.off i{left:2px}
+  .txt-opcao b{display:block; font-size:13px; font-weight:600}
+  .txt-opcao small{display:block; font-size:11.5px; color:var(--tinta-suave); line-height:1.5; margin-top:3px}
 
   #avisoFila{
     display:none; margin-top:14px; padding:11px 13px; border-radius:var(--raio-campo);
@@ -274,16 +359,126 @@
     border-bottom:1px solid var(--borda-int);
   }
   #listaOnline li:last-child{border-bottom:0}
-  #listaOnline .pt{width:9px; height:9px; border-radius:50%; background:#20bf6b; flex:none}
+  #listaOnline .av{
+    width:32px; height:32px; border-radius:50%; flex:none; color:#fff;
+    font-size:11.5px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #listaOnline .av.mural{background:var(--azul)}
+  #listaOnline li.intervalo .av{opacity:.55}
   #listaOnline .quem{flex:1; min-width:0}
   #listaOnline .quem b{display:block; font-size:13.5px; font-weight:600;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   #listaOnline .quem small{display:block; font-size:11.5px; color:var(--tinta-suave); font-weight:500}
-  #listaOnline button{
-    font:inherit; font-size:12px; font-weight:600; padding:7px 11px; border-radius:10px;
-    border:1px solid var(--borda); background:var(--sup); color:var(--azul); cursor:pointer; flex:none;
+  #listaOnline li.clicavel{cursor:pointer; border-radius:var(--raio-campo)}
+  #listaOnline li.clicavel:hover{background:var(--fundo); border-bottom-color:transparent}
+  #listaOnline li.clicavel:focus-visible{outline:2px solid var(--azul); outline-offset:-2px}
+  #listaOnline li.aberto{background:var(--azul-suave); border-bottom-color:transparent}
+  #listaOnline li.aberto .quem b{color:var(--azul)}
+  #listaOnline .marca-aberto{
+    flex:none; font-size:11.5px; font-weight:700; letter-spacing:.03em;
+    text-transform:uppercase; color:var(--azul);
   }
-  #listaOnline button:hover{background:var(--azul-suave); border-color:transparent}
+  #listaOnline li.intervalo .pt{background:var(--atencao)}
+  #listaOnline li.intervalo .quem b{color:var(--tinta-suave)}
+  #listaOnline .etiqueta-status{
+    font-size:11.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+    padding:4px 9px; border-radius:20px; background:#f7d79440; color:var(--atencao-texto); flex:none;
+  }
+  #buscaProfissional{margin-bottom:12px}
+  #listaOnline li.linha-mural{
+    border-bottom:1px solid var(--borda); padding-bottom:14px; margin-bottom:4px;
+  }
+
+  #destinoAtual.nenhum{background:var(--fundo); color:var(--tinta-suave)}
+
+  /* seletor pesquisável de profissional */
+  .combo{position:relative}
+  .combo ul{
+    display:none; position:absolute; z-index:5; left:0; right:0; top:calc(100% + 4px);
+    max-height:15rem; overflow-y:auto; list-style:none; background:var(--sup);
+    border:1px solid var(--borda); border-radius:var(--raio-campo); box-shadow:var(--sombra);
+  }
+  .combo ul.aberta{display:block}
+  .combo li{padding:10px 13px; font-size:14px; cursor:pointer}
+  .combo li:hover, .combo li.marcado{background:var(--fundo)}
+  .combo li .cat{display:block; font-size:11.5px; color:var(--tinta-suave); font-weight:500; margin-top:1px}
+  .combo li.novo{font-weight:600; color:var(--azul); border-top:1px solid var(--borda-int)}
+  .combo li.nada{color:var(--tinta-suave); cursor:default}
+
+  /* identidade e status no cabeçalho */
+  /* Os três estados sempre à vista: trocar custa um clique, não dois. */
+  .seg-status{display:flex; gap:4px; background:var(--fundo); padding:4px; border-radius:20px}
+  .seg-status button{
+    display:flex; align-items:center; gap:6px; border:0; background:transparent;
+    border-radius:16px; padding:7px 13px; font:inherit; font-size:12.5px; font-weight:600;
+    color:var(--tinta-suave); cursor:pointer; white-space:nowrap;
+  }
+  .seg-status button:hover{color:var(--tinta)}
+  .seg-status button.ativo{background:var(--sup); color:var(--tinta); box-shadow:var(--sombra-leve)}
+  .pt{width:9px; height:9px; border-radius:50%; flex:none}
+  .pt.on{background:#20bf6b}
+  .pt.pausa{background:var(--atencao)}
+  .pt.off{background:var(--placeholder)}
+  @media(max-width:1100px){
+    .seg-status button span.pt{margin:0}
+    .seg-status button{padding:7px 10px}
+  }
+  button.eu{
+    display:flex; align-items:center; gap:10px; padding:6px 10px 6px 12px; cursor:pointer;
+    background:transparent; border:0; border-left:1px solid var(--borda); font:inherit;
+    color:inherit; text-align:left; border-radius:0 12px 12px 0;
+  }
+  button.eu:hover{background:var(--fundo)}
+  .eu-txt{min-width:0}
+  /* Cartão de perfil: identidade, estado e o atalho para editar. */
+  .cartao.perfil{position:relative; overflow:hidden}
+  .rot-perfil{font-size:11.5px; font-weight:700; letter-spacing:.03em;
+    text-transform:uppercase; color:var(--tinta-suave)}
+  .cartao.perfil h3{font-size:19px; font-weight:700; margin:5px 0 2px; line-height:1.2}
+  .cartao.perfil .cargo{font-size:12.5px; color:var(--tinta-suave); font-weight:600; line-height:1.4}
+  .cartao.perfil h3, .cartao.perfil .cargo, .cartao.perfil .acoes-perfil{max-width:100%}
+  .estado-perfil{
+    display:inline-flex; align-items:center; gap:7px; margin-top:12px;
+    border-radius:20px; padding:6px 12px; font-size:11.5px; font-weight:700;
+    background:#20bf6b1f; color:#12794a;
+  }
+  .estado-perfil.st-intervalo{background:#f7d79440; color:var(--atencao-texto)}
+  .estado-perfil.st-offline{background:var(--fundo); color:var(--tinta-suave)}
+  .acoes-perfil{margin-top:14px; display:flex; gap:8px}
+  .acoes-perfil .mini{flex:1}
+  #avisoFarmaciaResumo{
+    display:none; margin-top:14px; padding:12px 14px; border-radius:var(--raio-campo);
+    background:var(--fundo); font-size:12.5px; color:var(--tinta-suave); line-height:1.5;
+  }
+  #dlgPerfil{max-width:26rem}
+  #dlgPerfil label:first-of-type{margin-top:0}
+  #perfilErro{
+    display:none; margin:14px 0 0; padding:10px 12px; border-radius:10px;
+    background:var(--alerta-suave); color:var(--alerta-texto); font-size:12.5px; font-weight:600;
+  }
+  #perfilErro.visivel{display:block}
+  dialog button.principal{background:var(--azul); border-color:var(--azul); color:#fff}
+  dialog button.principal:hover{background:var(--azul-hover)}
+  .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+  /* bloco da pessoa muda de cor enquanto houver mensagem não lida dela */
+  #listaOnline li.naolida{
+    background:var(--azul-suave); border-radius:var(--raio-campo);
+    padding:11px 10px; border-bottom-color:transparent;
+  }
+  #listaOnline li.naolida .quem b{color:var(--azul)}
+  #listaOnline li.naolida .quem small{color:var(--azul)}
+  #listaOnline li.naolida-direta{background:#f7d79440}
+  #listaOnline li.naolida-direta .quem b,
+  #listaOnline li.naolida-direta .quem small{color:var(--atencao-texto)}
+  #listaOnline .contador{
+    flex:none; min-width:22px; height:22px; padding:0 6px; border-radius:11px;
+    background:var(--azul); color:#fff; font-size:11.5px; font-weight:700;
+    line-height:22px; text-align:center;
+  }
+  #listaOnline li.naolida-direta .contador{background:var(--atencao); color:var(--atencao-texto)}
+  .mini:disabled{color:var(--placeholder); cursor:default}
+  .mini:disabled:hover{background:var(--sup)}
 
   #destinoBarra{display:flex; align-items:center; gap:10px; margin-bottom:16px; flex-wrap:wrap}
   #destinoBarra .rotulo{font-size:12.5px; font-weight:600; color:var(--tinta-suave)}
@@ -295,25 +490,43 @@
   #btnMural{margin-left:auto}
 
   #mensagens{
-    list-style:none; display:flex; flex-direction:column; gap:12px;
-    height:50vh; min-height:16rem; overflow-y:auto; padding:4px;
+    list-style:none; display:flex; flex-direction:column;
+    height:50vh; min-height:16rem; overflow-y:auto; padding:4px 2px;
   }
-  #mensagens li{max-width:80%; padding:11px 14px; border-radius:var(--raio-medio);
-    background:var(--fundo); align-self:flex-start}
-  #mensagens li.minha{align-self:flex-end; background:var(--azul-suave)}
-  #mensagens li.direta{background:#f7d79426}
-  #mensagens .cab{display:flex; gap:8px; align-items:baseline; margin-bottom:4px; flex-wrap:wrap}
-  #mensagens .cab b{font-size:13px; font-weight:600}
-  #mensagens .cab .meta{font-size:11.5px; color:var(--tinta-suave); font-weight:500}
-  #mensagens .cab .etiqueta{
+  /* Conversa agrupada: avatar de lado, mensagens seguidas da mesma pessoa
+     empilhadas, hora só na última. A cor identifica quem falou. */
+  #mensagens li.grupo{display:flex; gap:10px; margin-top:14px}
+  #mensagens li.grupo:first-child{margin-top:0}
+  #mensagens li.grupo.minha{flex-direction:row-reverse}
+  #mensagens .av{
+    width:34px; height:34px; border-radius:50%; flex:none; align-self:flex-end;
+    color:#fff; font-size:12px; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #mensagens .pilha{display:flex; flex-direction:column; gap:3px; max-width:74%; min-width:0}
+  #mensagens li.minha .pilha{align-items:flex-end}
+  #mensagens .nome{font-size:11.5px; font-weight:700; padding:0 4px; margin-bottom:2px}
+  #mensagens .balao{
+    padding:10px 14px; border-radius:16px; font-size:14px; line-height:1.45;
+    white-space:pre-wrap; word-break:break-word; background:var(--fundo);
+  }
+  #mensagens .balao.ponta{border-bottom-left-radius:5px}
+  #mensagens li.minha .balao.ponta{border-bottom-left-radius:16px; border-bottom-right-radius:5px}
+  #mensagens .hora{font-size:11.5px; color:var(--placeholder); font-weight:500; padding:2px 6px}
+  #mensagens .etiqueta{
     font-size:11.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
-    color:var(--atencao-texto);
+    color:var(--atencao-texto); padding:0 4px; margin-bottom:2px;
   }
-  #mensagens .texto{font-size:14px; line-height:1.5; white-space:pre-wrap; word-break:break-word}
+  /* mensagem direta: contorno âmbar por cima da cor da pessoa */
+  #mensagens li.direta .balao{box-shadow:inset 0 0 0 1.5px var(--atencao)}
+  /* as minhas: azul cheio, para me separar de todos os colegas de uma vez */
+  #mensagens li.minha .av{background:var(--azul)}
+  #mensagens li.minha .balao{background:var(--azul); color:#fff}
   #mensagens .vazio-chat{
     align-self:center; max-width:100%; background:transparent; color:var(--tinta-suave);
     font-size:13px; text-align:center; padding:2rem 1rem;
   }
+
   #linhaEnviar{display:flex; gap:10px; margin-top:16px; padding-top:16px;
     border-top:1px solid var(--borda-int); align-items:flex-end}
   #textoMensagem{flex:1; min-height:2.9rem; max-height:8rem; resize:vertical}
@@ -360,6 +573,7 @@
   }
   #btnEntrar:hover{background:var(--azul-hover)}
   #codigoErro{color:var(--alerta-texto); font-size:12.5px; font-weight:600; min-height:1.2rem}
+  .versao{font-size:11.5px; font-weight:600; color:var(--placeholder); letter-spacing:.03em}
 </style>
 </head>
 <body>
@@ -368,6 +582,7 @@
   <div class="logo">MS</div>
   <h2>Painel de Chamada</h2>
   <p>Digite o código de acesso de 6 números fornecido pela coordenação da unidade.</p>
+  <p class="versao">Painel de Chamada · versão 3.9</p>
   <input id="campoCodigo" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="······">
   <div id="codigoErro"></div>
   <button id="btnEntrar">Entrar</button>
@@ -389,7 +604,7 @@
 
     <button class="rail-btn" id="abaEquipe" title="Conversa da equipe">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 01-.9 3.8A8.5 8.5 0 0112.5 20a8.4 8.4 0 01-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 014 11.5 8.5 8.5 0 018.7 3.9a8.4 8.4 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
-      Equipe
+      Chat
       <span class="selo" id="seloEquipe">0</span>
     </button>
 
@@ -412,16 +627,28 @@
         <small id="subTurno">0 pessoas aguardando</small>
       </div>
       <div class="h-dir">
+        <div class="seg-status" id="meuStatus" role="group" aria-label="Meu status no Chat"
+          title="Você continua online com a aba em segundo plano; só sai da lista ao fechar a aba ou escolher Offline">
+          <button type="button" data-status="online" title="Disponível para os colegas">
+            <span class="pt on"></span>Online
+          </button>
+          <button type="button" data-status="intervalo" title="Continua na lista, marcado como em intervalo">
+            <span class="pt pausa"></span>Intervalo
+          </button>
+          <button type="button" data-status="offline" title="Sai da lista do Chat">
+            <span class="pt off"></span>Offline
+          </button>
+        </div>
         <button class="botao-claro" id="btnPrivacidade" title="Alterna entre nome completo e nome abreviado na TV"></button>
         <button class="botao-claro perigo" id="btnEncerrar">Encerrar turno</button>
-        <div id="conexao"><span class="bolinha"></span><span id="conexaoTexto">Conectando…</span></div>
-        <div class="eu">
-          <div class="avatar" id="euIniciais">--</div>
-          <div>
+        <div id="conexao" title="Conexão com o servidor"><span class="bolinha"></span><span id="conexaoTexto">Conectando…</span></div>
+        <button class="eu" id="btnEditarPerfil" title="Editar meu perfil: nome, categoria e sala">
+          <span class="avatar" id="euIniciais">--</span>
+          <span class="eu-txt">
             <b id="euNome">Sem identificação</b>
-            <small id="euCargo">Preencha o plantão</small>
-          </div>
-        </div>
+            <small id="euCargo">Configurar perfil</small>
+          </span>
+        </button>
       </div>
     </header>
 
@@ -436,24 +663,17 @@
         </div>
 
         <div class="pilha">
-          <div class="cartao">
-            <h2>Plantão</h2>
-            <div id="blocoIdentificacao">
-              <label for="profissional">Nome do profissional</label>
-              <input id="profissional" placeholder="Ana Souza" autocomplete="off">
-              <label for="categoria">Categoria profissional</label>
-              <select id="categoria"></select>
-              <input id="categoriaOutra" placeholder="Qual categoria?" style="margin-top:8px; display:none" autocomplete="off">
+          <div class="cartao perfil" id="cartaoPerfil">
+            <span class="rot-perfil">Meu perfil</span>
+            <h3 id="perfilNome">Sem identificação</h3>
+            <div class="cargo" id="perfilCargo">Toque em editar para configurar</div>
+            <span class="estado-perfil" id="perfilEstado"><span class="pt on"></span>Online</span>
+            <div class="acoes-perfil">
+              <button class="mini" id="btnEditarPerfil2">Editar meu perfil</button>
             </div>
-            <div id="avisoFarmacia">
+            <div id="avisoFarmaciaResumo">
               Modo Farmácia: a chamada é por senha e não identifica profissional.
-              <button id="btnSairFarmacia" class="mini" style="margin-top:10px; width:100%">
-                Sair do modo Farmácia
-              </button>
             </div>
-            <label for="sala">Sala</label>
-            <select id="sala"></select>
-            <input id="salaOutra" placeholder="Escreva a sala" style="margin-top:8px; display:none" autocomplete="off">
           </div>
 
           <div class="cartao">
@@ -466,6 +686,29 @@
             <div id="blocoNome">
               <label for="paciente">Nome do paciente</label>
               <input id="paciente" placeholder="Nome de quem será chamado" autocomplete="off">
+              <button class="gatilho-pronuncia" id="btnAbrirPronuncia">
+                <span class="mais">+</span> Ajustar como o nome é falado
+              </button>
+              <div id="blocoPronuncia">
+                <div class="cab-pronuncia">
+                  <b>Como se fala</b>
+                  <button id="btnFecharPronuncia" title="Fechar e voltar à pronúncia normal">×</button>
+                </div>
+                <div class="linha-ouvir">
+                  <input id="fala" maxlength="120" autocomplete="off"
+                    placeholder="Escreva do jeito que se pronuncia">
+                  <button class="mini" id="btnOuvirFala">Ouvir</button>
+                </div>
+                <p class="nota" style="margin-top:8px">
+                  Escreva com letras do português, como se fosse ler em voz alta.
+                  Exemplo: <code>Jhoan</code> vira <code>Ioan</code>.
+                  O nome continua aparecendo escrito do jeito certo na TV.
+                </p>
+                <div id="comparativoFala">
+                  <div class="lado"><span class="rot">Na TV aparece</span><div class="valor" id="ladoTela">—</div></div>
+                  <div class="lado voz"><span class="rot">A voz fala</span><div class="valor" id="ladoVoz">—</div></div>
+                </div>
+              </div>
             </div>
 
             <div id="blocoSenha" style="display:none">
@@ -504,100 +747,91 @@
             <h2 class="pagina">Avisos e conteúdo da TV</h2>
             <div class="sub-pagina">O que a sala de espera vê e ouve enquanto aguarda</div>
           </div>
-        </div>
-        <div id="avisoRestaurado"></div>
-
-        <div class="pilha">
-          <div class="cartao">
-            <h2>Conteúdo da tela</h2>
+          <div class="acoes">
             <div class="seg" id="modosTela">
               <button id="modoTelaVideo">Vídeos educativos</button>
               <button id="modoTelaAvisos">Avisos e mensagens</button>
             </div>
-            <p class="nota" style="margin-top:14px">
-              No modo "Avisos e mensagens", o lado esquerdo da TV passa os avisos ativos em rodízio,
-              entremeados por frases de orientação para quem espera. As chamadas funcionam igual nos dois.
-            </p>
-          </div>
-
-          <div class="cartao">
-            <h2>Avisos na TV</h2>
-            <div id="listaAvisos"></div>
-            <label for="textoAviso">Novo aviso</label>
-            <textarea id="textoAviso" maxlength="300"
-              placeholder="Hoje teremos reunião de equipe e o funcionamento será diferente, das 7 às 15 horas."></textarea>
-            <label for="tipoAviso">Tipo de aviso</label>
-            <select id="tipoAviso">
-              <option value="audio" selected>Falado em voz alta e escrito na faixa</option>
-              <option value="estatico">Somente escrito na faixa, sem áudio</option>
-            </select>
-            <div id="blocoFreq">
-              <label for="freqAviso">Falar a cada</label>
-              <select id="freqAviso">
-                <option value="10">10 minutos</option>
-                <option value="15">15 minutos</option>
-                <option value="20" selected>20 minutos</option>
-                <option value="30">30 minutos</option>
-                <option value="60">1 hora</option>
-                <option value="120">2 horas</option>
-              </select>
-            </div>
-            <button id="btnAddAviso" class="mini suave" style="margin-top:14px; width:100%; padding:12px">
-              Adicionar aviso
-            </button>
           </div>
         </div>
+        <div id="avisoRestaurado"></div>
 
-        <div class="pilha">
-          <div class="cartao">
-            <h2>Frases de orientação</h2>
-            <p class="nota" style="margin-bottom:14px">
-              Passam na TV em rodízio, alternadas com os avisos da unidade, quando o conteúdo está
-              em "Avisos e mensagens". Desativar deixa a frase guardada sem aparecer.
-            </p>
-            <ul class="lista-simples" id="listaFrases"></ul>
-            <div class="linha-add">
-              <input id="novaFrase" maxlength="160" placeholder="Nova frase de orientação" autocomplete="off">
-              <button class="mini" id="btnAddFrase">Adicionar</button>
-            </div>
-          </div>
+        <div class="resumo">
+          <div class="r-at"><b id="rAvisosAtivos">0</b><span>Avisos ativos</span></div>
+          <div><b id="rAvisosMudos">0</b><span>Somente na faixa</span></div>
+          <div class="r-ok"><b id="rFrasesAtivas">0</b><span>Frases ativas</span></div>
+        </div>
 
-          <div class="cartao">
-            <h2>Farmácia — medicamentos em falta</h2>
-            <p class="nota" style="margin-bottom:14px">
-              A lista aparece na TV como um quadro próprio, sem áudio, para as pessoas verem antes de
-              chegar ao balcão. Some da tela quando não houver nenhum item ou quando estiver desativada.
-            </p>
-            <ul class="lista-simples" id="listaFarmacia"></ul>
-            <div class="linha-add">
-              <input id="novoMedicamento" maxlength="80" placeholder="Losartana 50mg" autocomplete="off">
-              <button class="mini" id="btnAddMedicamento">Adicionar</button>
-            </div>
-            <div class="linha-add">
-              <button class="mini" id="btnFarmaciaAtivo" style="flex:1"></button>
-              <button class="mini perigo" id="btnFarmaciaLimpar">Limpar tudo</button>
-            </div>
+        <section class="cartao larga">
+          <div class="cabecalho-historico">
+            <h2>Avisos na TV</h2>
+            <p class="nota" id="dicaModoTela" style="margin-left:auto; max-width:46ch; text-align:right"></p>
           </div>
+          <div id="listaAvisos"></div>
+        </section>
+
+        <div class="faixa-cartoes">
+        <div class="cartao">
+          <h2>Novo aviso</h2>
+          <textarea id="textoAviso" maxlength="300"
+            placeholder="Hoje teremos reunião de equipe e o funcionamento será diferente, das 7 às 15 horas."></textarea>
+          <label for="tipoAviso">Tipo de aviso</label>
+          <select id="tipoAviso">
+            <option value="audio" selected>Falado em voz alta e escrito na faixa</option>
+            <option value="estatico">Somente escrito na faixa, sem áudio</option>
+          </select>
+          <div id="blocoFreq">
+            <label for="freqAviso">Falar a cada</label>
+            <select id="freqAviso">
+              <option value="10">10 minutos</option>
+              <option value="15">15 minutos</option>
+              <option value="20" selected>20 minutos</option>
+              <option value="30">30 minutos</option>
+              <option value="60">1 hora</option>
+              <option value="120">2 horas</option>
+            </select>
+          </div>
+          <button id="btnAddAviso" class="mini suave" style="margin-top:14px; width:100%; padding:12px">
+            Adicionar aviso
+          </button>
+        </div>
+
+        <div class="cartao">
+          <h2>Frases de orientação</h2>
+          <p class="nota" style="margin-bottom:14px">
+            Passam na TV em rodízio, alternadas com os avisos da unidade. Desativar deixa a
+            frase guardada sem aparecer.
+          </p>
+          <ul class="lista-simples" id="listaFrases"></ul>
+          <div class="linha-add">
+            <input id="novaFrase" maxlength="160" placeholder="Nova frase de orientação" autocomplete="off">
+            <button class="mini" id="btnAddFrase">Adicionar</button>
+          </div>
+        </div>
         </div>
       </main>
 
       <main id="telaEquipe" class="oculta">
         <div class="topo-pagina">
           <div>
-            <h2 class="pagina">Equipe</h2>
+            <h2 class="pagina">Chat</h2>
             <div class="sub-pagina">Mural do turno e mensagens diretas, apagadas depois de 24 horas</div>
           </div>
           <div class="acoes">
             <button class="mini" id="btnSomChat"></button>
+            <button class="mini" id="btnNotificar" title="Mostra um aviso do sistema por cima de qualquer janela quando chegar mensagem"></button>
+            <button class="mini" id="btnMuralFlutuante" title="Abre uma janelinha do mural que fica por cima de todas as janelas">Janela flutuante</button>
           </div>
         </div>
 
         <div class="pilha">
           <div class="cartao">
-            <h2>Quem está online</h2>
+            <h2>Profissionais disponíveis</h2>
+            <input id="buscaProfissional" type="search" autocomplete="off"
+              placeholder="Pesquisar profissional" aria-label="Pesquisar profissional">
             <ul id="listaOnline"></ul>
             <p class="nota" style="margin-top:14px">
-              Aparece quem tem o painel aberto agora, com a sala escolhida na tela de Chamadas.
+              Aparece quem está com o painel aberto e não se marcou como offline.
               Toque em "Direto" para falar só com aquela pessoa.
             </p>
           </div>
@@ -612,13 +846,16 @@
               As mensagens são apagadas sozinhas depois de 24 horas. Por isso, evite escrever
               nome, endereço ou dados clínicos de pacientes — prefira a sala ou a senha da chamada.
             </p>
+            <p class="nota" style="margin-top:10px">
+              Você continua online para os colegas mesmo com esta aba atrás de outra janela.
+              Só sai da lista ao fechar a aba ou ao se marcar como offline.
+            </p>
           </div>
         </div>
 
         <section class="cartao">
           <div id="chatSemNome">
-            Preencha o "Nome do profissional" na tela de Chamadas para poder enviar mensagens.
-            Até lá você só consegue ler o mural.
+            Configure seu perfil para poder enviar mensagens. Até lá você só consegue ler o mural.
           </div>
           <div id="destinoBarra">
             <span class="rotulo">Enviando para</span>
@@ -639,6 +876,55 @@
 </div>
 
 <div id="retornoEmergencia"></div>
+
+<dialog id="dlgPerfil">
+  <h3 id="dlgPerfilTitulo">Quem está usando este computador?</h3>
+  <p id="dlgPerfilTexto">
+    Preencha uma vez só. Fica salvo neste navegador e você não precisa repetir
+    a cada acesso — nem se desligar o computador.
+  </p>
+
+  <div id="blocoIdentificacao">
+    <label for="profissional">Nome do profissional</label>
+    <div class="combo">
+      <input id="profissional" placeholder="Digite para procurar" autocomplete="off"
+        role="combobox" aria-expanded="false" aria-controls="listaProfissionais">
+      <ul id="listaProfissionais" role="listbox"></ul>
+    </div>
+    <label for="categoria">Categoria profissional</label>
+    <select id="categoria"></select>
+    <input id="categoriaOutra" placeholder="Qual categoria?" style="margin-top:8px; display:none" autocomplete="off">
+  </div>
+
+  <div id="avisoFarmacia">
+    Modo Farmácia: a chamada é por senha e não identifica profissional.
+    <button id="btnSairFarmacia" class="mini" style="margin-top:10px; width:100%">
+      Sair do modo Farmácia
+    </button>
+  </div>
+
+  <label for="sala">Sala</label>
+  <select id="sala"></select>
+  <input id="salaOutra" placeholder="Escreva a sala" style="margin-top:8px; display:none" autocomplete="off">
+
+  <div class="opcao-perfil">
+    <button type="button" class="interruptor off" id="chavePronuncia" role="switch"
+      aria-checked="false" aria-labelledby="rotuloPronuncia"><i></i></button>
+    <span class="txt-opcao">
+      <b id="rotuloPronuncia">Mostrar sempre o campo de pronúncia</b>
+      <small>
+        Deixa o campo "como se fala" aberto em todas as chamadas, em vez de escondido
+        atrás do link. Vale só neste computador.
+      </small>
+    </span>
+  </div>
+
+  <p id="perfilErro"></p>
+  <div class="fila-botoes" style="margin-top:18px">
+    <button id="btnPerfilCancelar">Cancelar</button>
+    <button id="btnPerfilSalvar" class="principal">Salvar</button>
+  </div>
+</dialog>
 
 <dialog id="dlgEncerrar">
   <h3>Encerrar o turno?</h3>
@@ -673,6 +959,9 @@
     socket.on("connect", () => {
       localStorage.setItem(CHAVE_CODIGO, codigo);
       $("telaCodigo").classList.remove("visivel");
+      // Primeiro acesso neste navegador: pede a identificação antes de usar.
+      // Nos próximos, entra direto — nem senha, nem perfil.
+      if(!temPerfil()) abrirPerfil(true);
     });
     socket.on("connect_error", (err) => {
       if(err && err.message === "codigo-invalido"){
@@ -689,11 +978,57 @@
   };
   $("campoCodigo").addEventListener("keydown", e => { if(e.key === "Enter") $("btnEntrar").click(); });
 
+  /* ---------- cadastro da unidade ---------- */
+  // Categoria de cada profissional. Serve só para adiantar o preenchimento:
+  // a categoria continua editável na tela de perfil.
+  const EQUIPE = {
+    "Agente Comunitário de Saúde": [
+      "Elena Mara Dias de Oliveira","Eloisa Helena dos Santos","Gilmara Barbosa",
+      "Gisele Costa","Graziela Regina Barbosa","Luciana Ferreira",
+      "Rosana Costa Machado","Sabrina Mari da Fonseca de Souza","Vanuza Soares",
+    ],
+    "Técnico de Enfermagem": [
+      "Andrea Carla da Silva","Claudia Albertina Marcal Nunes","Cristiani Margarida da Silva",
+      "Eunice Cristine Patricio","Gizele Silveira e Melo","Maria Eduarda Cabral",
+      "Tamara Benedetti Heidrich",
+    ],
+    "Enfermeiro": [
+      "Aline Oliveira Albuquerque","Andreia da Gama Almeida","Gabriela Schuck Kern",
+      "Jessica Hegedeus Camargo","Jessicamila dos Santos Pais Iglesias","Thais Borges da Silva",
+    ],
+    "Cirurgião-Dentista": [
+      "Caio Cesar Borges de Oliveira","Deborah de Oliveira Renzetti",
+    ],
+    "Coordenadora da Unidade": ["Flaviane Silveira Fialho"],
+    "Médico": [
+      "Gabriela dos Santos Marques","Gabriela Ribeiro Medeiros",
+      "Gustavo Berje Armelin","Jorge Pascual Asencio Rondon",
+    ],
+    "Administrativo": [
+      "Leila Gabriela Mateus Zanoni","Mayara Mara de Souza","Rafaela Felipe",
+      "Shirlei Soraia Mathias",
+    ],
+    "Nutricionista": ["Mayumi Marcela Ujissato"],
+    "Fisioterapeuta": ["Cledion Meirelles dos Santos"],
+    "Assistente Social": ["Kamila Branco Carlos"],
+  };
+
+  // Nomes sem categoria definida: entram na lista e escolhem na mão.
+  const SEM_CATEGORIA = [
+    "Bruna de Liz Hillesheim","Jackson Rodrigo Ricardo","Luciane Carmen Villela Papaleo",
+    "Marcos Augusto Farias e Silva","Nathalia Celestino Silva",
+  ];
+
+  const CATEGORIA_DE = {};
+  Object.entries(EQUIPE).forEach(([cat, nomes]) => nomes.forEach(n => { CATEGORIA_DE[n] = cat; }));
+  const PROFISSIONAIS = [...Object.keys(CATEGORIA_DE), ...SEM_CATEGORIA]
+    .sort((a, b) => a.localeCompare(b, "pt-BR", { sensitivity: "base" }));
+
   const CATEGORIAS = [
     "Cirurgião-Dentista","Médico","Enfermeiro","Técnico de Enfermagem",
     "Auxiliar de Saúde Bucal","Psicólogo","Assistente Social","Nutricionista",
     "Farmacêutico","Fisioterapeuta","Agente Comunitário de Saúde",
-    "Coordenadora da Unidade","Farmácia","Outro"
+    "Coordenadora da Unidade","Administrativo","Farmácia","Outro"
   ];
   // Ordem alfabética, com "Outro" sempre no fim da lista
   const ordenar = (lista) => {
@@ -738,6 +1073,110 @@
   selCategoria.appendChild(new Option("Selecione a categoria", ""));
   ordenar(CATEGORIAS).forEach(c => selCategoria.appendChild(new Option(c, c)));
 
+  /* ---------- seletor pesquisável de profissional ---------- */
+  const campoProf = $("profissional");
+  const listaProf = $("listaProfissionais");
+  let marcado = -1;      // item destacado pelas setas do teclado
+  let opcoesVisiveis = [];
+
+  const semAcento = (t) => String(t || "").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+
+  function abrirLista(filtro){
+    const alvo = semAcento(filtro);
+    // procura em qualquer parte do nome: "gabi" e "medeiros" acham a mesma pessoa
+    opcoesVisiveis = PROFISSIONAIS.filter(n => !alvo || semAcento(n).includes(alvo));
+    listaProf.innerHTML = "";
+
+    if(!opcoesVisiveis.length){
+      const li = document.createElement("li");
+      li.className = "nada";
+      li.textContent = "Ninguém com esse nome na lista.";
+      listaProf.appendChild(li);
+    }
+    opcoesVisiveis.forEach((nome, i) => {
+      const li = document.createElement("li");
+      li.setAttribute("role", "option");
+      li.dataset.nome = nome;
+      li.innerHTML = `${escapar(nome)}<span class="cat">${escapar(CATEGORIA_DE[nome] || "Categoria a definir")}</span>`;
+      if(i === marcado) li.classList.add("marcado");
+      listaProf.appendChild(li);
+    });
+
+    const novo = document.createElement("li");
+    novo.className = "novo";
+    novo.dataset.novo = "1";
+    novo.textContent = "+ Adicionar outro profissional";
+    listaProf.appendChild(novo);
+
+    listaProf.classList.add("aberta");
+    campoProf.setAttribute("aria-expanded", "true");
+  }
+
+  function fecharLista(){
+    listaProf.classList.remove("aberta");
+    campoProf.setAttribute("aria-expanded", "false");
+    marcado = -1;
+  }
+
+  function escolherProfissional(nome){
+    campoProf.value = nome;
+    // preenche a categoria só quando a pessoa é conhecida e o campo ainda está
+    // vazio ou tinha a categoria da pessoa anterior — nunca sobrescreve escolha manual
+    const cat = CATEGORIA_DE[nome];
+    if(cat && !selCategoria.dataset.manual) selCategoria.value = cat;
+    aoMudarCategoria();
+    aplicarModoFarmacia();
+    fecharLista();
+    salvarPlantao();
+  }
+
+  campoProf.addEventListener("focus", () => abrirLista(campoProf.value));
+  campoProf.addEventListener("input", () => { marcado = -1; abrirLista(campoProf.value); });
+  campoProf.addEventListener("keydown", (e) => {
+    if(e.key === "ArrowDown" || e.key === "ArrowUp"){
+      e.preventDefault();
+      if(!listaProf.classList.contains("aberta")) abrirLista(campoProf.value);
+      marcado += (e.key === "ArrowDown" ? 1 : -1);
+      if(marcado < 0) marcado = opcoesVisiveis.length - 1;
+      if(marcado >= opcoesVisiveis.length) marcado = 0;
+      abrirLista(campoProf.value);
+      const alvo = listaProf.querySelector("li.marcado");
+      if(alvo) alvo.scrollIntoView({ block: "nearest" });
+    }else if(e.key === "Enter"){
+      if(marcado >= 0 && opcoesVisiveis[marcado]){
+        e.preventDefault();
+        escolherProfissional(opcoesVisiveis[marcado]);
+      }else{
+        fecharLista();
+      }
+    }else if(e.key === "Escape"){
+      fecharLista();
+    }
+  });
+
+  listaProf.addEventListener("mousedown", (e) => {
+    const li = e.target.closest("li");
+    if(!li) return;
+    e.preventDefault();
+    if(li.dataset.novo){
+      // digitar um nome que ainda não está no cadastro
+      campoProf.value = "";
+      fecharLista();
+      campoProf.focus();
+      return;
+    }
+    if(li.dataset.nome) escolherProfissional(li.dataset.nome);
+  });
+
+  document.addEventListener("click", (e) => {
+    if(!e.target.closest(".combo")) fecharLista();
+  });
+
+  // Marca que a categoria foi escolhida na mão, para o preenchimento
+  // automático não desfazer a escolha depois.
+  selCategoria.addEventListener("change", () => { selCategoria.dataset.manual = "1"; });
+
   /* ---------- plantão salvo no navegador ---------- */
   const CHAVE = "plantao-monte-serrat";
   function salvarPlantao(){
@@ -771,6 +1210,95 @@
   }
   ["profissional","salaOutra","categoriaOutra","senha"].forEach(id =>
     $(id).addEventListener("input", salvarPlantao));
+
+  /* ---------- perfil do profissional ---------- */
+  // O perfil é a identidade deste navegador. Fica no localStorage (mesma chave
+  // do plantão), então sobrevive a fechar a aba, atualizar e desligar o
+  // computador. A presença no chat, essa não: é sempre resolvida no servidor.
+  const dlgPerfil = $("dlgPerfil");
+  let perfilObrigatorio = false;
+
+  function temPerfil(){
+    return !!(meuNomeChat() && salaAtual());
+  }
+
+  function abrirPerfil(primeiraVez){
+    perfilObrigatorio = !!primeiraVez;
+    $("dlgPerfilTitulo").textContent = primeiraVez
+      ? "Quem está usando este computador?"
+      : "Editar meu perfil";
+    $("dlgPerfilTexto").textContent = primeiraVez
+      ? "Preencha uma vez só. Fica salvo neste navegador e você não precisa repetir a cada acesso — nem se desligar o computador."
+      : "As alterações valem para este navegador e aparecem na hora para os colegas.";
+    $("btnPerfilCancelar").style.display = primeiraVez ? "none" : "";
+    $("perfilErro").classList.remove("visivel");
+    if(!dlgPerfil.open) dlgPerfil.showModal();
+    setTimeout(() => { if(!ehFarmacia()) campoProf.focus(); }, 50);
+  }
+
+  // No primeiro acesso não dá para fechar sem preencher.
+  dlgPerfil.addEventListener("cancel", (e) => { if(perfilObrigatorio) e.preventDefault(); });
+
+  $("btnEditarPerfil").onclick = () => abrirPerfil(false);
+  $("btnEditarPerfil2").onclick = () => abrirPerfil(false);
+  $("btnPerfilCancelar").onclick = () => { if(!perfilObrigatorio) dlgPerfil.close(); };
+
+  $("btnPerfilSalvar").onclick = () => {
+    const erro = $("perfilErro");
+    if(!salaAtual()){
+      erro.textContent = "Escolha a sala onde você está atendendo.";
+      erro.classList.add("visivel");
+      return;
+    }
+    if(!ehFarmacia()){
+      if(!campoProf.value.trim()){
+        erro.textContent = "Escolha ou digite o nome do profissional.";
+        erro.classList.add("visivel");
+        return;
+      }
+      if(!categoriaAtual()){
+        erro.textContent = "Escolha a categoria profissional.";
+        erro.classList.add("visivel");
+        return;
+      }
+    }
+    erro.classList.remove("visivel");
+    salvarPlantao();
+    perfilObrigatorio = false;
+    dlgPerfil.close();
+  };
+
+  function renderPerfil(){
+    const nome = meuNomeChat();
+    const cargo = [categoriaAtual(), salaAtual()].filter(Boolean).join(" · ");
+    $("perfilNome").textContent = nome || "Sem identificação";
+    $("perfilCargo").textContent = cargo || "Toque em editar para configurar";
+    $("avisoFarmaciaResumo").style.display = ehFarmacia() ? "block" : "none";
+  }
+
+  /* ---------- meu status ---------- */
+  let meuStatus = "online"; // ao entrar, sempre online (a presença é do momento)
+  const segStatus = $("meuStatus");
+
+  function aplicarStatus(novo, avisar){
+    meuStatus = ["online","intervalo","offline"].includes(novo) ? novo : "online";
+    const chip = $("perfilEstado");
+    chip.className = "estado-perfil st-" + meuStatus;
+    chip.innerHTML = `<span class="pt ${meuStatus === "online" ? "on"
+      : meuStatus === "intervalo" ? "pausa" : "off"}"></span>`
+      + (meuStatus === "online" ? "Online" : meuStatus === "intervalo" ? "Em intervalo" : "Offline");
+    segStatus.querySelectorAll("button[data-status]").forEach(b => {
+      const ativo = b.dataset.status === meuStatus;
+      b.classList.toggle("ativo", ativo);
+      b.setAttribute("aria-pressed", ativo ? "true" : "false");
+    });
+    if(avisar && socket && socket.connected) socket.emit("chat-status", meuStatus);
+  }
+
+  segStatus.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-status]");
+    if(b) aplicarStatus(b.dataset.status, true);
+  });
 
   /* ---------- modo de chamada ---------- */
   let modo = "nome";
@@ -854,8 +1382,13 @@
     if(modo === "nome"){
       const paciente = $("paciente").value.trim();
       if(!paciente){ $("paciente").focus(); return; }
-      socket.emit("chamar", { modo, paciente, profissional, categoria: categoriaAtual(), sala });
+      const fala = $("fala").value.trim();
+      socket.emit("chamar", { modo, paciente, fala, profissional, categoria: categoriaAtual(), sala });
       $("paciente").value = "";
+      // A pronúncia vale só para esta chamada. Se ficasse guardada, o próximo
+      // paciente sairia na TV com um nome e na voz com o nome do anterior.
+      $("fala").value = "";
+      renderComparativo();
       $("paciente").focus();
     }else{
       const senha = doisDigitos($("senha").value);
@@ -864,6 +1397,79 @@
       salvarPlantao();
     }
   }
+  /* ---------- campo opcional "como se fala" ---------- */
+  // Fica escondido por padrão: quem nunca precisa só vê o link. A preferência
+  // de deixá-lo sempre aberto é local, do computador, e não afeta os colegas.
+  const CHAVE_PRONUNCIA = "pronuncia-sempre-monte-serrat";
+  let pronunciaSempre = localStorage.getItem(CHAVE_PRONUNCIA) === "1";
+
+  function abrirPronuncia(foco){
+    $("blocoPronuncia").classList.add("aberto");
+    $("btnAbrirPronuncia").classList.add("oculto");
+    if(foco) $("fala").focus();
+  }
+  function fecharPronuncia(){
+    $("blocoPronuncia").classList.remove("aberto");
+    $("btnAbrirPronuncia").classList.remove("oculto");
+    $("fala").value = "";
+    renderComparativo();
+  }
+  function aplicarPreferenciaPronuncia(){
+    $("chavePronuncia").classList.toggle("off", !pronunciaSempre);
+    $("chavePronuncia").setAttribute("aria-checked", pronunciaSempre ? "true" : "false");
+    if(pronunciaSempre) abrirPronuncia(false);
+    else if(!$("fala").value.trim()) fecharPronuncia();
+  }
+
+  $("btnAbrirPronuncia").onclick = () => abrirPronuncia(true);
+  $("btnFecharPronuncia").onclick = () => {
+    // fechar no × desliga também a preferência, senão reabriria sozinho
+    if(pronunciaSempre){
+      pronunciaSempre = false;
+      localStorage.setItem(CHAVE_PRONUNCIA, "0");
+      aplicarPreferenciaPronuncia();
+    }
+    fecharPronuncia();
+  };
+  $("chavePronuncia").onclick = () => {
+    pronunciaSempre = !pronunciaSempre;
+    localStorage.setItem(CHAVE_PRONUNCIA, pronunciaSempre ? "1" : "0");
+    aplicarPreferenciaPronuncia();
+  };
+
+  // Mostra lado a lado o que vai na tela e o que sai na voz, para conferir
+  // antes de apertar Chamar.
+  function renderComparativo(){
+    const nome = $("paciente").value.trim();
+    const fala = $("fala").value.trim();
+    const comp = $("comparativoFala");
+    if(!fala || !nome){
+      comp.classList.remove("visivel");
+      return;
+    }
+    $("ladoTela").textContent = nome;
+    $("ladoVoz").textContent = fala;
+    comp.classList.add("visivel");
+  }
+  $("fala").addEventListener("input", renderComparativo);
+  $("paciente").addEventListener("input", renderComparativo);
+  $("fala").addEventListener("keydown", e => { if(e.key === "Enter") chamar(); });
+
+  // O teste toca no computador de quem está chamando, não na TV: dá para
+  // experimentar duas ou três grafias sem incomodar a sala de espera.
+  let audioTeste = null;
+  $("btnOuvirFala").onclick = () => {
+    const texto = $("fala").value.trim() || $("paciente").value.trim();
+    if(!texto) return;
+    try{
+      if(audioTeste) audioTeste.pause();
+      audioTeste = new Audio("/tts?vel=160&texto=" + encodeURIComponent(texto));
+      audioTeste.play().catch(() => {
+        alert("Não consegui tocar o áudio aqui. Verifique o som deste computador.");
+      });
+    }catch(e){}
+  };
+
   $("btnChamar").onclick = chamar;
   $("paciente").addEventListener("keydown", e => { if(e.key === "Enter") chamar(); });
   $("senha").addEventListener("keydown", e => { if(e.key === "Enter") chamar(); });
@@ -905,8 +1511,11 @@
     socket.on("connect", () => {
       caixaConexao.classList.remove("offline");
       caixaConexao.classList.add("online");
-      $("conexaoTexto").textContent = "Online";
+      // Conectado é o normal: fica só a bolinha verde, sem repetir a palavra
+      // "Online", que agora pertence ao seletor de status ao lado.
+      $("conexaoTexto").textContent = "";
       identificarNoChat(); // avisa quem entrou e recebe o histórico do chat
+      aplicarStatus(meuStatus, true);
     });
     socket.on("disconnect", () => {
       caixaConexao.classList.remove("online");
@@ -918,16 +1527,20 @@
   const horaLocal = (iso) => new Date(iso).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
 
   // Cabeçalho: identidade de quem está no plantão e resumo do turno.
+  function iniciaisDe(nome){
+    const partes = String(nome || "").trim().split(/\s+/).filter(Boolean);
+    if(!partes.length) return "--";
+    const t = partes.length > 1 ? partes[0][0] + partes[partes.length - 1][0] : partes[0].slice(0, 2);
+    return t.toUpperCase();
+  }
+
   function atualizarCabecalho(){
     const nome = meuNomeChat() || "Sem identificação";
-    const cargo = [categoriaAtual(), salaAtual()].filter(Boolean).join(" · ") || "Preencha o plantão";
+    const cargo = [categoriaAtual(), salaAtual()].filter(Boolean).join(" · ") || "Configurar perfil";
     $("euNome").textContent = nome;
     $("euCargo").textContent = cargo;
-    const partes = nome.split(/\s+/).filter(Boolean);
-    const iniciais = partes.length > 1
-      ? (partes[0][0] + partes[partes.length - 1][0])
-      : (partes[0] ? partes[0].slice(0, 2) : "--");
-    $("euIniciais").textContent = iniciais.toUpperCase();
+    $("euIniciais").textContent = iniciaisDe(meuNomeChat());
+    renderPerfil();
   }
 
   function render(){
@@ -955,7 +1568,6 @@
     renderModoTela();
     renderAvisos();
     renderFrases();
-    renderFarmacia();
     talvezRestaurarConteudo();
     if(estado.conteudoSalvo) guardarConteudo();
 
@@ -1163,7 +1775,6 @@
       localStorage.setItem(CHAVE_CONTEUDO, JSON.stringify({
         avisos: estado.avisos || [],
         frases: estado.frases || [],
-        farmacia: estado.farmacia || { ativo:false, itens:[] },
         modoTela: estado.modoTela || "avisos",
         salvoEm: new Date().toISOString(),
       }));
@@ -1175,8 +1786,7 @@
     let copia = null;
     try{ copia = JSON.parse(localStorage.getItem(CHAVE_CONTEUDO) || "null"); }catch(e){}
     if(!copia) return;
-    const temAlgo = (copia.avisos || []).length || (copia.frases || []).length
-      || ((copia.farmacia || {}).itens || []).length;
+    const temAlgo = (copia.avisos || []).length || (copia.frases || []).length;
     if(!temAlgo) return;
     jaRestaurou = true;
     socket.emit("restaurar-conteudo", copia);
@@ -1212,12 +1822,27 @@
   // Mural coletivo e mensagens diretas entre os painéis. Nada disto trafega
   // para a TV: no servidor, só os painéis entram na sala "equipe".
   const CHAVE_SOM_CHAT = "som-chat-monte-serrat";
+  const CHAVE_NOTIF = "notificar-chat-monte-serrat";
   let msgs = [];          // mensagens que este profissional pode ver
   let euChave = "";       // identidade deste painel no chat
-  let destino = null;     // null = mural; { chave, nome } = mensagem direta
+  // null = ninguém escolhido ainda (não dá para enviar), { mural:true } = mural
+  // da equipe, { chave, nome } = conversa direta. Começa em null de propósito:
+  // sem isso, a primeira mensagem do dia sairia no mural sem querer.
+  let destino = null;
   let naoLidas = 0;
+  // Quantas mensagens não lidas de cada colega, separando mural de direta.
+  // É o que pinta o bloco da pessoa na lista de quem está online.
+  const naoLidasPor = new Map();
   let onlineAgora = [];
-  let somLigado = localStorage.getItem(CHAVE_SOM_CHAT) !== "0";
+  // Três níveis de som: "alto" (padrão, para sala com ruído), "normal" e "off".
+  // O valor antigo "0"/"1" continua sendo entendido, para quem já tinha usado.
+  const NIVEIS = ["alto", "normal", "off"];
+  let nivelSom = (() => {
+    const salvo = localStorage.getItem(CHAVE_SOM_CHAT);
+    if(salvo === "0") return "off";
+    if(salvo === "1") return "normal";
+    return NIVEIS.includes(salvo) ? salvo : "alto";
+  })();
   const tituloOriginal = document.title;
 
   // Nome usado no chat: o do plantão. Na Farmácia, onde não há identificação
@@ -1228,9 +1853,6 @@
     return ehFarmacia() ? (salaAtual() || "Farmácia") : "";
   }
 
-  const semAcento = (t) => String(t||"").trim().toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ");
-
   let timerIdent = null;
   function identificarNoChat(){
     clearTimeout(timerIdent);
@@ -1240,6 +1862,7 @@
         nome: meuNomeChat(),
         categoria: categoriaAtual(),
         sala: salaAtual(),
+        status: meuStatus,
       });
       atualizarEnvio();
     }, 400);
@@ -1247,10 +1870,45 @@
 
   function atualizarEnvio(){
     const temNome = !!meuNomeChat();
-    $("textoMensagem").disabled = !temNome;
-    $("btnEnviar").disabled = !temNome;
+    const pode = temNome && !!destino;
+    $("textoMensagem").disabled = !pode;
+    $("btnEnviar").disabled = !pode;
     $("chatSemNome").style.display = temNome ? "none" : "block";
   }
+
+  function contarNaoLidas(){
+    let t = 0;
+    naoLidasPor.forEach((v) => { t += v.mural + v.direto; });
+    naoLidas = t;
+    botarSelo();
+    renderOnline();
+  }
+
+  function marcarNaoLida(m){
+    const atual = naoLidasPor.get(m.deChave) || { mural: 0, direto: 0, nome: m.de, ultima: 0 };
+    if(m.paraChave) atual.direto += 1; else atual.mural += 1;
+    atual.nome = m.de;
+    atual.ultima = new Date(m.hora).getTime() || Date.now();
+    naoLidasPor.set(m.deChave, atual);
+    contarNaoLidas();
+  }
+
+  // Ler o mural zera o que veio do mural; abrir a conversa de alguém zera
+  // só as diretas daquela pessoa. Assim o bloco continua colorido enquanto
+  // houver mensagem direta esperando resposta. Usada tanto pela tela
+  // principal quanto pela janela flutuante — cada uma passa a sua própria
+  // conversa aberta.
+  function limparNaoLidaDe(dest){
+    if(!dest){ contarNaoLidas(); return; }
+    if(!ehMural(dest)){
+      const v = naoLidasPor.get(dest.chave);
+      if(v){ v.direto = 0; if(!v.mural) naoLidasPor.delete(dest.chave); }
+    }else{
+      naoLidasPor.forEach((v, k) => { v.mural = 0; if(!v.direto) naoLidasPor.delete(k); });
+    }
+    contarNaoLidas();
+  }
+  function limparConversaAberta(){ limparNaoLidaDe(destino); }
 
   function botarSelo(){
     const selo = $("seloEquipe");
@@ -1258,123 +1916,689 @@
     selo.classList.toggle("visivel", naoLidas > 0);
     document.title = naoLidas > 0 ? `(${naoLidas}) ${tituloOriginal}` : tituloOriginal;
   }
-  function zerarNaoLidas(){ naoLidas = 0; botarSelo(); }
+  function zerarNaoLidas(){ limparConversaAberta(); }
 
   // Bipe curto e discreto, só neste computador. Fica fora da fila de
   // anúncios da TV, então nunca atrasa a chamada de um paciente.
   let audioChat = null;
-  function bipeChat(){
-    if(!somLigado) return;
+
+  // O navegador só libera áudio depois de um clique na página. Este destravamento
+  // acontece uma única vez, no primeiro toque em qualquer lugar do painel.
+  function destravarAudio(){
     try{
       audioChat = audioChat || new (window.AudioContext || window.webkitAudioContext)();
       if(audioChat.state === "suspended") audioChat.resume();
-      const osc = audioChat.createOscillator();
-      const vol = audioChat.createGain();
-      osc.type = "sine";
-      osc.frequency.value = 880;
-      vol.gain.setValueAtTime(0.0001, audioChat.currentTime);
-      vol.gain.exponentialRampToValueAtTime(0.06, audioChat.currentTime + 0.02);
-      vol.gain.exponentialRampToValueAtTime(0.0001, audioChat.currentTime + 0.22);
-      osc.connect(vol).connect(audioChat.destination);
-      osc.start();
-      osc.stop(audioChat.currentTime + 0.24);
+    }catch(e){}
+  }
+  // Sem "once": se o navegador recusar o áudio na primeira tentativa, qualquer
+  // clique seguinte tenta de novo. Trocar de aba também reativa o som.
+  document.addEventListener("click", destravarAudio);
+  document.addEventListener("keydown", destravarAudio);
+  document.addEventListener("visibilitychange", () => { if(!document.hidden) destravarAudio(); });
+
+  // Onda quadrada corta melhor o ruído de sala de espera que a senoide, e o
+  // nível alto toca duas notas, para não se confundir com bipe de aparelho.
+  function nota(freq, atraso, dur, pico){
+    const osc = audioChat.createOscillator();
+    const vol = audioChat.createGain();
+    const t = audioChat.currentTime + atraso;
+    osc.type = "square";
+    osc.frequency.value = freq;
+    vol.gain.setValueAtTime(0.0001, t);
+    vol.gain.exponentialRampToValueAtTime(pico, t + 0.015);
+    vol.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(vol).connect(audioChat.destination);
+    osc.start(t);
+    osc.stop(t + dur + 0.02);
+  }
+
+  function bipeChat(direta, discreto){
+    if(nivelSom === "off") return;
+    try{
+      destravarAudio();
+      if(discreto){
+        // você já está com a conversa aberta: uma nota curta e baixa basta
+        nota(880, 0, 0.12, 0.10);
+        return;
+      }
+      const pico = nivelSom === "alto" ? 0.55 : 0.16;
+      nota(880, 0, 0.16, pico);
+      if(nivelSom === "alto"){
+        nota(1245, 0.17, 0.20, pico);
+        if(direta) nota(1245, 0.42, 0.20, pico); // direta insiste uma vez mais
+      }
     }catch(e){}
   }
 
   function renderSomChat(){
     const b = $("btnSomChat");
-    b.textContent = somLigado ? "Aviso sonoro ligado" : "Aviso sonoro desligado";
-    b.classList.toggle("suave", somLigado);
+    const rotulo = { alto: "Som alto", normal: "Som normal", off: "Som desligado" };
+    b.textContent = rotulo[nivelSom];
+    b.classList.toggle("suave", nivelSom !== "off");
   }
   $("btnSomChat").onclick = () => {
-    somLigado = !somLigado;
-    localStorage.setItem(CHAVE_SOM_CHAT, somLigado ? "1" : "0");
+    nivelSom = NIVEIS[(NIVEIS.indexOf(nivelSom) + 1) % NIVEIS.length];
+    localStorage.setItem(CHAVE_SOM_CHAT, nivelSom);
     renderSomChat();
-    if(somLigado) bipeChat();
+    bipeChat(false); // toca no nível novo, para a pessoa ouvir a diferença
   };
+
+  /* --- aviso do sistema, por cima de qualquer janela --- */
+  // A Notification API desenha fora do navegador, então o aviso aparece mesmo
+  // com o painel minimizado ou atrás de outro programa. Exige permissão e só
+  // funciona em endereço https (o do Render) ou em localhost.
+  let notifLigada = localStorage.getItem(CHAVE_NOTIF) === "1";
+
+  function estadoNotif(){
+    if(!("Notification" in window)) return "indisponivel";
+    if(Notification.permission === "denied") return "bloqueada";
+    if(Notification.permission === "granted") return notifLigada ? "ligada" : "desligada";
+    return "sem-permissao";
+  }
+
+  function renderNotif(){
+    const b = $("btnNotificar");
+    const est = estadoNotif();
+    const rotulo = {
+      indisponivel: "Aviso na tela indisponível",
+      bloqueada: "Aviso na tela bloqueado",
+      ligada: "Aviso na tela ligado",
+      desligada: "Aviso na tela desligado",
+      "sem-permissao": "Permitir aviso na tela",
+    };
+    b.textContent = rotulo[est];
+    b.classList.toggle("suave", est === "ligada");
+    b.disabled = est === "indisponivel" || est === "bloqueada";
+    b.title = est === "bloqueada"
+      ? "O navegador bloqueou os avisos para este endereço. Libere no cadeado da barra de endereços."
+      : "Mostra um aviso do sistema por cima de qualquer janela quando chegar mensagem";
+  }
+
+  $("btnNotificar").onclick = async () => {
+    if(!("Notification" in window)) return;
+    if(Notification.permission === "default"){
+      try{ await Notification.requestPermission(); }catch(e){}
+      notifLigada = Notification.permission === "granted";
+    }else{
+      notifLigada = !notifLigada;
+    }
+    localStorage.setItem(CHAVE_NOTIF, notifLigada ? "1" : "0");
+    renderNotif();
+    if(estadoNotif() === "ligada"){
+      mostrarNotificacao("Aviso na tela ligado", "É assim que as mensagens vão aparecer.", "teste");
+    }
+  };
+
+  function mostrarNotificacao(titulo, corpo, marca){
+    try{
+      const n = new Notification(titulo, { body: corpo, tag: marca, renotify: true });
+      n.onclick = () => { window.focus(); trocarAba("equipe"); n.close(); };
+      setTimeout(() => n.close(), 15000);
+    }catch(e){}
+  }
+
+  function notificarSistema(m){
+    if(estadoNotif() !== "ligada") return;
+    const titulo = m.paraChave ? m.de + " te mandou uma mensagem" : m.de + " no mural";
+    mostrarNotificacao(titulo, m.texto.slice(0, 120), "chat-" + m.deChave);
+  }
+
+  /* --- janela flutuante do chat --- */
+  // Document Picture-in-Picture cria uma janelinha que fica acima de tudo,
+  // inclusive de outros programas. É o mesmo recurso do botão de emergência.
+  // Roda no mesmo contexto de JavaScript do painel (não é um popup separado),
+  // então reaproveita socket, msgs, naoLidasPor e as mesmas funções de cor e
+  // nome — só a tela é outra.
+  let janelaChat = null;
+  let elFlutuante = null;      // referências aos elementos da janelinha
+  let destinoFlutuante = null; // conversa aberta ali dentro, independente da tela principal
+
+  async function abrirMuralFlutuante(){
+    if(!(window.documentPictureInPicture && documentPictureInPicture.requestWindow)){
+      alert("Este navegador não abre a janela flutuante. Use o Chrome ou o Edge no computador, "
+        + "ou ligue o \"Aviso na tela\", que funciona em qualquer navegador.");
+      return;
+    }
+    try{
+      const jan = await documentPictureInPicture.requestWindow({ width: 330, height: 360 });
+      janelaChat = jan;
+      const doc = jan.document;
+
+      const estilo = doc.createElement("style");
+      estilo.textContent = `
+        *{box-sizing:border-box; margin:0; padding:0}
+        body{font-family:Inter,-apple-system,sans-serif; background:#F2F4F8; color:#303952;
+          height:100vh; display:flex; flex-direction:column; overflow:hidden; padding:10px; gap:8px}
+        .fx-conversas{display:flex; gap:8px; padding:1px 1px 8px; border-bottom:1px solid #EEF0F4;
+          overflow-x:auto; flex:none}
+        .fx-conversas::-webkit-scrollbar{height:4px}
+        .fx-item{position:relative; flex:none; text-align:center; cursor:pointer; background:none; border:0;
+          font-family:inherit; color:inherit; padding:0}
+        .fx-av{width:30px; height:30px; border-radius:50%; font-size:11px; font-weight:700;
+          display:flex; align-items:center; justify-content:center; margin:0 auto}
+        .fx-item.ativo .fx-av{outline:2px solid #546de5; outline-offset:2px}
+        .fx-item small{display:block; font-size:8.5px; font-weight:600; color:#596275; margin-top:2px;
+          max-width:38px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+        .fx-contador{position:absolute; top:-3px; right:2px; min-width:14px; height:14px; border-radius:8px;
+          background:#f7d794; color:#8a6d13; font-size:8px; font-weight:800; line-height:14px;
+          text-align:center; border:1.5px solid #F2F4F8}
+        .fx-destino{font-size:10.5px; font-weight:700; color:#546de5; flex:none}
+        .fx-feed{flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:2px; min-height:0}
+        .fx-vazio{font-size:11.5px; color:#596275; text-align:center; padding:14px 4px}
+        .fx-grupo{display:flex; gap:7px; margin-top:9px}
+        .fx-grupo:first-child{margin-top:0}
+        .fx-grupo.minha{flex-direction:row-reverse}
+        .fx-grupo .fx-av{width:22px; height:22px; font-size:9px; align-self:flex-end; margin:0}
+        .fx-pilha{display:flex; flex-direction:column; gap:2px; max-width:78%; min-width:0}
+        .fx-grupo.minha .fx-pilha{align-items:flex-end}
+        .fx-nome{font-size:10px; font-weight:700; padding:0 3px; color:#303952}
+        .fx-etq{font-size:9px; font-weight:700; text-transform:uppercase; color:#8a6d13; padding:0 3px}
+        .fx-balao{padding:6px 9px; border-radius:11px; border-bottom-left-radius:3px;
+          font-size:11.5px; line-height:1.35; word-break:break-word; color:#303952}
+        .fx-grupo.minha .fx-balao{background:#546de5; color:#fff; border-bottom-left-radius:11px;
+          border-bottom-right-radius:3px}
+        .fx-grupo.direta .fx-balao{box-shadow:inset 0 0 0 1.5px #f7d794}
+        .fx-hora{font-size:9.5px; color:#A2A9BB; padding:0 3px}
+        .fx-compor{display:flex; gap:5px; padding-top:6px; border-top:1px solid #EEF0F4; flex:none}
+        .fx-compor input{flex:1; font:inherit; font-size:11px; border:1px solid #E9EBF2; border-radius:14px;
+          padding:6px 10px; color:#303952; background:#fff}
+        .fx-compor input::placeholder{color:#A2A9BB}
+        .fx-compor button{font:inherit; font-size:10.5px; font-weight:700; border:0; border-radius:14px;
+          background:#546de5; color:#fff; padding:6px 12px; cursor:pointer; flex:none}
+        .fx-compor button:disabled{background:#E9EBF2; color:#A2A9BB; cursor:default}
+        .fx-abrir{flex:none; font:inherit; font-size:10.5px; font-weight:600; padding:6px; border-radius:8px;
+          border:1px solid #E9EBF2; background:#fff; color:#596275; cursor:pointer}
+      `;
+      doc.head.append(estilo);
+
+      const conversas = doc.createElement("div");
+      conversas.className = "fx-conversas";
+
+      const linhaDestino = doc.createElement("div");
+      linhaDestino.style.cssText = "display:flex; align-items:center; gap:6px; flex:none";
+      const destinoTxt = doc.createElement("span");
+      destinoTxt.className = "fx-destino";
+      const btnAbrir = doc.createElement("button");
+      btnAbrir.className = "fx-abrir";
+      btnAbrir.textContent = "Abrir o painel";
+      btnAbrir.style.marginLeft = "auto";
+      btnAbrir.onclick = () => { window.focus(); trocarAba("equipe"); };
+      linhaDestino.append(destinoTxt, btnAbrir);
+
+      const feed = doc.createElement("div");
+      feed.className = "fx-feed";
+
+      const compor = doc.createElement("div");
+      compor.className = "fx-compor";
+      const campo = doc.createElement("input");
+      campo.placeholder = "Escreva e aperte Enter";
+      const btnEnviar = doc.createElement("button");
+      btnEnviar.textContent = "Enviar";
+      compor.append(campo, btnEnviar);
+
+      doc.body.append(conversas, linhaDestino, feed, compor);
+      elFlutuante = { doc, conversas, destinoTxt, feed, campo, btnEnviar };
+
+      conversas.addEventListener("click", (e) => {
+        const item = e.target.closest(".fx-item");
+        if(item) selecionarFlutuante(item.dataset.mural ? { mural: true } : { chave: item.dataset.chave, nome: item.dataset.nome });
+      });
+      const enviar = () => {
+        if(enviarTexto(destinoFlutuante, campo.value)){ campo.value = ""; campo.focus(); }
+      };
+      btnEnviar.onclick = enviar;
+      campo.addEventListener("keydown", (e) => { if(e.key === "Enter") enviar(); });
+
+      jan.addEventListener("pagehide", () => { janelaChat = null; elFlutuante = null; });
+
+      // abre direto na conversa mais urgente: compara a mensagem direta não
+      // lida mais recente com a mensagem de mural não lida mais recente, e
+      // fica com o mural em caso de empate ou se não houver nada pendente
+      const topDireta = listaConversasFlutuante().find(c => {
+        const v = naoLidasPor.get(c.chave);
+        return v && v.direto > 0;
+      });
+      const ultimaDireta = topDireta ? (naoLidasPor.get(topDireta.chave) || {}).ultima || 0 : 0;
+      const ultimaMural = [...naoLidasPor.values()]
+        .filter(v => v.mural > 0).reduce((max, v) => Math.max(max, v.ultima || 0), 0);
+      destinoFlutuante = (topDireta && ultimaDireta > ultimaMural) ? topDireta : { mural: true };
+      limparNaoLidaDe(destinoFlutuante);
+      renderFlutuante();
+      setTimeout(() => campo.focus(), 50);
+    }catch(e){ /* usuário cancelou */ }
+  }
+  $("btnMuralFlutuante").onclick = abrirMuralFlutuante;
+
+  // Quem aparece na tira de avatares: todo mundo com quem há uma conversa
+  // direta nas últimas 24h, mais quem tem mensagem não lida agora, mais a
+  // conversa aberta no momento (para ela não sumir da tira ao ser lida).
+  // Não recalcula do zero a cada mensagem — deriva sempre de msgs/naoLidasPor,
+  // então nunca fica desatualizada.
+  function listaConversasFlutuante(){
+    const vistas = new Map();
+    msgs.forEach(m => {
+      if(!m.paraChave) return;
+      const outro = m.deChave === euChave ? m.paraChave : (m.paraChave === euChave ? m.deChave : null);
+      if(!outro) return;
+      const nome = m.deChave === euChave ? (m.paraNome || outro) : m.de;
+      vistas.set(outro, { chave: outro, nome });
+    });
+    // só entra na tira quem tem conversa DIRETA de verdade — mensagem no
+    // mural não vira uma "conversa" com aquela pessoa, o mural já é a
+    // primeira posição da tira, fixa, separada
+    naoLidasPor.forEach((v, k) => { if(k !== euChave && v.direto > 0) vistas.set(k, { chave: k, nome: v.nome }); });
+    if(destinoFlutuante && !ehMural(destinoFlutuante)) vistas.set(destinoFlutuante.chave, destinoFlutuante);
+    return [...vistas.values()].sort((a, b) => {
+      const ua = (naoLidasPor.get(a.chave) || {}).ultima || 0;
+      const ub = (naoLidasPor.get(b.chave) || {}).ultima || 0;
+      if(ua || ub) return ub - ua;
+      return primeiroNomeDe(a.nome).localeCompare(primeiroNomeDe(b.nome), "pt-BR", { sensitivity: "base" });
+    });
+  }
+
+  function selecionarFlutuante(dest){
+    destinoFlutuante = dest;
+    limparNaoLidaDe(destinoFlutuante);
+    renderFlutuante();
+    if(elFlutuante) elFlutuante.campo.focus();
+  }
+
+  function renderFlutuante(){
+    if(!janelaChat || !elFlutuante) return;
+    const { doc, conversas, destinoTxt, feed, campo, btnEnviar } = elFlutuante;
+
+    // tira de avatares: mural primeiro (fixo), depois os colegas
+    conversas.innerHTML = "";
+    const muralNaoLidas = [...naoLidasPor.values()].reduce((t, v) => t + v.mural, 0);
+    conversas.append(itemFlutuante(doc, {
+      mural: true, iniciais: "MU", nome: "Mural", cor: "#546de5", texto: "#FFFFFF",
+      ativo: ehMural(destinoFlutuante), contador: muralNaoLidas,
+    }));
+    listaConversasFlutuante().forEach(c => {
+      const nl = naoLidasPor.get(c.chave);
+      const info = infoDePessoa(c.chave);
+      conversas.append(itemFlutuante(doc, {
+        chave: c.chave, nome: c.nome, iniciais: iniciaisDe(c.nome), cor: info.cor, texto: info.texto,
+        ativo: !ehMural(destinoFlutuante) && destinoFlutuante && destinoFlutuante.chave === c.chave,
+        contador: nl ? nl.mural + nl.direto : 0,
+      }));
+    });
+
+    // rótulo e estado do campo de resposta
+    const podeEscrever = !!meuNomeChat();
+    if(ehMural(destinoFlutuante)) destinoTxt.textContent = "Mural da equipe";
+    else destinoTxt.textContent = "Direto · " + primeiroNomeDe(destinoFlutuante.nome);
+    campo.disabled = !podeEscrever;
+    btnEnviar.disabled = !podeEscrever;
+    campo.placeholder = podeEscrever
+      ? "Escreva e aperte Enter"
+      : "Configure seu perfil para escrever";
+
+    // mensagens da conversa selecionada
+    const visiveis = ehMural(destinoFlutuante)
+      ? msgs.filter(m => !m.paraChave)
+      : msgs.filter(m => m.paraChave && (
+          (m.deChave === euChave && m.paraChave === destinoFlutuante.chave) ||
+          (m.deChave === destinoFlutuante.chave && m.paraChave === euChave)));
+
+    feed.innerHTML = "";
+    if(!visiveis.length){
+      const p = doc.createElement("div");
+      p.className = "fx-vazio";
+      p.textContent = ehMural(destinoFlutuante)
+        ? "Nenhuma mensagem no mural ainda."
+        : `Nenhuma mensagem com ${primeiroNomeDe(destinoFlutuante.nome)} nas últimas 24h.`;
+      feed.append(p);
+      return;
+    }
+
+    const grupos = [];
+    visiveis.forEach(m => {
+      const ultimo = grupos[grupos.length - 1];
+      const mesmo = ultimo && ultimo.deChave === m.deChave && !!ultimo.direta === !!m.paraChave
+        && (new Date(m.hora) - new Date(ultimo.fim)) < 5 * 60 * 1000;
+      if(mesmo){ ultimo.textos.push(m.texto); ultimo.fim = m.hora; }
+      else grupos.push({ deChave: m.deChave, de: m.de, direta: !!m.paraChave,
+        paraNome: m.paraNome || "", textos: [m.texto], fim: m.hora });
+    });
+    grupos.forEach(g => {
+      const minha = g.deChave === euChave;
+      const info = minha ? { cor: "#546de5", texto: "#FFFFFF" } : infoDePessoa(g.deChave);
+      const div = doc.createElement("div");
+      div.className = "fx-grupo" + (minha ? " minha" : "") + (g.direta ? " direta" : "");
+      const av = doc.createElement("span");
+      av.className = "fx-av";
+      av.style.cssText = `background:${info.cor}; color:${info.texto}`;
+      av.textContent = iniciaisDe(minha ? meuNomeChat() : g.de);
+      const pilha = doc.createElement("div");
+      pilha.className = "fx-pilha";
+      if(!minha){
+        const nome = doc.createElement("span");
+        nome.className = "fx-nome";
+        nome.style.color = infoDePessoa(g.deChave).escuro;
+        nome.textContent = primeiroNomeDe(g.de);
+        pilha.append(nome);
+      }
+      if(g.direta){
+        const et = doc.createElement("span");
+        et.className = "fx-etq";
+        et.textContent = minha ? "só para " + primeiroNomeDe(g.paraNome) : "te mandou uma mensagem";
+        pilha.append(et);
+      }
+      g.textos.forEach(t => {
+        const b = doc.createElement("div");
+        b.className = "fx-balao";
+        // balão a 15% de opacidade da cor da pessoa; as minhas continuam azul cheio
+        b.style.cssText = minha ? "background:#546de5; color:#fff" : `background:${corBalao(g.deChave)}`;
+        b.textContent = t;
+        pilha.append(b);
+      });
+      const hora = doc.createElement("span");
+      hora.className = "fx-hora";
+      hora.textContent = horaLocal(g.fim);
+      pilha.append(hora);
+      div.append(minha ? pilha : av, minha ? av : pilha);
+      feed.append(div);
+    });
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function itemFlutuante(doc, { mural, chave, nome, iniciais, cor, texto, ativo, contador }){
+    const b = doc.createElement("button");
+    b.className = "fx-item" + (ativo ? " ativo" : "");
+    if(mural) b.dataset.mural = "1"; else { b.dataset.chave = chave; b.dataset.nome = nome; }
+    b.innerHTML = `
+      <span class="fx-av" style="background:${cor}; color:${texto}">${escapar(iniciais)}</span>
+      ${contador ? `<span class="fx-contador">${contador > 9 ? "9+" : contador}</span>` : ""}
+      <small>${escapar(mural ? "Mural" : primeiroNomeDe(nome))}</small>`;
+    return b;
+  }
+
+  const ehMural = (d) => !!(d && d.mural);
+
+  // Cada um dos 41 profissionais cadastrados tem uma cor fixa e exclusiva,
+  // sorteada uma única vez. É a mesma cor em qualquer computador: a Aline é
+  // sempre azul-marinho, no painel dela, no seu e na janela flutuante.
+  // "escuro" é a mesma cor a 55% de luz, usada no nome acima do balão, onde a
+  // cor cheia não teria contraste suficiente sobre o fundo branco.
+  const CORES_EQUIPE = {
+    "aline oliveira albuquerque": { cor: "#0652DD", texto: "#FFFFFF", escuro: "#032D7A" }, // Merchant Marine Blue
+    "andrea carla da silva": { cor: "#5758BB", texto: "#FFFFFF", escuro: "#303067" }, // Circumorbital Ring
+    "andreia da gama almeida": { cor: "#95AFC0", texto: "#1a1a1a", escuro: "#52606A" }, // Soaring Eagle
+    "bruna de liz hillesheim": { cor: "#CCAE62", texto: "#1a1a1a", escuro: "#706036" }, // Desert
+    "caio cesar borges de oliveira": { cor: "#009432", texto: "#FFFFFF", escuro: "#00511C" }, // Pixelated Grass
+    "claudia albertina marcal nunes": { cor: "#1289A7", texto: "#FFFFFF", escuro: "#0A4B5C" }, // Mediterranean Sea
+    "cledion meirelles dos santos": { cor: "#9B59B6", texto: "#FFFFFF", escuro: "#553164" }, // Amethyst
+    "cristiani margarida da silva": { cor: "#9AECDB", texto: "#1a1a1a", escuro: "#558278" }, // Oasis Stream
+    "deborah de oliveira renzetti": { cor: "#3498DB", texto: "#FFFFFF", escuro: "#1D5478" }, // Peter River
+    "elena mara dias de oliveira": { cor: "#F79F1F", texto: "#1a1a1a", escuro: "#885711" }, // Radiant Yellow
+    "eloisa helena dos santos": { cor: "#1B1464", texto: "#FFFFFF", escuro: "#0F0B37" }, // 20000 Leagues
+    "eunice cristine patricio": { cor: "#D35400", texto: "#FFFFFF", escuro: "#742E00" }, // Pumpkin
+    "flaviane silveira fialho": { cor: "#1B9CFC", texto: "#FFFFFF", escuro: "#0F568B" }, // Clear Chill
+    "gabriela dos santos marques": { cor: "#FFBE76", texto: "#1a1a1a", escuro: "#8C6941" }, // Spiced Nectarine
+    "gabriela ribeiro medeiros": { cor: "#17C0EB", texto: "#FFFFFF", escuro: "#0D6A81" }, // Spiro Disco Ball
+    "gabriela schuck kern": { cor: "#34495E", texto: "#FFFFFF", escuro: "#1D2834" }, // Wet Asphalt
+    "gilmara barbosa": { cor: "#FFF200", texto: "#1a1a1a", escuro: "#8C8500" }, // Dorn Yellow
+    "gisele costa": { cor: "#C0392B", texto: "#FFFFFF", escuro: "#6A1F18" }, // Pomegranate
+    "gizele silveira e melo": { cor: "#F6E58D", texto: "#1a1a1a", escuro: "#877E4E" }, // Beekeeper
+    "graziela regina barbosa": { cor: "#7EFFF5", texto: "#1a1a1a", escuro: "#458C87" }, // Electric Blue
+    "gustavo berje armelin": { cor: "#F97F51", texto: "#1a1a1a", escuro: "#89462D" }, // Rich Gardenia
+    "jackson rodrigo ricardo": { cor: "#BDC581", texto: "#1a1a1a", escuro: "#686C47" }, // Pine Glade
+    "jessica hegedeus camargo": { cor: "#95A5A6", texto: "#1a1a1a", escuro: "#525B5B" }, // Concrete
+    "jessicamila dos santos pais iglesias": { cor: "#7D5FFF", texto: "#FFFFFF", escuro: "#45348C" }, // Light Slate Blue
+    "jorge pascual asencio rondon": { cor: "#CD84F1", texto: "#1a1a1a", escuro: "#714985" }, // Bright Lilac
+    "kamila branco carlos": { cor: "#FAD390", texto: "#1a1a1a", escuro: "#8A744F" }, // Flat Flesh
+    "leila gabriela mateus zanoni": { cor: "#1ABC9C", texto: "#FFFFFF", escuro: "#0E6756" }, // Turquoise
+    "luciana ferreira": { cor: "#3D3D3D", texto: "#FFFFFF", escuro: "#222222" }, // Baltic Sea
+    "luciane carmen villela papaleo": { cor: "#D6A2E8", texto: "#1a1a1a", escuro: "#765980" }, // Bright Ube
+    "marcos augusto farias e silva": { cor: "#006266", texto: "#FFFFFF", escuro: "#003638" }, // Turkish Aqua
+    "maria eduarda cabral": { cor: "#FDA7DF", texto: "#1a1a1a", escuro: "#8B5C7B" }, // Lavender Rose
+    "mayara mara de souza": { cor: "#E67E22", texto: "#FFFFFF", escuro: "#7F4513" }, // Carrot
+    "mayumi marcela ujissato": { cor: "#F1C40F", texto: "#1a1a1a", escuro: "#856C08" }, // Sun Flower
+    "nathalia celestino silva": { cor: "#55E6C1", texto: "#1a1a1a", escuro: "#2F7F6A" }, // Sweet Garden
+    "rafaela felipe": { cor: "#FC427B", texto: "#FFFFFF", escuro: "#8B2444" }, // Sasquatch Socks
+    "rosana costa machado": { cor: "#FC5C65", texto: "#FFFFFF", escuro: "#8B3338" }, // Fusion Red
+    "sabrina mari da fonseca de souza": { cor: "#12CBC4", texto: "#FFFFFF", escuro: "#0A706C" }, // Blue Martina
+    "shirlei soraia mathias": { cor: "#2ECC71", texto: "#FFFFFF", escuro: "#19703E" }, // Emerald
+    "tamara benedetti heidrich": { cor: "#6F1E51", texto: "#FFFFFF", escuro: "#3D102D" }, // Magenta Purple
+    "thais borges da silva": { cor: "#B53471", texto: "#FFFFFF", escuro: "#641D3E" }, // Very Berry
+    "vanuza soares": { cor: "#BADC58", texto: "#1a1a1a", escuro: "#667930" }, // June Bud
+  };
+
+  // As 41 cores da lista, para atribuir a quem não está no cadastro (quem entra
+  // pelo "+ Adicionar outro profissional"). É determinístico: a mesma pessoa cai
+  // sempre na mesma cor, só que sem a garantia de ser exclusiva dela.
+  const PALETA_RESERVA = Object.values(CORES_EQUIPE).map(c => c.cor);
+
+  function infoDePessoa(chave){
+    const t = String(chave || "").trim();
+    if(CORES_EQUIPE[t]) return CORES_EQUIPE[t];
+    let n = 0;
+    for(let i = 0; i < t.length; i++) n = (n * 31 + t.charCodeAt(i)) % 1000003;
+    const cor = PALETA_RESERVA[n % PALETA_RESERVA.length];
+    const r = parseInt(cor.slice(1,3),16), g = parseInt(cor.slice(3,5),16), b = parseInt(cor.slice(5,7),16);
+    const brilho = (r*299 + g*587 + b*114) / 1000;
+    const paraHex = (v) => v.toString(16).padStart(2,"0").toUpperCase();
+    const escuro = "#" + paraHex(Math.round(r*0.55)) + paraHex(Math.round(g*0.55)) + paraHex(Math.round(b*0.55));
+    return { cor, texto: brilho > 150 ? "#1a1a1a" : "#FFFFFF", escuro };
+  }
+
+  // O balão de fala usa a mesma cor, só que a 15% de opacidade: identifica a
+  // pessoa sem competir com o azul das suas próprias mensagens nem com o
+  // contorno âmbar das diretas. Nessa diluição o texto preto é legível em
+  // todas as 41 cores, inclusive nas mais escuras da lista.
+  function corBalao(chave){
+    return infoDePessoa(chave).cor + "26"; // 26 hex = 15% de alpha
+  }
+
+  const primeiroNomeDe = (nome) => String(nome || "").trim().split(/\s+/)[0] || "";
 
   function renderDestino(){
     const alvo = $("destinoAtual");
-    if(destino){
-      alvo.textContent = "Direto para " + destino.nome;
-      alvo.classList.add("direto");
-      $("btnMural").style.display = "";
-      $("textoMensagem").placeholder = `Mensagem só para ${destino.nome}`;
+    alvo.classList.toggle("direto", !!(destino && !ehMural(destino)));
+    alvo.classList.toggle("nenhum", !destino);
+    $("btnMural").style.display = destino ? "" : "none";
+    if(!destino){
+      alvo.textContent = "Escolha quem vai receber";
+      $("textoMensagem").placeholder = "Primeiro escolha um colega ou o mural, ao lado";
+    }else if(ehMural(destino)){
+      alvo.textContent = "Mural da equipe — todos veem";
+      $("textoMensagem").placeholder = "Mensagem para toda a equipe";
     }else{
-      alvo.textContent = "Mural da equipe";
-      alvo.classList.remove("direto");
-      $("btnMural").style.display = "none";
-      $("textoMensagem").placeholder = "Escreva sua mensagem e aperte Enter";
+      alvo.textContent = "Só para " + destino.nome;
+      $("textoMensagem").placeholder = `Mensagem só para ${destino.nome}`;
     }
+    atualizarEnvio();
   }
-  $("btnMural").onclick = () => { destino = null; renderDestino(); renderMensagens(); };
+  // Trocar volta ao estado de escolha, em vez de cair no mural
+  $("btnMural").onclick = () => {
+    destino = null;
+    renderDestino();
+    renderMensagens();
+    renderOnline();
+  };
 
   function renderOnline(){
     const ul = $("listaOnline");
     ul.innerHTML = "";
-    if(!onlineAgora.length){
-      ul.innerHTML = '<li style="border:0; color:var(--tinta-suave)">Ninguém com o painel aberto agora.</li>';
+    // A própria pessoa não precisa aparecer para si mesma na lista — só os
+    // colegas com quem dá para conversar.
+    const colegas = onlineAgora.filter(p => p.chave !== euChave);
+    const busca = semAcento($("buscaProfissional").value);
+    // a pesquisa vale pelo nome completo, mesmo com o primeiro nome na tela
+    const filtrados = busca
+      ? colegas.filter(p => semAcento(p.nome).includes(busca))
+      : colegas;
+    if(!colegas.length){
+      ul.innerHTML = '<li style="border:0; color:var(--tinta-suave)">Nenhum colega com o painel aberto agora.</li>';
       return;
     }
-    onlineAgora.forEach(p => {
+    if(!filtrados.length){
+      ul.innerHTML = '<li style="border:0; color:var(--tinta-suave)">Ninguém com esse nome entre quem está disponível.</li>';
+      return;
+    }
+    // Quem tem mensagem não lida sobe para o topo, a mais recente primeiro.
+    // Sem mensagem pendente, a ordem cai para alfabética pelo primeiro nome
+    // (a mesma que o servidor já manda).
+    const lista = [...filtrados].sort((a, b) => {
+      const ua = (naoLidasPor.get(a.chave) || {}).ultima || 0;
+      const ub = (naoLidasPor.get(b.chave) || {}).ultima || 0;
+      if(ua || ub) return ub - ua;
+      return 0; // mantém a ordem alfabética que já veio do servidor
+    });
+    // Primeira linha: o mural. Fica explícito que é uma escolha, e não o padrão.
+    const muralNaoLidas = [...naoLidasPor.values()].reduce((t, v) => t + v.mural, 0);
+    const liMural = document.createElement("li");
+    liMural.className = "linha-mural clicavel" + (ehMural(destino) ? " aberto" : "")
+      + (muralNaoLidas ? " naolida" : "");
+    liMural.dataset.mural = "1";
+    liMural.setAttribute("role", "button");
+    liMural.tabIndex = 0;
+    liMural.innerHTML = `
+      <span class="av mural">MU</span>
+      <span class="quem">
+        <b>Mural da equipe</b>
+        <small>Todos os profissionais leem</small>
+      </span>
+      ${muralNaoLidas ? `<span class="contador">${muralNaoLidas > 9 ? "9+" : muralNaoLidas}</span>` : ""}
+      ${ehMural(destino) ? '<span class="marca-aberto">Aberto</span>' : ""}`;
+    ul.appendChild(liMural);
+
+    lista.forEach(p => {
       const li = document.createElement("li");
       const sou = p.chave === euChave;
-      li.className = sou ? "eu" : "";
-      const detalhe = [p.sala, p.categoria].filter(Boolean).join(" · ");
+      const nl = naoLidasPor.get(p.chave);
+      const total = nl ? nl.mural + nl.direto : 0;
+      const intervalo = p.status === "intervalo";
+      const aberto = !!(destino && !ehMural(destino) && destino.chave === p.chave);
+      // Na tela fica o primeiro nome; o nome completo continua sendo a
+      // identificação e vale para a pesquisa e para a mensagem direta.
+      const curto = p.curto || p.nome;
+      const detalhe = [p.categoria, p.sala].filter(Boolean).join(" · ");
+      const info = infoDePessoa(p.chave);
+      li.className = [sou ? "eu" : "clicavel",
+        total ? "naolida" : "", (nl && nl.direto) ? "naolida-direta" : "",
+        intervalo ? "intervalo" : "", aberto ? "aberto" : ""].filter(Boolean).join(" ");
+      if(!sou){
+        li.dataset.direto = p.chave;
+        li.dataset.nome = curto;
+        li.setAttribute("role", "button");
+        li.tabIndex = 0;
+      }
+      const marca = total ? `<span class="contador">${total > 9 ? "9+" : total}</span>` : "";
+      const etiqueta = intervalo && !total
+        ? '<span class="etiqueta-status">Em intervalo</span>' : "";
       li.innerHTML = `
-        <span class="pt"></span>
+        <span class="av" style="background:${info.cor}; color:${info.texto}">${escapar(iniciaisDe(p.nome))}</span>
         <span class="quem">
-          <b>${escapar(p.nome)}${sou ? " (você)" : ""}</b>
-          <small>${escapar(detalhe || "sala não informada")}</small>
+          <b>${escapar(curto)}${sou ? " (você)" : ""}</b>
+          <small>${nl && nl.direto ? "te mandou uma mensagem" : escapar(detalhe || "sala não informada")}</small>
         </span>
-        ${sou ? "" : `<button data-direto="${escapar(p.chave)}" data-nome="${escapar(p.nome)}">Direto</button>`}`;
+        ${etiqueta}
+        ${marca}
+        ${aberto ? '<span class="marca-aberto">Aberto</span>' : ""}`;
       ul.appendChild(li);
     });
   }
 
-  $("listaOnline").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-direto]");
-    if(!b) return;
-    destino = { chave: b.dataset.direto, nome: b.dataset.nome };
+  $("buscaProfissional").addEventListener("input", renderOnline);
+
+  // Basta clicar na pessoa (ou no mural) para abrir a conversa.
+  function abrirConversa(li){
+    if(li.dataset.mural) destino = { mural: true };
+    else if(li.dataset.direto) destino = { chave: li.dataset.direto, nome: li.dataset.nome };
+    else return;
     renderDestino();
     renderMensagens();
+    limparConversaAberta();
+    renderOnline();
+    rolarChat();
     $("textoMensagem").focus();
+  }
+
+  $("listaOnline").addEventListener("click", (e) => {
+    const li = e.target.closest("li.clicavel");
+    if(li) abrirConversa(li);
+  });
+  $("listaOnline").addEventListener("keydown", (e) => {
+    if(e.key !== "Enter" && e.key !== " ") return;
+    const li = e.target.closest("li.clicavel");
+    if(li){ e.preventDefault(); abrirConversa(li); }
   });
 
   function renderMensagens(){
     const ul = $("mensagens");
     // No mural aparecem as mensagens coletivas; ao abrir um direto, só a
     // conversa com aquela pessoa, para não misturar os assuntos.
-    const visiveis = destino
-      ? msgs.filter(m => m.paraChave && (
-          (m.deChave === euChave && m.paraChave === destino.chave) ||
-          (m.deChave === destino.chave && m.paraChave === euChave)))
-      : msgs.filter(m => !m.paraChave);
     ul.innerHTML = "";
-    if(!visiveis.length){
+    if(!destino){
       const li = document.createElement("li");
       li.className = "vazio-chat";
-      li.textContent = destino
-        ? `Nenhuma mensagem trocada com ${destino.nome} nas últimas 24 horas.`
-        : "Nenhuma mensagem no mural. Escreva a primeira — ela aparece no painel de todos os colegas.";
+      li.textContent = "Escolha ao lado com quem você quer falar: um colega da lista, "
+        + "ou o mural da equipe, que todo mundo lê.";
       ul.appendChild(li);
       return;
     }
-    visiveis.forEach(m => {
+    const visiveis = ehMural(destino)
+      ? msgs.filter(m => !m.paraChave)
+      : msgs.filter(m => m.paraChave && (
+          (m.deChave === euChave && m.paraChave === destino.chave) ||
+          (m.deChave === destino.chave && m.paraChave === euChave)));
+    if(!visiveis.length){
       const li = document.createElement("li");
-      const minha = m.deChave === euChave;
-      li.className = (minha ? "minha" : "") + (m.paraChave ? " direta" : "");
-      const detalhe = [m.sala, m.categoria].filter(Boolean).join(" · ");
-      const etiqueta = m.paraChave
-        ? (minha ? `Direto para ${escapar(m.paraNome || "")}` : "Direto para você")
+      li.className = "vazio-chat";
+      li.textContent = ehMural(destino)
+        ? "Nenhuma mensagem no mural. O que você escrever aqui aparece no painel de todos os colegas."
+        : `Nenhuma mensagem trocada com ${destino.nome} nas últimas 24 horas.`;
+      ul.appendChild(li);
+      return;
+    }
+    // Mensagens seguidas da mesma pessoa viram um grupo só: um avatar, um
+    // nome e a hora apenas na última. Quebra o grupo quando muda quem falou,
+    // quando passa de mural para direta, ou depois de 5 minutos de intervalo.
+    const grupos = [];
+    visiveis.forEach(m => {
+      const ultimo = grupos[grupos.length - 1];
+      const mesmaLinha = ultimo
+        && ultimo.deChave === m.deChave
+        && !!ultimo.direta === !!m.paraChave
+        && ultimo.paraChave === (m.paraChave || null)
+        && (new Date(m.hora) - new Date(ultimo.fim)) < 5 * 60 * 1000;
+      if(mesmaLinha){
+        ultimo.textos.push(m.texto);
+        ultimo.fim = m.hora;
+      }else{
+        grupos.push({
+          deChave: m.deChave, de: m.de, direta: !!m.paraChave,
+          paraChave: m.paraChave || null, paraNome: m.paraNome || "",
+          textos: [m.texto], fim: m.hora,
+        });
+      }
+    });
+
+    grupos.forEach(g => {
+      const minha = g.deChave === euChave;
+      const info = minha ? { cor: "#546de5", texto: "#FFFFFF", escuro: "#546de5" } : infoDePessoa(g.deChave);
+      const li = document.createElement("li");
+      li.className = ["grupo", minha ? "minha" : "", g.direta ? "direta" : ""]
+        .filter(Boolean).join(" ");
+      const etiqueta = g.direta
+        ? (minha ? `Só para ${escapar(g.paraNome)}` : "te mandou uma mensagem")
         : "";
+      // balão a 15% de opacidade da cor da pessoa; as minhas continuam azul cheio
+      const corDoBalao = minha ? "var(--azul)" : corBalao(g.deChave);
+      const corDoTexto = minha ? "#fff" : "inherit";
+      const baloes = g.textos.map((t, i) => `
+        <div class="balao${i === g.textos.length - 1 ? " ponta" : ""}"
+          style="background:${corDoBalao}; color:${corDoTexto}">${escapar(t)}</div>`).join("");
       li.innerHTML = `
-        <div class="cab">
-          <b>${minha ? "Você" : escapar(m.de)}</b>
-          <span class="meta">${horaLocal(m.hora)}${detalhe && !minha ? " · " + escapar(detalhe) : ""}</span>
+        <span class="av" style="background:${info.cor}; color:${info.texto}">${escapar(iniciaisDe(minha ? meuNomeChat() : g.de))}</span>
+        <div class="pilha">
+          ${minha ? "" : `<span class="nome" style="color:${info.escuro}">${escapar(primeiroNomeDe(g.de))}</span>`}
           ${etiqueta ? `<span class="etiqueta">${etiqueta}</span>` : ""}
-        </div>
-        <div class="texto">${escapar(m.texto)}</div>`;
+          ${baloes}
+          <span class="hora">${horaLocal(g.fim)}</span>
+        </div>`;
       ul.appendChild(li);
     });
   }
@@ -1384,16 +2608,26 @@
     ul.scrollTop = ul.scrollHeight;
   }
 
-  function enviarMensagem(){
-    const texto = $("textoMensagem").value.trim();
-    if(!texto || !meuNomeChat()) return;
+  // Compartilhado entre a tela principal e a janela flutuante: as duas
+  // rodam no mesmo socket, então enviar dali ou daqui é o mesmo pedido ao
+  // servidor. Devolve true se enviou, para quem chamou limpar o campo.
+  function enviarTexto(dest, textoBruto){
+    const texto = String(textoBruto || "").trim();
+    if(!texto || !meuNomeChat() || !dest) return false;
+    const direta = !ehMural(dest);
     socket.emit("chat-mensagem", {
       texto,
-      para: destino ? destino.chave : "",
-      paraNome: destino ? destino.nome : "",
+      para: direta ? dest.chave : "",
+      paraNome: direta ? dest.nome : "",
     });
-    $("textoMensagem").value = "";
-    $("textoMensagem").focus();
+    return true;
+  }
+
+  function enviarMensagem(){
+    if(enviarTexto(destino, $("textoMensagem").value)){
+      $("textoMensagem").value = "";
+      $("textoMensagem").focus();
+    }
   }
   $("btnEnviar").onclick = enviarMensagem;
   $("textoMensagem").addEventListener("keydown", (e) => {
@@ -1410,6 +2644,7 @@
       renderMensagens();
       renderOnline();
       rolarChat();
+      renderFlutuante();
     });
     socket.on("chat-presenca", (lista) => {
       onlineAgora = Array.isArray(lista) ? lista : [];
@@ -1418,20 +2653,46 @@
     socket.on("chat-mensagem", (m) => {
       msgs.push(m);
       const minha = m.deChave === euChave;
-      const noAssunto = destino
-        ? (m.paraChave && (m.deChave === destino.chave || m.paraChave === destino.chave))
-        : !m.paraChave;
+
+      const pertenceA = (dest) => !dest ? false : (ehMural(dest)
+        ? !m.paraChave
+        : (m.paraChave && (m.deChave === dest.chave || m.paraChave === dest.chave)));
+      const noAssunto = pertenceA(destino);
+      const noAssuntoFlutuante = janelaChat && pertenceA(destinoFlutuante);
+
       if(noAssunto) renderMensagens();
-      if(minha){ if(noAssunto) rolarChat(); return; }
-      const perdida = abaAtual !== "equipe" || document.hidden;
-      if(perdida){
-        naoLidas += 1;
-        botarSelo();
-        bipeChat();
-      }else{
-        rolarChat();
-        if(!noAssunto) bipeChat(); // chegou noutro assunto que não o aberto
+      if(minha){
+        if(noAssunto) rolarChat();
+        if(janelaChat) renderFlutuante();
+        return;
       }
+
+      // "Já li" exige que a janela esteja em foco, e não apenas visível: com
+      // dois painéis abertos lado a lado, os dois contam como visíveis, e a
+      // mensagem entrava como lida sem ninguém ter olhado.
+      const olhando = !document.hidden && document.hasFocus();
+      const lidaPrincipal = noAssunto && abaAtual === "equipe" && olhando;
+      // A janela flutuante fica sempre visível por cima de tudo, então basta
+      // ela estar mostrando aquela conversa para contar como lida — não
+      // depende de foco, que ela nem tem como detectar direito.
+      const lidaFlutuante = noAssuntoFlutuante;
+
+      if(lidaPrincipal || lidaFlutuante){
+        if(lidaPrincipal){
+          // conversa aberta e em foco: aviso curto e baixo, só para não passar batido
+          bipeChat(false, true);
+          rolarChat();
+        }
+        if(janelaChat) renderFlutuante();
+        return;
+      }
+
+      // Não lida em lugar nenhum: registra antes de redesenhar, para a
+      // janelinha já nascer com o contador certo, não um render atrasado.
+      marcarNaoLida(m);
+      bipeChat(!!m.paraChave);
+      notificarSistema(m);
+      if(janelaChat) renderFlutuante();
     });
   }
 
@@ -1439,6 +2700,7 @@
   function renderFrases(){
     const ul = $("listaFrases");
     ul.innerHTML = "";
+    $("rFrasesAtivas").textContent = (estado.frases || []).filter(f => f.ativo).length;
     (estado.frases || []).forEach(f => {
       const li = document.createElement("li");
       li.className = f.ativo ? "" : "desligada";
@@ -1470,46 +2732,6 @@
   $("btnAddFrase").onclick = addFrase;
   $("novaFrase").addEventListener("keydown", e => { if(e.key === "Enter") addFrase(); });
 
-  /* ---------- farmácia: medicamentos em falta ---------- */
-  function renderFarmacia(){
-    const f = estado.farmacia || { ativo:false, itens:[] };
-    const ul = $("listaFarmacia");
-    ul.innerHTML = "";
-    f.itens.forEach(item => {
-      const li = document.createElement("li");
-      li.innerHTML = `
-        <span>${escapar(item.nome)}</span>
-        <button class="b-x" data-med="remover" data-id="${item.id}">Excluir</button>`;
-      ul.appendChild(li);
-    });
-    if(!f.itens.length){
-      ul.innerHTML = '<li style="border:0; color:var(--tinta-suave)">Nenhum medicamento na lista.</li>';
-    }
-    const btn = $("btnFarmaciaAtivo");
-    btn.textContent = f.ativo ? "Exibindo na TV" : "Não está na TV";
-    btn.classList.toggle("suave", f.ativo);
-  }
-
-  $("listaFarmacia").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-med]");
-    if(b) socket.emit("farmacia-remover", Number(b.dataset.id));
-  });
-
-  function addMedicamento(){
-    const t = $("novoMedicamento").value.trim();
-    if(!t){ $("novoMedicamento").focus(); return; }
-    socket.emit("farmacia-adicionar", t);
-    $("novoMedicamento").value = "";
-    $("novoMedicamento").focus();
-  }
-  $("btnAddMedicamento").onclick = addMedicamento;
-  $("novoMedicamento").addEventListener("keydown", e => { if(e.key === "Enter") addMedicamento(); });
-  $("btnFarmaciaAtivo").onclick = () => socket.emit("farmacia-alternar");
-  $("btnFarmaciaLimpar").onclick = () => {
-    if(confirm("Limpar toda a lista de medicamentos em falta?")) socket.emit("farmacia-limpar");
-  };
-
-  /* ---------- conteúdo da TV ---------- */
   $("modoTelaVideo").onclick = () => socket.emit("modo-tela", "video");
   $("modoTelaAvisos").onclick = () => socket.emit("modo-tela", "avisos");
 
@@ -1517,6 +2739,9 @@
     const modo = estado.modoTela || "video";
     $("modoTelaVideo").classList.toggle("ativo", modo === "video");
     $("modoTelaAvisos").classList.toggle("ativo", modo === "avisos");
+    $("dicaModoTela").textContent = modo === "avisos"
+      ? "A TV está passando os avisos ativos em rodízio, alternados com as frases de orientação."
+      : "A TV está passando os vídeos. Os avisos ativos continuam na faixa e são falados em voz alta.";
   }
 
   /* ---------- avisos da TV ---------- */
@@ -1524,6 +2749,9 @@
     const lista = $("listaAvisos");
     lista.innerHTML = "";
     const avisos = estado.avisos || [];
+    const ativos = avisos.filter(a => a.ativo);
+    $("rAvisosAtivos").textContent = ativos.length;
+    $("rAvisosMudos").textContent = ativos.filter(a => a.falar === false).length;
     if(!avisos.length){
       lista.innerHTML = '<p style="font-size:.82rem; color:var(--tinta-suave); margin-bottom:.6rem">' +
         'Nenhum aviso cadastrado. Avisos ativos aparecem na faixa da TV; os que têm áudio também são lidos em voz alta, entre as chamadas.</p>';
@@ -1620,8 +2848,40 @@
   const caixaConexao = $("conexao");
 
   carregarPlantao();
+  aplicarPreferenciaPronuncia();
+  aplicarStatus("online", false);
   atualizarCabecalho();
+
+  // Sinal de vida complementar. O que garante a presença de verdade é o
+  // ping/pong do próprio Socket.IO, que o servidor enxerga mesmo com a aba em
+  // segundo plano; este timer é só um reforço, e o navegador tem liberdade
+  // para estrangulá-lo até 1 por minuto sem que isso derrube ninguém.
+  setInterval(() => {
+    if(socket && socket.connected) socket.emit("chat-ping");
+  }, 20000);
+
+  // Ao voltar para a aba, avisa na hora que continua aqui — evita depender do
+  // próximo tique do timer, que pode ter sido adiado enquanto estava oculta.
+  document.addEventListener("visibilitychange", () => {
+    if(document.hidden) return;
+    if(socket && socket.connected){
+      socket.emit("chat-ping");
+    }else{
+      identificarNoChat(); // reconectou enquanto estava oculta
+    }
+  });
+
+  // Fechar a aba é o que de fato tira a pessoa da lista dos colegas, então
+  // vale avisar antes. Só pergunta quando há perfil configurado e a pessoa
+  // não se marcou como offline — nesses casos não há nada a perder.
+  window.addEventListener("beforeunload", (e) => {
+    if(!meuNomeChat() || meuStatus === "offline") return;
+    e.preventDefault();
+    e.returnValue = "Ao fechar esta aba você ficará offline para os colegas no Chat.";
+    return e.returnValue;
+  });
   renderSomChat();
+  renderNotif();
   renderDestino();
   renderOnline();
   renderMensagens();

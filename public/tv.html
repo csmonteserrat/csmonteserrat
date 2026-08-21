@@ -83,9 +83,6 @@
   #mensagemAtual.aviso #mensagemSelo{color:#B9791A}
   #mensagemAtual.aviso #mensagemTexto{color:#4A3306}
   /* farmácia em roxo Shy Moment, para não se confundir com os avisos */
-  #mensagemAtual.farmacia{background:#F1EFFF; border-color:#A29BFE}
-  #mensagemAtual.farmacia #mensagemSelo{color:#6C5CE7}
-  #mensagemAtual.farmacia #mensagemTexto{color:#2E2760}
   #listaFalta{
     list-style:none; text-align:left; display:grid; gap:1.2vh;
     grid-template-columns:1fr; margin:0 auto; max-width:52vw;
@@ -566,16 +563,6 @@
     const destaques = (estado.avisos || []).filter(a => a.ativo)
       .map(a => ({ selo: "Aviso da unidade", texto: a.texto, aviso: true }));
 
-    const farm = estado.farmacia || { ativo: false, itens: [] };
-    if(farm.ativo && farm.itens.length){
-      destaques.push({
-        selo: "Farmácia",
-        texto: "Medicamentos em falta:",
-        itens: farm.itens.map(i => i.nome),
-        farmacia: true,
-      });
-    }
-
     const orientacoes = (frases.length ? frases : FRASES_PADRAO)
       .map(t => ({ selo: "Atenção", texto: t, aviso: false }));
 
@@ -595,7 +582,6 @@
     $("mensagemSelo").textContent = m.selo;
     $("mensagemTexto").textContent = m.texto;
     caixa.classList.toggle("aviso", !!m.aviso);
-    caixa.classList.toggle("farmacia", !!m.farmacia);
 
     // farmácia: título fixo e a lista de itens embaixo, um por linha
     const lista = $("listaFalta");
@@ -1008,7 +994,9 @@
       const setor = ch.categoria === "Farmácia" ? "Farmácia" : (ch.sala || ch.categoria);
       return `${textoParaVoz(semZeroAEsquerda(setor))}, senha ${porExtenso(ch.senha)}`;
     }
-    const nome = nomeParaVoz(nomeExibido(ch));
+    // Se quem chamou preencheu "como se fala", a voz usa essa grafia; a tela
+    // continua mostrando o nome verdadeiro, vindo de nomeExibido().
+    const nome = nomeParaVoz(String(ch.fala || "").trim() || nomeExibido(ch));
     const sala = textoParaVoz(semZeroAEsquerda(ch.sala));
     if(ehCoordenacao(ch)){
       return `${nome}, compareça à sala da coordenação`;
@@ -1124,10 +1112,10 @@
     }else if(ehCoordenacao(ch)){
       $("popSala").textContent = "COMPAREÇA À SALA DA COORDENAÇÃO";
       $("popSala").classList.add("longo");
-      $("popProf").textContent = ch.profissional;
+      $("popProf").textContent = ch.profissionalCurto || ch.profissional;
     }else{
       $("popSala").textContent = ch.sala;
-      $("popProf").textContent = `${ch.profissional} · ${ch.categoria}`;
+      $("popProf").textContent = `${ch.profissionalCurto || ch.profissional} · ${ch.categoria}`;
     }
     pop.classList.add("visivel");
   }
