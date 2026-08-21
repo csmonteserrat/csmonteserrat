@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Painel local para acompanhamento mensal e quadrimestral dos indicadores de saúde bucal.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'self'; form-action 'self'">
+  <title>Indicadores Saúde Bucal</title>
+  <link rel="stylesheet" href="./assets/app.css">
+</head>
+<body>
+  <div class="app-shell" id="appShell">
+    <aside class="sidebar" aria-label="Navegação principal">
+      <div class="brand" title="Indicadores Saúde Bucal">SB</div>
+      <button class="side-btn active" data-view="overview" aria-label="Visão geral" title="Visão geral"><span data-icon="grid"></span></button>
+      <button class="side-btn" data-view="municipal" aria-label="Indicadores municipais" title="Municipal"><span data-icon="building"></span></button>
+      <button class="side-btn" data-view="federal" aria-label="Indicadores federais" title="Federal"><span data-icon="shield"></span></button>
+      <button class="side-btn" data-view="pregnant" aria-label="Saúde bucal da gestante" title="2I - Gestantes"><span data-icon="heart"></span></button>
+      <button class="side-btn" data-view="imports" aria-label="Importações e conferência" title="Importações"><span data-icon="upload"></span></button>
+      <button class="side-btn" data-view="diagnostics" aria-label="Diagnóstico dos dados" title="Diagnóstico"><span data-icon="alert"></span><i class="side-badge hidden" id="diagnosticBadge">0</i></button>
+      <div class="side-spacer"></div>
+      <button class="side-btn" data-view="settings" aria-label="Configurações e ajuda" title="Configurações"><span data-icon="settings"></span></button>
+    </aside>
+
+    <header class="topbar">
+      <label class="search-box" for="globalSearch">
+        <span data-icon="search"></span>
+        <input id="globalSearch" type="search" autocomplete="off" placeholder="Buscar indicador, equipe ou importação...">
+      </label>
+      <div class="top-spacer"></div>
+      <div class="privacy-chip"><span class="privacy-dot"></span>Processamento local</div>
+      <button class="icon-btn" id="lockBtn" title="Bloquear ferramenta" aria-label="Bloquear ferramenta"><span data-icon="lock"></span></button>
+      <div class="profile"><div class="avatar">CB</div><div><strong>Caio</strong><span>Odontologia</span></div></div>
+    </header>
+
+    <main class="workspace">
+      <div class="page-wrap">
+        <div class="eyebrow" id="eyebrow">Indicadores / Saúde Bucal</div>
+        <div class="titlebar">
+          <div>
+            <h1 id="pageTitle">Indicadores Saúde Bucal</h1>
+            <p class="subtitle" id="pageSubtitle">Acompanhamento mensal e quadrimestral com leitura municipal, federal e painel operacional 2I.</p>
+          </div>
+          <div class="actions">
+            <button class="btn" id="backupBtn"><span data-icon="database"></span>Backup</button>
+            <button class="btn" id="printBtn"><span data-icon="print"></span>Imprimir</button>
+            <button class="btn primary" id="importBtn"><span data-icon="upload"></span>Importar relatórios</button>
+          </div>
+        </div>
+
+        <section class="source-strip" aria-label="Contexto da análise">
+          <div class="source-meta">
+            <span id="lastUpdate">Nenhum relatório importado</span><i></i>
+            <span id="snapshotCount">0 snapshots</span><i></i>
+            <span id="backupStatus">Backup ainda não exportado</span>
+          </div>
+          <div class="filters">
+            <select class="filter" id="yearFilter" aria-label="Ano"></select>
+            <select class="filter" id="quarterFilter" aria-label="Quadrimestre">
+              <option value="1">Q1 · jan–abr</option>
+              <option value="2">Q2 · mai–ago</option>
+              <option value="3">Q3 · set–dez</option>
+            </select>
+            <select class="filter" id="monthFilter" aria-label="Competência"></select>
+            <select class="filter" id="unitFilter" aria-label="Unidade"><option value="">Todas as unidades</option></select>
+          </div>
+        </section>
+
+        <nav class="page-tabs" id="pageTabs" aria-label="Módulos da ferramenta">
+          <button class="page-tab active" data-view="overview"><span data-icon="grid"></span>Visão geral</button>
+          <button class="page-tab" data-view="municipal"><span data-icon="building"></span>Municipal · M1–M5</button>
+          <button class="page-tab" data-view="federal"><span data-icon="shield"></span>Federal · B1–B6</button>
+          <button class="page-tab" data-view="pregnant"><span data-icon="heart"></span>2I · Gestantes</button>
+          <button class="page-tab" data-view="imports"><span data-icon="file"></span>Conferência</button>
+          <button class="page-tab" data-view="diagnostics"><span data-icon="alert"></span>Diagnóstico</button>
+        </nav>
+
+        <section class="view" id="view-overview"></section>
+        <section class="view hidden" id="view-municipal"></section>
+        <section class="view hidden" id="view-federal"></section>
+        <section class="view hidden" id="view-pregnant"></section>
+        <section class="view hidden" id="view-imports"></section>
+        <section class="view hidden" id="view-diagnostics"></section>
+        <section class="view hidden" id="view-settings"></section>
+      </div>
+    </main>
+  </div>
+
+  <input id="fileInput" type="file" accept=".pdf,.csv,application/pdf,text/csv" multiple hidden>
+  <input id="backupInput" type="file" accept=".json,.saude-bucal-backup.json,application/json" hidden>
+
+  <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
+    <div><span data-icon="upload"></span><strong>Solte os relatórios aqui</strong><small>PDF do CELK ou CSV do Metabase</small></div>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
+    <section class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"></section>
+  </div>
+
+  <div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true">
+    <aside class="drawer" id="drawer" aria-label="Detalhes"></aside>
+  </div>
+
+  <div class="loading hidden" id="loading" role="status" aria-live="polite">
+    <div class="spinner"></div><strong id="loadingTitle">Processando...</strong><span id="loadingDetail"></span>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./assets/app.js"></script>
+</body>
+</html>
