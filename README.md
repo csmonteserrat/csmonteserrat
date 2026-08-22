@@ -1,4 +1,4 @@
-# Indicadores Saúde Bucal · versão 1.1
+# Indicadores Saúde Bucal · versão 1.13
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -6,8 +6,8 @@ Ferramenta estática para leitura de relatórios do CELK e consolidados do Metab
 
 - A leitura de PDF/CSV, os cálculos e a geração dos painéis acontecem no navegador.
 - Os arquivos importados não são enviados ao GitHub, ao Render ou a uma API.
-- Os dados salvos ficam no IndexedDB do navegador e vinculados ao endereço do site.
-- Exporte backups regularmente, principalmente antes de mudar o domínio do site.
+- **O navegador não salva nada.** Desde a v1.13, nada fica gravado em IndexedDB, localStorage ou qualquer outro armazenamento do navegador — o estado só existe na memória da aba enquanto ela está aberta. Fechar ou recarregar a página sem exportar um backup apaga tudo, sem aviso além do próprio alerta de "sair sem salvar" do navegador.
+- **Exporte um backup para salvar de verdade**, sempre que quiser preservar o trabalho — é o único jeito. Um ícone vermelho no topo da tela (e o texto ao lado do contador de snapshots) avisam quando há alteração ainda não exportada. Para continuar de onde parou numa próxima abertura, restaure esse backup ("Restaurar backup anterior", disponível assim que a ferramenta abre sem dados).
 
 O projeto não possui backend, banco de dados remoto ou serviço de telemetria. O PDF.js necessário para ler os relatórios já está incluído em `assets/`.
 
