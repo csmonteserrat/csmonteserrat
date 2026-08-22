@@ -21,7 +21,7 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '1.17';
+const APP_VERSION = '1.18';
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -194,7 +194,7 @@ function defaultState(){
     schemaVersion:SCHEMA_VERSION,appVersion:APP_VERSION,createdAt:nowISO(),updatedAt:nowISO(),snapshots:[],denominators:[],
     columnMappings:{consulta2i:{}},parserProfiles:{procedimentos:'CELK-PROC-1.0',atividades:'CELK-GRUPO-1.0',metabase:'METABASE-ESB-1.0',gestantes:'METABASE-2I-1.1'},
     gestantes:{manual:[],followups:{},merges:{},excluded:{}},manualOverrides:[],audit:[],lastBackupAt:null,dirty:false,
-    preferences:{year:d.getFullYear(),quarter:quarterOfMonth(d.getMonth()+1),month:monthKey(d.getFullYear(),d.getMonth()+1),unit:'',view:'overview',sourceMode:'auto',targetScore:100,pregTeam:'',pregStatus:'',pregFollowup:'',pregOrigin:'',pregPhone:'',pregStage:'',pregExcluded:'',pregSearch:''},
+    preferences:{year:d.getFullYear(),quarter:quarterOfMonth(d.getMonth()+1),month:monthKey(d.getFullYear(),d.getMonth()+1),unit:'',view:'overview',sourceMode:'auto',targetScore:100,overviewScope:'month',pregTeam:'',pregStatus:'',pregFollowup:'',pregOrigin:'',pregPhone:'',pregStage:'',pregExcluded:'',pregSearch:''},
     selfTests:null
   };
 }
@@ -497,6 +497,69 @@ function quarterMunicipal(id,year=state.preferences.year,q=state.preferences.qua
   const scores=valid.map(v=>v.score).filter(v=>v!=null),score=mean(scores),rawMean=mean(valid.map(v=>v.result)),auditScore=scoreMunicipal(id,rawMean),remaining=4-valid.length,target=Number(state.preferences.targetScore)||100,needed=remaining?((4*target-sum(scores))/remaining):null;return {id,months,values,score,rawMean,auditScore,validMonths:valid.length,needed,status:needed==null?'Quadrimestre completo':needed>100?'Matematicamente impossível':needed<=0?'Já assegurado':'Ainda possível',diverges:score!=null&&auditScore!=null&&Math.abs(score-auditScore)>.01};
 }
 function comparisonForMonth(mk){const rows=[];for(const [m,b] of [['M1','B1'],['M2','B2'],['M3','B4'],['M4','B5'],['M5','B6']]){const a=municipalComponents(m,mk),f=federalComponents(b,mk);rows.push({municipal:m,federal:b,name:RULESETS.municipal.indicators[m].name,municipalResult:a.result,federalResult:f.result,municipalStatus:m==='M1'?a.classification:a.score!=null?`${fmtNum(a.score,1)} pts`:'—',federalStatus:f.classification||'—'})}return rows}
+
+/* ---------- PREVIEW: leitura por meta (substitui a pontuação 0–100 na Visão Geral) ---------- */
+const META_UNIT_LABEL={
+  M1:{singular:'primeira consulta programada',plural:'primeiras consultas programadas'},
+  M2:{singular:'tratamento concluído',plural:'tratamentos concluídos'},
+  M3:{singular:'criança em escovação supervisionada',plural:'crianças em escovação supervisionada'},
+  M4:{singular:'procedimento preventivo',plural:'procedimentos preventivos'},
+  M5:{singular:'procedimento de ART',plural:'procedimentos de ART (Tratamento Restaurador Atraumático)'}
+};
+function metaTarget(id){return id==='M1'?1.25:RULESETS.municipal.indicators[id].meta}
+function cumulativeMunicipal(id,months){
+  const vals=months.map(m=>municipalComponents(id,m)).filter(v=>v.result!=null);
+  if(!vals.length)return {numerator:null,denominator:null,result:null,validMonths:0};
+  const numerator=sum(vals.map(v=>v.numerator)),denominator=sum(vals.map(v=>v.denominator));
+  return {numerator,denominator,result:denominator>0?100*numerator/denominator:null,validMonths:vals.length};
+}
+function metaGap(id,numerator,denominator){
+  if(numerator==null||!(denominator>0))return null;
+  if(id==='M1')return remainingForM1(numerator,denominator,1.25);
+  return remainingInclusive(numerator,denominator,metaTarget(id),['M4','M5'].includes(id));
+}
+function metaProgress(id,mk){
+  const comp=municipalComponents(id,mk),months=quarterMonths(state.preferences.year,state.preferences.quarter),cum=cumulativeMunicipal(id,months),meta=metaTarget(id);
+  const monthGap=metaGap(id,comp.numerator,comp.denominator),quarterGap=metaGap(id,cum.numerator,cum.denominator);
+  return {id,meta,month:{...comp,gap:monthGap,achieved:monthGap===0},quarter:{...cum,gap:quarterGap,achieved:quarterGap===0,validMonths:cum.validMonths}};
+}
+function metaLine(entry,unit,missingText,scopeWord){
+  if(entry.result==null)return missingText;
+  if(entry.achieved)return `<strong>Meta garantida</strong> — não depende de mais nenhum ${unit.singular} ${scopeWord}.`;
+  return `Faltam <strong>${fmtNum(entry.gap,0)}</strong> ${entry.gap===1?unit.singular:unit.plural} para bater a meta ${scopeWord==='agora'?'este mês':'no quadrimestre'}.`;
+}
+function m1Band(result){return result==null?null:RULESETS.municipal.indicators.M1.bands.find(b=>b.test(result))}
+function metaRulerHTML(id,result){
+  if(id==='M1'){
+    const max=1.7,marks=[{v:.25,l:'0,25'},{v:.75,l:'0,75'},{v:1.25,l:'1,25'}];
+    const band=m1Band(result),color=band?band.color:'#a2a9bb',pct=result==null?0:clamp(result/max*100);
+    return `<div class="ruler"><div class="ruler-track"><div class="ruler-fill" style="width:${pct}%;background:${color}"></div></div>${marks.map(m=>`<i class="ruler-mark" style="left:${m.v/max*100}%"></i><span class="ruler-label" style="left:${m.v/max*100}%">${m.l}%</span>`).join('')}</div>`;
+  }
+  const r=RULESETS.municipal.indicators[id],max=r.meta*1.3,cutPct=clamp(r.cutoff/max*100),metaPct=clamp(r.meta/max*100);
+  const color=result==null?'#a2a9bb':result>=r.meta?'#39b980':result>=r.cutoff?'#e7a23b':'#e15f41',pct=result==null?0:clamp(result/max*100);
+  return `<div class="ruler"><div class="ruler-track"><div class="ruler-fill" style="width:${pct}%;background:${color}"></div></div><i class="ruler-mark" style="left:${cutPct}%"></i><span class="ruler-label" style="left:${cutPct}%">corte</span><i class="ruler-mark meta" style="left:${metaPct}%"></i><span class="ruler-label meta" style="left:${metaPct}%">meta</span></div>`;
+}
+function metaCard(id,mk,scope){
+  const p=metaProgress(id,mk),rule=RULESETS.municipal.indicators[id],unit=META_UNIT_LABEL[id],entry=scope==='quarter'?p.quarter:p.month;
+  const metaLabel=id==='M1'?'faixas oficiais (Ótimo >1,25%)':fmtPct(p.meta,p.meta<2?1:0);
+  const band=id==='M1'?m1Band(entry.result):null;
+  const label=id==='M1'?(band?.label||'Sem dado'):(entry.result==null?'Sem dado':entry.achieved?(scope==='quarter'?'Meta garantida':'Meta batida'):(scope==='quarter'?'Ainda falta':'Abaixo da meta'));
+  const state=id==='M1'?(band?statusClass(band.label):'neutral'):(entry.result==null?'neutral':entry.achieved?'success':'warn');
+  const missing=entry.result==null?(scope==='month'&&entry.denomRecord===null&&['M1','M3'].includes(id)?'Denominador do mês ainda não confirmado.':scope==='quarter'?'Ainda sem meses suficientes com dado confirmado.':'Sem relatório desta competência ainda.'):'';
+  const scopeLabel=scope==='quarter'?`Quadrimestre · acumulado (${entry.validMonths}/4 meses)`:'Este mês';
+  return `<article class="card indicator-card meta-card" style="--accent:${state==='success'?'#39b980':state==='warn'?'#e7a23b':state==='good'?'#3dc1d3':state==='bad'?'#e15f41':'#a2a9bb'}"><div class="topline"></div>
+<div class="indicator-head"><div><div class="indicator-id">${id} · MUNICIPAL</div><div class="indicator-name">${esc(rule.name)}</div></div><button class="info-btn" data-composition="municipal|${id}|${mk}" aria-label="Como foi calculado?">i</button></div>
+<div class="indicator-result"><strong>${fmtPct(entry.result)}</strong>${pill(label,state)}</div>
+<div class="numerator-row"><span>${esc(scopeLabel)} · meta <strong>${metaLabel}</strong></span></div>
+${metaRulerHTML(id,entry.result)}
+<div class="need">${metaLine(entry,unit,missing,scope==='quarter'?'no quadrimestre':'agora')}</div>
+</article>`;
+}
+function metaGoalsHit(mk,scope){
+  const ids=['M1','M2','M3','M4','M5'];const withData=[];let hit=0;
+  for(const id of ids){const p=metaProgress(id,mk),entry=scope==='quarter'?p.quarter:p.month;if(entry.result!=null){withData.push(id);if(id==='M1'?m1Band(entry.result)?.label==='Ótimo':entry.achieved)hit++}}
+  return {hit,total:withData.length};
+}
 function reconciliationForMonth(mk){const con=aggregateConsolidatedMonth(mk),out=[];if(!con)return out;for(const id of ['M1','M2','M3','M4','M5']){const c=municipalComponents(id,mk),p=con.indicators[id];if(!p)continue;out.push({id,reported:p.result,reconstructed:c.reconstructed,difference:c.reconstructed==null?null:c.reconstructed-p.result,reportedNumerator:p.numerator,reconstructedNumerator:c.reconstructedNumerator,reportedDenominator:p.denominator,reconstructedDenominator:c.reconstructedDenominator})}return out}
 function suggestedDenominator(id,mk){const con=aggregateConsolidatedMonth(mk);return con?.indicators?.[id]?.denominator??null}
 
@@ -571,10 +634,11 @@ function indicatorCard(comp,scope='municipal'){
 function monthBoxes(q){return `<div class="month-strip">${q.values.map(v=>`<div class="month-box ${v.result==null?'missing':''}"><span>${fmtMonth(v.mk)}</span><strong>${fmtPct(v.result)}</strong><small>${v.result==null?'sem dado':v.id==='M1'?esc(v.classification):`${fmtNum(v.score,1)} pts`}</small></div>`).join('')}</div>`}
 function overviewHTML(){
   if(!state.snapshots.length)return emptyState('Importe os primeiros relatórios','Use o PDF “Procedimentos Detalhado” durante o mês, o relatório de atividades em grupo para M3/B4 e o CSV do Metabase como referência consolidada.');
-  const mk=state.preferences.month,qs=['M1','M2','M3','M4','M5'].map(id=>quarterMunicipal(id)),diag=buildDiagnostics(),active2i=getActive2ISnapshot(),episodes=(active2i?.episodes||[]).map(e=>({...e,origin:'metabase'})),attended=episodes.filter(e=>e.status2i==='atende').length;const validNotes=qs.filter(q=>q.id!=='M1'&&q.score!=null);const avg=mean(validNotes.map(q=>q.score));
-  const rows=qs.map(q=>`<tr class="click-row" data-go="municipal"><td><span class="strong">${q.id}</span> · ${esc(RULESETS.municipal.indicators[q.id].name)}</td><td>${q.validMonths}/4</td><td>${q.id==='M1'?fmtPct(q.result):`${fmtNum(q.score,1)} pts`}</td><td>${pill(q.id==='M1'?(q.classification||'Dados insuficientes'):(q.status||'Dados insuficientes'))}</td></tr>`).join('');
-  const recent=[...state.snapshots].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,5);
-  return `<div class="grid-kpis">${kpi('Competência em foco',fmtMonth(mk,true),`Q${state.preferences.quarter} de ${state.preferences.year}`,'#546de5','clock')}${kpi('Nota parcial M2–M5',avg==null?'—':fmtNum(avg,1),`${validNotes.length} indicador(es) com mês válido`,'#3dc1d3','trend')}${kpi('2I · panorama',episodes.length?fmtPct(100*attended/episodes.length,1):'—',`${attended} atende(m) em ${episodes.length} episódio(s) do recorte`,'#39b980','heart')}${kpi('Diagnósticos',fmtNum(diag.length),`${diag.filter(d=>d.level==='error').length} crítico(s) · ${diag.filter(d=>d.level==='warning').length} alerta(s)`,'#e7a23b','alert')}</div><div class="main-grid"><article class="card table-card"><div class="table-head"><div><h2 class="section-title">${icon('building')} Prévia quadrimestral municipal</h2><div class="section-sub">M1 é uma prévia analítica por faixas; M2–M5 usam média das pontuações mensais válidas.</div></div><button class="link-btn" data-go="municipal">Abrir painel municipal</button></div><div class="table-scroll"><table><thead><tr><th>Indicador</th><th>Meses válidos</th><th>Resultado parcial</th><th>Situação</th></tr></thead><tbody>${rows}</tbody></table></div></article><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('file')} Fontes mais recentes</h2><div class="section-sub">O consolidado nunca é somado à prévia.</div></div><button class="link-btn" data-go="imports">Conferir</button></div><div class="import-list">${recent.map(s=>`<div class="import-item"><div class="import-icon">${icon(s.profile.includes('metabase')?'database':'file')}</div><div><strong title="${esc(s.fileName)}">${esc(s.fileName)}</strong><small>${esc(profileLabel(s.profile))} · ${fmtDateTime(s.createdAt)}</small></div><button class="info-btn" data-open-snapshot="${s.id}">i</button></div>`).join('')}</div></article></div><div class="indicator-grid">${['M1','M2','M3','M4','M5'].map(id=>indicatorCard(municipalComponents(id,mk))).join('')}</div><article class="card table-card"><div class="table-head"><div><h2 class="section-title">${icon('shield')} Leitura municipal × federal</h2><div class="section-sub">As normas permanecem paralelas e podem divergir, sobretudo no denominador.</div></div><button class="link-btn" data-go="federal">Abrir leitura federal</button></div><div class="table-scroll"><table><thead><tr><th>Tema</th><th>Municipal</th><th>Situação municipal</th><th>Federal</th><th>Classificação federal</th></tr></thead><tbody>${comparisonForMonth(mk).map(r=>`<tr><td>${esc(r.name)}</td><td>${fmtPct(r.municipalResult)}</td><td>${esc(r.municipalStatus)}</td><td>${fmtPct(r.federalResult)}</td><td>${esc(r.federalStatus)}</td></tr>`).join('')}</tbody></table></div></article>`
+  const mk=state.preferences.month,diag=buildDiagnostics(),active2i=getActive2ISnapshot(),episodes=(active2i?.episodes||[]).map(e=>({...e,origin:'metabase'})),attended=episodes.filter(e=>e.status2i==='atende').length;
+  const scope=state.preferences.overviewScope==='quarter'?'quarter':'month';
+  const goals=metaGoalsHit(mk,scope);
+  const goalsLabel=scope==='quarter'?'Metas garantidas no quadrimestre':'Metas batidas este mês';
+  return `<div class="grid-kpis">${kpi('Competência em foco',fmtMonth(mk,true),`Q${state.preferences.quarter} de ${state.preferences.year}`,'#546de5','clock')}${kpi(goalsLabel,goals.total?`${goals.hit} de ${goals.total}`:'—',goals.total?`${goals.total} indicador(es) com dado nesse recorte`:'Nenhum indicador com dado ainda','#39b980','trend')}${kpi('2I · panorama',episodes.length?fmtPct(100*attended/episodes.length,1):'—',`${attended} atende(m) em ${episodes.length} episódio(s) do recorte`,'#3dc1d3','heart')}${kpi('Diagnósticos',fmtNum(diag.length),`${diag.filter(d=>d.level==='error').length} crítico(s) · ${diag.filter(d=>d.level==='warning').length} alerta(s)`,'#e7a23b','alert')}</div><div class="scope-toggle-row"><div class="scope-toggle" role="tablist" aria-label="Ver indicadores por"><button class="scope-btn ${scope==='month'?'active':''}" data-overview-scope="month">Por mês</button><button class="scope-btn ${scope==='quarter'?'active':''}" data-overview-scope="quarter">Por quadrimestre</button></div><span class="muted" style="font-size:11.5px">${scope==='month'?`Resultado de ${fmtMonth(mk,true)} contra a meta mensal.`:`Acumulado de Q${state.preferences.quarter}/${state.preferences.year} contra a mesma meta.`}</span></div><div class="indicator-grid" style="margin-top:12px">${['M1','M2','M3','M4','M5'].map(id=>metaCard(id,mk,scope)).join('')}</div>`
 }
 
 function municipalHTML(){
@@ -614,7 +678,8 @@ function importsHTML(){
 function diagnosticsHTML(){
   const list=buildDiagnostics(),counts={error:list.filter(x=>x.level==='error').length,warning:list.filter(x=>x.level==='warning').length,info:list.filter(x=>x.level==='info').length};
   const rows=list.map(d=>`<article class="diagnostic ${esc(d.level)}"><div class="diagnostic-icon">${d.level==='error'?'!':d.level==='warning'?'△':'i'}</div><div><strong>${esc(d.code||'DIAGNÓSTICO')}</strong><p>${esc(d.message)}</p>${d.fileName?`<small class="muted">${esc(d.fileName)}</small>`:''}</div>${d.snapshotId?`<button class="btn small" data-open-snapshot="${d.snapshotId}">Abrir fonte</button>`:''}</article>`).join('');
-  return `<div class="grid-kpis">${kpi('Críticos',fmtNum(counts.error),'Impedem ou invalidam um cálculo específico','#e15f41','alert')}${kpi('Alertas',fmtNum(counts.warning),'Exigem conferência ou denominador','#e7a23b','alert')}${kpi('Informativos',fmtNum(counts.info),'Hipóteses e limitações documentadas','#546de5','info')}${kpi('Autotestes',state.selfTests?`${state.selfTests.passed}/${state.selfTests.total}`:'não executados',state.selfTests?fmtDateTime(state.selfTests.at):'Execute após mudanças ou restauração','#39b980','check')}</div><div class="main-grid"><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('alert')} Diagnóstico dos dados</h2><div class="section-sub">Nenhum alerta altera silenciosamente os dados importados.</div></div></div><div class="diagnostic-list">${rows||'<div class="notice"><strong>Nenhum diagnóstico ativo.</strong> Ainda assim, confira a composição antes de homologar resultados.</div>'}</div></article><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('check')} Testes internos</h2><div class="section-sub">81 casos de fórmula, faixa, privacidade, deduplicação, 2I, diagnóstico e persistência definidos na especificação.</div></div></div>${testSummaryHTML()}<div class="card-actions"><button class="btn primary" data-run-tests>${icon('check')}Executar 81 testes</button></div></article></div><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('info')} Limitações visíveis</h2></div></div><div class="notice warn"><strong>PDF de procedimentos:</strong> não traz CBO, INE, CNS nem a janela federal de 12 meses; B1–B6 derivados dele são prévios. As descrições de restaurações podem vir truncadas pelo CELK.</div><div class="notice warn" style="margin-top:9px"><strong>Atividades em grupo:</strong> traz o total agregado de presentes, sem idade e sem deduplicação por participante. M3/B4 dependem de denominador confirmado.</div><div class="notice warn" style="margin-top:9px"><strong>2I:</strong> o CSV recebido não informa data/código/CBO da atividade. O painel reproduz somente o valor consolidado “Consulta Saude Bucal” após mapeamento explícito.</div></article>`;
+  const recent=[...state.snapshots].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,5);
+  return `<div class="grid-kpis">${kpi('Críticos',fmtNum(counts.error),'Impedem ou invalidam um cálculo específico','#e15f41','alert')}${kpi('Alertas',fmtNum(counts.warning),'Exigem conferência ou denominador','#e7a23b','alert')}${kpi('Informativos',fmtNum(counts.info),'Hipóteses e limitações documentadas','#546de5','info')}${kpi('Autotestes',state.selfTests?`${state.selfTests.passed}/${state.selfTests.total}`:'não executados',state.selfTests?fmtDateTime(state.selfTests.at):'Execute após mudanças ou restauração','#39b980','check')}</div><div class="main-grid"><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('alert')} Diagnóstico dos dados</h2><div class="section-sub">Nenhum alerta altera silenciosamente os dados importados.</div></div></div><div class="diagnostic-list">${rows||'<div class="notice"><strong>Nenhum diagnóstico ativo.</strong> Ainda assim, confira a composição antes de homologar resultados.</div>'}</div></article><div class="stack"><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('file')} Fontes mais recentes</h2><div class="section-sub">O consolidado nunca é somado à prévia.</div></div><button class="link-btn" data-go="imports">Conferir</button></div><div class="import-list">${recent.map(s=>`<div class="import-item"><div class="import-icon">${icon(s.profile.includes('metabase')?'database':'file')}</div><div><strong title="${esc(s.fileName)}">${esc(s.fileName)}</strong><small>${esc(profileLabel(s.profile))} · ${fmtDateTime(s.createdAt)}</small></div><button class="info-btn" data-open-snapshot="${s.id}">i</button></div>`).join('')||'<span class="muted">Nenhum arquivo importado.</span>'}</div></article><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('check')} Testes internos</h2><div class="section-sub">88 casos de fórmula, faixa, privacidade, deduplicação, 2I, diagnóstico e persistência definidos na especificação.</div></div></div>${testSummaryHTML()}<div class="card-actions"><button class="btn primary" data-run-tests>${icon('check')}Executar 88 testes</button></div></article></div></div><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('info')} Limitações visíveis</h2></div></div><div class="notice warn"><strong>PDF de procedimentos:</strong> não traz CBO, INE, CNS nem a janela federal de 12 meses; B1–B6 derivados dele são prévios. As descrições de restaurações podem vir truncadas pelo CELK.</div><div class="notice warn" style="margin-top:9px"><strong>Atividades em grupo:</strong> traz o total agregado de presentes, sem idade e sem deduplicação por participante. M3/B4 dependem de denominador confirmado.</div><div class="notice warn" style="margin-top:9px"><strong>2I:</strong> o CSV recebido não informa data/código/CBO da atividade. O painel reproduz somente o valor consolidado “Consulta Saude Bucal” após mapeamento explícito.</div></article>`;
 }
 
 function settingsHTML(){
@@ -808,6 +873,13 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('79. Falha de importação guarda o motivo por arquivo em vez de deixar o resumo final sobrescrever a mensagem de erro (regressão do bug em que o toast escondia o motivo real)',()=>{const src=importFiles.toString();return src.includes('failures.push')&&src.includes('showImportFailures')});
   await add('80. Relatório de falha de importação inclui navegador e detalhe técnico, sem depender do console do navegador',()=>{const rep=importFailureReportText([{name:'x.pdf',message:'erro teste',stack:'stack teste'}]);return rep.includes('x.pdf')&&rep.includes('erro teste')&&rep.includes('stack teste')&&rep.includes(navigator.userAgent)});
   await add('81. ReadableStream é assíncrono-iterável (nativo ou via polyfill) — sem isso o pdf.js falha só no Safari até a versão 26 ao ler o texto do PDF',async()=>{if(typeof ReadableStream==='undefined')return true;if(typeof ReadableStream.prototype[Symbol.asyncIterator]!=='function')return false;const rs=new ReadableStream({start(c){c.enqueue(1);c.enqueue(2);c.close()}});const got=[];for await(const v of rs)got.push(v);return got.length===2&&got[0]===1&&got[1]===2});
+  await add('82. Leitura por meta (M2, não simultâneo): 32/70 com meta 50% ainda precisa de 3 tratamentos concluídos a mais',()=>metaGap('M2',32,70)===3);
+  await add('83. Leitura por meta (M4, simultâneo — novo preventivo também aumenta o denominador): 183/675 com meta 40% ainda precisa de 145 procedimentos preventivos a mais',()=>metaGap('M4',183,675)===145);
+  await add('84. Leitura por meta (M1, meta = faixa Ótimo >1,25%): 57/11358,5 ainda precisa de 85 primeiras consultas a mais',()=>metaGap('M1',57,11358.5)===85);
+  await add('85. m1Band classifica corretamente as 4 faixas oficiais de M1 usadas na régua da Visão Geral',()=>m1Band(1.3)?.label==='Ótimo'&&m1Band(0.8)?.label==='Bom'&&m1Band(0.3)?.label==='Suficiente'&&m1Band(0.1)?.label==='Regular');
+  await add('86. metaGoalsHit devolve contagem coerente (batidas ≤ com dado) tanto para o mês quanto para o quadrimestre, sem lançar erro',()=>{const mk=state.preferences.month,gm=metaGoalsHit(mk,'month'),gq=metaGoalsHit(mk,'quarter');return gm.hit<=gm.total&&gq.hit<=gq.total&&Number.isFinite(gm.hit)&&Number.isFinite(gq.hit)});
+  await add('87. Visão Geral não usa mais pontuação em pontos (\"pts\") — cada régua de meta tem escala e cor próprias, com toggle mês/quadrimestre',()=>{const src=metaCard.toString()+metaRulerHTML.toString()+overviewHTML.toString();return !src.includes('pts')&&src.includes('metaRulerHTML')&&src.includes('overviewScope')});
+  await add('88. Preferência padrão de escopo da Visão Geral é "por mês"',()=>defaultState().preferences.overviewScope==='month');
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -843,7 +915,8 @@ function updatePreference(key,value){state.preferences[key]=value;queueSave();re
 function globalSearch(value){const n=norm(value);if(!n)return;if(/^M[1-5]$/.test(n)){switchView('municipal');openComposition('municipal',n,state.preferences.month);return}if(/^B[1-6]$/.test(n)){switchView('federal');openComposition('federal',n,state.preferences.month);return}if(n.includes('GEST')||n.includes('2I')||mergedEpisodes().some(e=>norm(e.equipe).includes(n))){state.preferences.pregSearch=value;switchView('pregnant');refreshAll();return}const snap=state.snapshots.find(s=>norm(s.fileName).includes(n));if(snap){switchView('imports');openSnapshot(snap.id);return}toast('Nenhuma correspondência direta encontrada.')}
 
 function setupEvents(){
-  document.addEventListener('click',async ev=>{const el=ev.target.closest('button,[data-go],[data-open-episode],[data-open-snapshot],[data-team-filter]');if(!el)return;
+  document.addEventListener('click',async ev=>{const el=ev.target.closest('button,[data-go],[data-open-episode],[data-open-snapshot],[data-team-filter],[data-overview-scope]');if(!el)return;
+    if(el.dataset.overviewScope)return updatePreference('overviewScope',el.dataset.overviewScope);
     if(el.matches('[data-close-modal]'))return closeModal();if(el.matches('[data-close-drawer]'))return closeDrawer();if(el.dataset.view)return switchView(el.dataset.view);if(el.dataset.go)return switchView(el.dataset.go);if(el.dataset.action==='import')return document.getElementById('fileInput').click();if(el.dataset.action==='restore-backup')return document.getElementById('backupInput').click();if(el.dataset.action==='export-backup')return openBackupModal();
     if(el.dataset.openSnapshot)return openSnapshot(el.dataset.openSnapshot);if(el.dataset.snapshotTab)return openSnapshot(el.dataset.snapshotId,el.dataset.snapshotTab);if(el.dataset.composition){const [scope,id,mk]=el.dataset.composition.split('|');return openComposition(scope,id,mk)}
     if(el.dataset.saveDenom){const [id,scope]=el.dataset.saveDenom.split('|'),input=el.closest('.denom-inline')?.querySelector(`[data-denom-input="${id}|${scope}"]`);return openDenominatorModal(id,scope,input?.value||'')}
@@ -852,7 +925,7 @@ function setupEvents(){
     if(el.dataset.copyName){const e=mergedEpisodes().find(x=>x.id===el.dataset.copyName);if(e)await navigator.clipboard.writeText(e.nome||'');return toast('Nome copiado.')}
     if(el.dataset.openWhatsapp){const e=mergedEpisodes().find(x=>x.id===el.dataset.openWhatsapp);if(e?.phoneNormalized)window.open(`https://wa.me/${e.phoneNormalized}`,'_blank','noopener,noreferrer');return}
     if(el.dataset.followup){const [id,next]=el.dataset.followup.split('|');return setFollowup(id,next)}if(el.dataset.mergeManual){const [m,e]=el.dataset.mergeManual.split('|');return mergeManual(m,e)}if(el.dataset.editManual){closeDrawer();return openManualPregnant(el.dataset.editManual)}if(el.dataset.archiveManual){const m=state.gestantes.manual.find(x=>x.id===el.dataset.archiveManual);if(m){m.archived=true;audit('2i_manual_archived',{manualId:m.id});closeDrawer();refreshAll();toast('Cadastro manual arquivado.')}return}if(el.dataset.excludeEpisode){closeDrawer();return openExcludeEpisode(el.dataset.excludeEpisode)}if(el.dataset.restoreEpisode)return restoreEpisode(el.dataset.restoreEpisode);
-    if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading('Executando 81 testes','Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
+    if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading('Executando 88 testes','Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
     if(el.hasAttribute('data-create-backup'))return createBackupFromModal();if(el.hasAttribute('data-restore-backup'))return document.getElementById('backupInput').click();if(el.hasAttribute('data-unlock-backup'))return processPendingBackup(document.getElementById('restorePassword')?.value||'');
   });
   document.getElementById('importBtn').onclick=()=>document.getElementById('fileInput').click();document.getElementById('fileInput').onchange=e=>importFiles(e.target.files);document.getElementById('backupBtn').onclick=openBackupModal;document.getElementById('printBtn').onclick=()=>window.print();document.getElementById('saveBtn').onclick=openBackupModal;
