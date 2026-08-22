@@ -1,6 +1,12 @@
 # Histórico de versões
 
-## Versão 1.15 (tentativa de correção: PDF falhando no Safari macOS)
+## Versão 1.16 (falha de importação agora mostra o detalhe técnico na tela, sem precisar do console)
+
+- A troca de biblioteca do `pdf.js` na v1.15 (build "moderna" → "legacy") **não resolveu** o erro no Safari macOS — o usuário confirmou que o mesmo erro persiste lá, com o Chrome continuando 100% funcional. Como não há como reproduzir/depurar Safari real neste ambiente de desenvolvimento, e pedir para o usuário abrir e copiar o console do navegador se mostrou pouco prático, a janela de "Importação com falha" (introduzida na v1.14) agora traz o **detalhe técnico completo direto na tela**: navegador (`navigator.userAgent`) e o stack trace do erro, num campo de texto pronto para copiar (botão "Copiar detalhes", com repescagem manual se a cópia automática falhar). Não é mais necessário abrir nenhum console — só reproduzir o erro e copiar o que aparece na própria janela.
+- 1 autoteste novo (80): o relatório de falha inclui arquivo, mensagem, stack técnico e navegador.
+- **Ainda não resolvido**: a causa raiz do erro no Safari continua desconhecida — sem o stack trace real do ambiente do usuário (agora capturável pela própria ferramenta), só era possível especular. Próximo passo assim que o usuário reenviar o relatório copiado.
+
+## Versão 1.15 (tentativa de correção: PDF falhando no Safari macOS — NÃO resolveu, ver v1.16)
 
 - **Reportado pelo usuário**: mesmo depois da v1.14, a importação de PDF continuava falhando — mas só no Safari (macOS 26.5.2); no Chrome funcionava normalmente. O erro específico (`undefined is not a function (near '...t of e...')`) é a formatação de erro característica do motor do Safari (JavaScriptCore) e apontava para dentro do próprio leitor de PDF (`pdf.js`), não para o código da ferramenta.
 - **Ação tomada**: a versão do `pdf.js` empacotada (5.6.205, build "moderna") foi trocada pela build **"legacy"** da versão mais recente disponível (6.2.108) — variante que o próprio projeto `pdf.js` publica especificamente para navegadores com suporte mais restrito a recursos modernos de JavaScript/DOM, com polyfills adicionais. `assets/pdf.min.js` e `assets/pdf.worker.min.js` foram substituídos; a API usada pela ferramenta (`getDocument`, `GlobalWorkerOptions`, worker de módulo) continua idêntica, sem mudança de código em `app.js` além da própria substituição dos arquivos.
