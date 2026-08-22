@@ -1,4 +1,4 @@
-# Indicadores Saúde Bucal · versão 1.13
+# Indicadores Saúde Bucal · versão 1.14
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -51,6 +51,6 @@ Depois acesse `http://localhost:8080`.
 - `index.html`: interface principal.
 - `assets/app.js`: importação, normalização, cálculos e navegação.
 - `assets/app.css`: apresentação visual responsiva.
-- `assets/pdf.min.mjs` e `assets/pdf.worker.min.mjs`: leitor local de PDF.
+- `assets/pdf.min.js` e `assets/pdf.worker.min.js`: leitor local de PDF (extensão `.js`, não `.mjs` — nem todo host estático serve `.mjs` com o Content-Type de JavaScript, e o navegador bloqueia a importação do módulo quando isso acontece).
 - `render.yaml`: configuração do Render.
 - `.github/workflows/pages.yml`: publicação automática no GitHub Pages.

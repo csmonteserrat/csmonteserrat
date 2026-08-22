@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Versão 1.14 (correção: importação de PDF falhando no Render)
+
+- **Bug real corrigido: PDFs falhavam ao importar quando publicados no Render** (CSV continuava funcionando normalmente). Causa: o leitor de PDF (`pdf.js`) era carregado com `import()` dinâmico e um Web Worker de módulo a partir de arquivos com extensão `.mjs`. Nem todo host estático mapeia `.mjs` para um Content-Type de JavaScript por padrão — e como o navegador aplica checagem estrita de MIME type para scripts de módulo (e o `render.yaml` já define `X-Content-Type-Options: nosniff` para todas as rotas), o módulo é bloqueado silenciosamente e a importação de PDF falha, mesmo com o arquivo correto. Corrigido renomeando `assets/pdf.min.mjs` → `assets/pdf.min.js` e `assets/pdf.worker.min.mjs` → `assets/pdf.worker.min.js` (extensão `.js` é reconhecida como JavaScript por praticamente qualquer host). Confirmado localmente que o MIME retorna `text/javascript` e que os dois PDFs de amostra voltam a importar normalmente.
+- **Bug real corrigido: o motivo de uma falha de importação nunca aparecia.** `importFiles` mostrava o erro específico de cada arquivo num toast, mas logo em seguida sempre disparava um segundo toast com o resumo ("X concluída(s) · Y falha(s)") no mesmo elemento — sobrescrevendo a mensagem real antes que desse para ler. Agora, quando há falha, abre uma janela listando cada arquivo com o motivo exato do erro, em vez de só o contador genérico.
+- Adicionados 2 autotestes novos (78–79): o leitor de PDF referencia `.js` e não `.mjs`; a falha de importação guarda o motivo por arquivo em vez de deixar o resumo final sobrescrevê-lo. Total: 79 autotestes.
+
 ## Versão 1.13 (nada mais é salvo pelo navegador, a pedido do usuário)
 
 Mudança de arquitetura pedida pelo usuário: o navegador deixou de guardar qualquer coisa entre uma abertura e outra da ferramenta. Todo o "salvar" passou a acontecer só na exportação manual do backup — se a aba for fechada ou recarregada sem exportar, tudo se perde, de propósito.

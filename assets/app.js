@@ -3,7 +3,7 @@
  * Nenhum arquivo importado é enviado para serviços externos.
  */
 
-const APP_VERSION = '1.13';
+const APP_VERSION = '1.14';
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -203,8 +203,8 @@ function audit(action,details={}){state.audit.push({id:uuid(),at:nowISO(),action
 async function loadPdfJs(){
   if(pdfjsPromise)return pdfjsPromise;
   pdfjsPromise=(async()=>{
-    const moduleUrl=new URL('./pdf.min.mjs',import.meta.url);
-    const workerUrl=new URL('./pdf.worker.min.mjs',import.meta.url);
+    const moduleUrl=new URL('./pdf.min.js',import.meta.url);
+    const workerUrl=new URL('./pdf.worker.min.js',import.meta.url);
     const lib=await import(moduleUrl.href);
     lib.GlobalWorkerOptions.workerSrc=workerUrl.href;
     return lib;
@@ -389,8 +389,8 @@ function commitSnapshot(snap){
   if(snap.unit&&!state.preferences.unit)state.preferences.unit=snap.unit;queueSave();refreshAll();
 }
 async function importFiles(files){
-  const list=[...files];if(!list.length)return;showLoading('Preparando importação',`${list.length} arquivo(s)`);let ok=0,fail=0;
-  try{for(let i=0;i<list.length;i++){setLoading(`Importando ${i+1} de ${list.length}`,list[i].name);try{const result=await importOne(list[i]);if(result)ok++}catch(e){fail++;showError(e)}}}finally{hideLoading();document.getElementById('fileInput').value='';toast(`${ok} importação(ões) concluída(s)${fail?` · ${fail} falha(s)`:''}`)}
+  const list=[...files];if(!list.length)return;showLoading('Preparando importação',`${list.length} arquivo(s)`);let ok=0;const failures=[];
+  try{for(let i=0;i<list.length;i++){setLoading(`Importando ${i+1} de ${list.length}`,list[i].name);try{const result=await importOne(list[i]);if(result)ok++}catch(e){console.error(e);failures.push({name:list[i].name,message:e?.message||String(e)||'Erro desconhecido.'})}}}finally{hideLoading();document.getElementById('fileInput').value='';if(failures.length){audit('import_failed',{ok,failures:failures.map(f=>({name:f.name,message:f.message}))});showImportFailures(ok,failures)}else{toast(`${ok} importação(ões) concluída(s)`)}}
 }
 
 /* ---------- Motor de cálculo e proveniência ---------- */
@@ -596,7 +596,7 @@ function importsHTML(){
 function diagnosticsHTML(){
   const list=buildDiagnostics(),counts={error:list.filter(x=>x.level==='error').length,warning:list.filter(x=>x.level==='warning').length,info:list.filter(x=>x.level==='info').length};
   const rows=list.map(d=>`<article class="diagnostic ${esc(d.level)}"><div class="diagnostic-icon">${d.level==='error'?'!':d.level==='warning'?'△':'i'}</div><div><strong>${esc(d.code||'DIAGNÓSTICO')}</strong><p>${esc(d.message)}</p>${d.fileName?`<small class="muted">${esc(d.fileName)}</small>`:''}</div>${d.snapshotId?`<button class="btn small" data-open-snapshot="${d.snapshotId}">Abrir fonte</button>`:''}</article>`).join('');
-  return `<div class="grid-kpis">${kpi('Críticos',fmtNum(counts.error),'Impedem ou invalidam um cálculo específico','#e15f41','alert')}${kpi('Alertas',fmtNum(counts.warning),'Exigem conferência ou denominador','#e7a23b','alert')}${kpi('Informativos',fmtNum(counts.info),'Hipóteses e limitações documentadas','#546de5','info')}${kpi('Autotestes',state.selfTests?`${state.selfTests.passed}/${state.selfTests.total}`:'não executados',state.selfTests?fmtDateTime(state.selfTests.at):'Execute após mudanças ou restauração','#39b980','check')}</div><div class="main-grid"><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('alert')} Diagnóstico dos dados</h2><div class="section-sub">Nenhum alerta altera silenciosamente os dados importados.</div></div></div><div class="diagnostic-list">${rows||'<div class="notice"><strong>Nenhum diagnóstico ativo.</strong> Ainda assim, confira a composição antes de homologar resultados.</div>'}</div></article><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('check')} Testes internos</h2><div class="section-sub">77 casos de fórmula, faixa, privacidade, deduplicação, 2I, diagnóstico e persistência definidos na especificação.</div></div></div>${testSummaryHTML()}<div class="card-actions"><button class="btn primary" data-run-tests>${icon('check')}Executar 77 testes</button></div></article></div><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('info')} Limitações visíveis</h2></div></div><div class="notice warn"><strong>PDF de procedimentos:</strong> não traz CBO, INE, CNS nem a janela federal de 12 meses; B1–B6 derivados dele são prévios. As descrições de restaurações podem vir truncadas pelo CELK.</div><div class="notice warn" style="margin-top:9px"><strong>Atividades em grupo:</strong> traz o total agregado de presentes, sem idade e sem deduplicação por participante. M3/B4 dependem de denominador confirmado.</div><div class="notice warn" style="margin-top:9px"><strong>2I:</strong> o CSV recebido não informa data/código/CBO da atividade. O painel reproduz somente o valor consolidado “Consulta Saude Bucal” após mapeamento explícito.</div></article>`;
+  return `<div class="grid-kpis">${kpi('Críticos',fmtNum(counts.error),'Impedem ou invalidam um cálculo específico','#e15f41','alert')}${kpi('Alertas',fmtNum(counts.warning),'Exigem conferência ou denominador','#e7a23b','alert')}${kpi('Informativos',fmtNum(counts.info),'Hipóteses e limitações documentadas','#546de5','info')}${kpi('Autotestes',state.selfTests?`${state.selfTests.passed}/${state.selfTests.total}`:'não executados',state.selfTests?fmtDateTime(state.selfTests.at):'Execute após mudanças ou restauração','#39b980','check')}</div><div class="main-grid"><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('alert')} Diagnóstico dos dados</h2><div class="section-sub">Nenhum alerta altera silenciosamente os dados importados.</div></div></div><div class="diagnostic-list">${rows||'<div class="notice"><strong>Nenhum diagnóstico ativo.</strong> Ainda assim, confira a composição antes de homologar resultados.</div>'}</div></article><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('check')} Testes internos</h2><div class="section-sub">79 casos de fórmula, faixa, privacidade, deduplicação, 2I, diagnóstico e persistência definidos na especificação.</div></div></div>${testSummaryHTML()}<div class="card-actions"><button class="btn primary" data-run-tests>${icon('check')}Executar 79 testes</button></div></article></div><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('info')} Limitações visíveis</h2></div></div><div class="notice warn"><strong>PDF de procedimentos:</strong> não traz CBO, INE, CNS nem a janela federal de 12 meses; B1–B6 derivados dele são prévios. As descrições de restaurações podem vir truncadas pelo CELK.</div><div class="notice warn" style="margin-top:9px"><strong>Atividades em grupo:</strong> traz o total agregado de presentes, sem idade e sem deduplicação por participante. M3/B4 dependem de denominador confirmado.</div><div class="notice warn" style="margin-top:9px"><strong>2I:</strong> o CSV recebido não informa data/código/CBO da atividade. O painel reproduz somente o valor consolidado “Consulta Saude Bucal” após mapeamento explícito.</div></article>`;
 }
 
 function settingsHTML(){
@@ -613,6 +613,7 @@ function openDrawer(html){const b=document.getElementById('drawerBackdrop'),d=do
 function closeDrawer(){const b=document.getElementById('drawerBackdrop');b.classList.remove('open');b.setAttribute('aria-hidden','true');document.getElementById('drawer').innerHTML=''}
 function toast(message){const t=document.getElementById('toast');t.textContent=message;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),3500)}
 function showError(error){console.error(error);toast(error?.message||String(error)||'Ocorreu um erro.');}
+function showImportFailures(ok,failures){openModal(`<div class="modal-head"><div><h2 id="modalTitle">Importação com falha</h2><p>${ok} importação(ões) concluída(s) · ${failures.length} falha(s). Nada foi salvo desses arquivos — reveja e importe de novo.</p></div></div><div class="modal-body"><div class="table-scroll"><table><thead><tr><th>Arquivo</th><th>Motivo</th></tr></thead><tbody>${failures.map(f=>`<tr><td>${esc(f.name)}</td><td>${esc(f.message)}</td></tr>`).join('')}</tbody></table></div></div><div class="modal-foot"><button class="btn primary" data-close-modal>Entendi</button></div>`)}
 function showLoading(title,detail=''){document.getElementById('loadingTitle').textContent=title;document.getElementById('loadingDetail').textContent=detail;document.getElementById('loading').classList.remove('hidden')}
 function setLoading(title,detail=''){document.getElementById('loadingTitle').textContent=title;document.getElementById('loadingDetail').textContent=detail}
 function hideLoading(){document.getElementById('loading').classList.add('hidden')}
@@ -784,6 +785,8 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
     return result;
   });
   await add('77. Nenhuma função de IndexedDB restou no código — nada é salvo pelo navegador',()=>typeof dbGet==='undefined'&&typeof dbPut==='undefined'&&typeof openDB==='undefined');
+  await add('78. Leitor de PDF referencia arquivos .js (não .mjs), evitando bloqueio de MIME type em hospedagem estática que não mapeia .mjs como JavaScript',()=>{const src=loadPdfJs.toString();return src.includes('pdf.min.js')&&src.includes('pdf.worker.min.js')&&!src.includes('.mjs')});
+  await add('79. Falha de importação guarda o motivo por arquivo em vez de deixar o resumo final sobrescrever a mensagem de erro (regressão do bug em que o toast escondia o motivo real)',()=>{const src=importFiles.toString();return src.includes('failures.push')&&src.includes('showImportFailures')});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -828,7 +831,7 @@ function setupEvents(){
     if(el.dataset.copyName){const e=mergedEpisodes().find(x=>x.id===el.dataset.copyName);if(e)await navigator.clipboard.writeText(e.nome||'');return toast('Nome copiado.')}
     if(el.dataset.openWhatsapp){const e=mergedEpisodes().find(x=>x.id===el.dataset.openWhatsapp);if(e?.phoneNormalized)window.open(`https://wa.me/${e.phoneNormalized}`,'_blank','noopener,noreferrer');return}
     if(el.dataset.followup){const [id,next]=el.dataset.followup.split('|');return setFollowup(id,next)}if(el.dataset.mergeManual){const [m,e]=el.dataset.mergeManual.split('|');return mergeManual(m,e)}if(el.dataset.editManual){closeDrawer();return openManualPregnant(el.dataset.editManual)}if(el.dataset.archiveManual){const m=state.gestantes.manual.find(x=>x.id===el.dataset.archiveManual);if(m){m.archived=true;audit('2i_manual_archived',{manualId:m.id});closeDrawer();refreshAll();toast('Cadastro manual arquivado.')}return}if(el.dataset.excludeEpisode){closeDrawer();return openExcludeEpisode(el.dataset.excludeEpisode)}if(el.dataset.restoreEpisode)return restoreEpisode(el.dataset.restoreEpisode);
-    if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading('Executando 77 testes','Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
+    if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading('Executando 79 testes','Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
     if(el.hasAttribute('data-create-backup'))return createBackupFromModal();if(el.hasAttribute('data-restore-backup'))return document.getElementById('backupInput').click();if(el.hasAttribute('data-unlock-backup'))return processPendingBackup(document.getElementById('restorePassword')?.value||'');
   });
   document.getElementById('importBtn').onclick=()=>document.getElementById('fileInput').click();document.getElementById('fileInput').onchange=e=>importFiles(e.target.files);document.getElementById('backupBtn').onclick=openBackupModal;document.getElementById('printBtn').onclick=()=>window.print();document.getElementById('saveBtn').onclick=openBackupModal;
