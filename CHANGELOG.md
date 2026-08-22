@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Versão 1.19 (ajustes finos na Visão Geral + bug real corrigido no selo de qualidade)
+
+- **KPI "2I · panorama" virou "Gestantes"**, a pedido do usuário. O percentual continua a mesma conta de sempre (atendidas ÷ total do recorte); só o texto abaixo mudou, de "X atende(m) em Y episódio(s) do recorte" para "X gestante(s) atendida(s) do total de Y com pré-natal aberto".
+- **Bug real corrigido, achado enquanto eu conferia o painel Municipal para responder à pergunta do usuário sobre o selo "Prévia não homologada"**: a função que decide esse selo (`dataQuality`) comparava o motivo do resultado com o texto exato `'informado pelo Metabase'`, mas o valor real gerado pela ferramenta é `'informado pelo Metabase porque não há CELK para o mês'` — uma string mais longa. Como a comparação era de igualdade exata, ela nunca batia, e por isso **todo indicador com resultado vindo do Metabase (nos meses sem PDF do CELK) aparecia incorretamente como "Prévia não homologada"** em vez de "Consolidado informado". Corrigido comparando só o início da string.
+- 2 autotestes novos (89–90): o texto do KPI de gestantes usa a mesma fórmula de percentual de sempre; o selo "Consolidado informado" volta a aparecer quando o resultado vem do Metabase. Total: **90 autotestes**.
+
 ## Versão 1.18 (Visão Geral redesenhada: sem pontos, com leitura por meta)
 
 - **Pedido do usuário**: "não quero que fique mostrando ou calculando isso dos 100 pts — a ideia é ver a % da meta do mês e do quadrimestre e quanto falta para bater a meta". A tela **Visão Geral** foi redesenhada; **Municipal, Federal e as demais telas continuam exatamente como estavam** (a mudança de escopo por enquanto é só na Visão Geral).
