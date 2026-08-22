@@ -3,7 +3,7 @@
  * Nenhum arquivo importado é enviado para serviços externos.
  */
 
-const APP_VERSION = '1.14';
+const APP_VERSION = '1.15';
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
