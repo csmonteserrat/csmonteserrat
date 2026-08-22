@@ -1,4 +1,4 @@
-# Indicadores Saúde Bucal
+# Indicadores Saúde Bucal · versão 1.1
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -10,6 +10,13 @@ Ferramenta estática para leitura de relatórios do CELK e consolidados do Metab
 - Exporte backups regularmente, principalmente antes de mudar o domínio do site.
 
 O projeto não possui backend, banco de dados remoto ou serviço de telemetria. O PDF.js necessário para ler os relatórios já está incluído em `assets/`.
+
+## Prioridade das fontes
+
+- Quando houver dados do CELK para o mês, eles são usados no cálculo.
+- O consolidado do Metabase permanece como referência de conferência.
+- Divergências entre CELK e Metabase são apresentadas nos cards, na reconciliação e no diagnóstico.
+- O Metabase só fornece o resultado ativo quando não há relatório CELK aplicável para aquela competência.
 
 ## Publicar no Render
 
