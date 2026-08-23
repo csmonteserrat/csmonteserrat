@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## Versão 1.24 (coluna "Funções" do Resumo por procedimento mostra indicador + papel, não o código bruto)
+
+- **Pedido do usuário**: na tela "Importações e conferência", tabela "Resumo por procedimento", mostrar de forma mais clara em "Funções" em qual indicador e como (numerador ou denominador) cada procedimento entra — exemplo dado pelo usuário: "B1 - Numerador", "M2 - Denominador".
+- **Antes**: a coluna "Funções" mostrava o código interno bruto da regra (`first`, `concluded`, `preventive`, `m4den`, `art`, `restorative`, `b3num`, `b3den`, `b5den`), sem indicar a que indicador cada código pertencia nem se era numerador ou denominador — só quem já conhecia o código de cor entendia.
+- **Agora**: cada código de papel é traduzido para um ou mais selos "Indicador - Papel" (ex.: "M1 - Numerador", "B2 - Denominador"), via um mapa fixo (`ROLE_INDICATOR_MAP`, novo) que espelha exatamente a lógica de cálculo já existente em `municipalComponents`/`federalComponents` (inclusive os indicadores federais que espelham o municipal — B1/B2/B4/B6). Um mesmo procedimento pode acumular vários selos: por exemplo "Primeira consulta odontológica programada" mostra M1 - Numerador, B1 - Numerador, M2 - Denominador e B2 - Denominador ao mesmo tempo, porque entra de formas diferentes em indicadores diferentes. Selos de numerador usam uma cor (azul); selos de denominador usam outra (verde-azulado), com uma legenda nova acima da tabela explicando as duas cores.
+- Processo: preview em cópia separada com os 4 arquivos reais de julho/2026, aprovado pelo usuário sem ressalvas.
+- 1 autoteste novo (111): confirma que a badge de "first" traduz corretamente para os 4 selos esperados (M1/B1 numerador, M2/B2 denominador) e que a tabela não usa mais o pill bruto do código de papel. Total: **111 autotestes**.
+
 ## Versão 1.23 (lista 2I redesenhada como cartões com selo colorido; nome do usuário removido do topo)
 
 - **Pedido do usuário**: a linha inteira do nome da gestante mudar de cor conforme a situação — pediu preview antes de aplicar. Foi rejeitado ("não gostei do design"); pediu mais duas opções. As duas seguintes também foram rejeitadas ("não gostei de nenhuma"); pediu 5 ideias diferentes. Entre as 5, aprovou a opção 4 ("lista de cartões com selo à direita") e, no mesmo pedido, acrescentou tirar o nome do usuário do topo da página.

@@ -1,4 +1,4 @@
-# Indicadores Saúde Bucal · versão 1.23
+# Indicadores Saúde Bucal · versão 1.24
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
