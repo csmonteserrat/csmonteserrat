@@ -12,13 +12,14 @@
 <body>
   <div class="app-shell" id="appShell">
     <aside class="sidebar" aria-label="Navegação principal">
-      <div class="brand" title="Indicadores Saúde Bucal">SB</div>
+      <div class="brand" title="Indicadores Saúde Bucal"><span data-icon="tooth"></span></div>
       <button class="side-btn active" data-view="overview" aria-label="Visão geral" title="Visão geral"><span data-icon="grid"></span></button>
       <button class="side-btn" data-view="municipal" aria-label="Indicadores municipais" title="Municipal"><span data-icon="building"></span></button>
       <button class="side-btn" data-view="federal" aria-label="Indicadores federais" title="Federal"><span data-icon="shield"></span></button>
       <button class="side-btn" data-view="pregnant" aria-label="Saúde bucal da gestante" title="2I - Gestantes"><span data-icon="heart"></span></button>
       <button class="side-btn" data-view="imports" aria-label="Importações e conferência" title="Importações"><span data-icon="upload"></span></button>
       <button class="side-btn" data-view="diagnostics" aria-label="Diagnóstico dos dados" title="Diagnóstico"><span data-icon="alert"></span><i class="side-badge hidden" id="diagnosticBadge">0</i></button>
+      <button class="side-btn" data-view="calculator" aria-label="Calculadora odontopediátrica" title="Calculadora odontopediátrica"><span data-icon="calculator"></span></button>
       <div class="side-spacer"></div>
       <button class="side-btn" data-view="settings" aria-label="Configurações e ajuda" title="Configurações"><span data-icon="settings"></span></button>
     </aside>
@@ -81,6 +82,7 @@
         <section class="view hidden" id="view-pregnant"></section>
         <section class="view hidden" id="view-imports"></section>
         <section class="view hidden" id="view-diagnostics"></section>
+        <section class="view hidden" id="view-calculator"></section>
         <section class="view hidden" id="view-settings"></section>
       </div>
     </main>
