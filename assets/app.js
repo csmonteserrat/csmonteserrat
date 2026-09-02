@@ -21,7 +21,7 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '1.29';
+const APP_VERSION = '1.35';
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -166,6 +166,8 @@ function parseDate(v){
   if(!v)return null;if(v instanceof Date)return isNaN(v)?null:v;
   const s=String(v).trim();let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
   if(m){const d=new Date(+m[3],+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0));return isNaN(d)?null:d;}
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if(m){const d=new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0));return isNaN(d)?null:d;}
   m=s.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})/);if(m&&EN_MONTH[m[1].toLowerCase()])return new Date(+m[3],EN_MONTH[m[1].toLowerCase()]-1,+m[2]);
   const d=new Date(s);return isNaN(d)?null:d;
 }
@@ -185,6 +187,7 @@ function maskName(v){const p=String(v||'').trim().split(/\s+/);return p.map((x,i
 function maskPhone(v){const d=String(v||'').replace(/\D/g,'');if(d.length<4)return v?'••••':'—';return `(${d.slice(0,2)}) •••••-${d.slice(-4)}`;}
 function normalizePhone(v){let d=String(v||'').replace(/\D/g,'');if(d.length===10||d.length===11)d='55'+d;if(/^55\d{10,11}$/.test(d))return d;return '';}
 function sanitizeProntuario(v){return String(v??'').replace(/[,.\s]/g,'').trim();}
+function stripIdPrefix(v){return String(v??'').replace(/^\(\s*[0-9A-Za-z]+\s*\)\s*/,'').trim();}
 function isScientificNotation(v){return /^\s*-?\d+([.,]\d+)?e[+\-]?\d+\s*$/i.test(String(v??''));}
 function safeFileName(v){return norm(v).toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'').slice(0,60)||'arquivo';}
 function bytesToBase64(bytes){let out='';const chunk=0x8000;for(let i=0;i<bytes.length;i+=chunk)out+=String.fromCharCode(...bytes.subarray(i,i+chunk));return btoa(out)}
@@ -285,6 +288,52 @@ function extractPdfMetadata(pages){
 }
 function makeSnapshotBase(file,hash,profile,meta={}){return {id:uuid(),hash,fileName:file.name,fileSize:file.size,createdAt:nowISO(),dataExtraction:meta.issuedAt||nowISO(),profile,parserVersion:'1.0.0',unit:meta.unit||'',unitCode:meta.unitCode||'',periodStart:meta.periodStart||'',periodEnd:meta.periodEnd||'',status:'preliminar',dataByMonth:{},procedureCounts:[],validations:[],supersededBy:null}}
 
+// Motor de agregação compartilhado por PDF e CSV de "Procedimentos Detalhado": recebe linhas já
+// normalizadas no formato {patient,age,sex,date(DD/MM/YYYY),professional,procedure,unitOrigin,quantity,page?}
+// e preenche snap.dataByMonth/snap.procedureCounts/snap.validations. Mantido como função pura (sem side
+// effect fora de `snap`) para poder ser testado direto com linhas sintéticas, sem precisar de PDF/CSV real.
+function buildProcedureSnapshotFromRows(snap,allRows){
+  const monthGroups={};for(const r of allRows){const d=parseDate(r.date);if(!d)continue;const mk=monthKey(d.getFullYear(),d.getMonth()+1);(monthGroups[mk]??=[]).push(r)}
+  const procGlobal={};
+  for(const [mk,rows] of Object.entries(monthGroups)){
+    const byProcedure={},firstPeople=new Set(),concludedPeople=new Set(),firstPatients=[];
+    for(const r of rows){const match=procedureMatch(r.procedure);const key=match.normalized;const pr=byProcedure[key]??={descriptionOriginal:r.procedure,descriptionNormalized:match.name,sigtap:match.code,quantityRaw:0,quantityValid:0,lineCount:0,roles:match.roles,ambiguous:!!match.ambiguous,unrecognized:!!match.unrecognized,outOfScope:!!match.outOfScope,pages:new Set(),professionals:{}};pr.quantityRaw+=r.quantity;pr.quantityValid+=r.quantity;pr.lineCount++;pr.pages.add(r.page);pr.professionals[r.professional]=(pr.professionals[r.professional]||0)+r.quantity;byProcedure[key]=pr;
+      if(match.roles.includes('first')){firstPeople.add(norm(r.patient));firstPatients.push({name:r.patient,date:r.date,quantity:r.quantity})}
+      if(match.roles.includes('concluded'))concludedPeople.add(norm(r.patient));
+    }
+    const procs=Object.values(byProcedure).map(p=>({...p,pages:[...p.pages].filter(x=>x!=null).sort((a,b)=>a-b)}));
+    const roleQty=role=>sum(procs.filter(p=>p.roles.includes(role)).map(p=>p.quantityValid));
+    // M4 (municipal): "número total de procedimentos individuais no mês", excluindo só primeira consulta,
+    // tratamento concluído e a nota de evolução de atividade em grupo que vaza para este relatório.
+    // Propositalmente inclui procedimentos ainda não identificados: são procedimentos individuais reais,
+    // só não catalogados ainda. B5 (federal) é diferente: usa lista fechada de SIGTAP (role 'b5den'), sem
+    // expandir automaticamente para itens não catalogados.
+    const isGroupNote=p=>/^EVOLUCAO DA ATIVIDADE EM GRUPO/.test(norm(p.descriptionOriginal));
+    const individualM4=sum(procs.filter(p=>!p.roles.includes('first')&&!p.roles.includes('concluded')&&!isGroupNote(p)).map(p=>p.quantityValid));
+    snap.dataByMonth[mk]={kind:'procedure',firstConsultations:firstPeople.size,firstConsultationQuantity:roleQty('first'),treatmentsConcluded:concludedPeople.size,treatmentConcludedQuantity:roleQty('concluded'),preventive:roleQty('preventive'),individualProcedures:individualM4,art:roleQty('art'),restorative:roleQty('restorative'),b5Denominator:roleQty('b5den'),b3Numerator:roleQty('b3num'),b3Denominator:roleQty('b3den'),procedureCounts:procs,firstPatients};
+    for(const p of procs){const g=procGlobal[p.descriptionNormalized]??={...p,quantityRaw:0,quantityValid:0,lineCount:0,pages:new Set(),professionals:{}};g.quantityRaw+=p.quantityRaw;g.quantityValid+=p.quantityValid;g.lineCount+=p.lineCount;p.pages.forEach(x=>g.pages.add(x));for(const [n,q] of Object.entries(p.professionals))g.professionals[n]=(g.professionals[n]||0)+q;procGlobal[p.descriptionNormalized]=g}
+    if(roleQty('first')!==firstPeople.size)snap.validations.push({level:'warning',code:'M1_QUANTITY_VS_PEOPLE',month:mk,message:`Primeira consulta: a fonte soma ${roleQty('first')} na coluna quantidade, mas contém ${firstPeople.size} pessoas distintas pelo nome exibido. A prévia usa pessoas distintas.`});
+    if(roleQty('concluded')!==concludedPeople.size)snap.validations.push({level:'warning',code:'M2_QUANTITY_VS_PEOPLE',month:mk,message:`Tratamento concluído: a fonte soma ${roleQty('concluded')} na coluna quantidade, mas contém ${concludedPeople.size} pessoas distintas pelo nome exibido. A prévia usa pessoas distintas.`});
+  }
+  snap.procedureCounts=Object.values(procGlobal).map(p=>({...p,pages:[...p.pages].sort((a,b)=>a-b)}));
+  if(snap.procedureCounts.some(p=>p.ambiguous))snap.validations.push({level:'warning',code:'TRUNCATED_RESTORATION',message:'O CELK abrevia descrições de restaurações. Elas entram na família restauradora, mas o SIGTAP específico não é afirmado.'});
+}
+// Dado um conjunto de linhas já com {unitOrigin}, decide qual unidade "vale" para o snapshot (a mais
+// frequente no arquivo) e reporta quantas linhas tinham uma unidade de origem diferente registrada.
+// Usado pelo CSV de "Procedimentos Detalhado", que pode trazer mais de uma unidade no mesmo arquivo
+// (ex.: um profissional que atende em mais de um CS, ou um paciente de outra unidade que foi atendido
+// aqui) — o PDF nunca tem esse problema porque cada relatório já é emitido para uma única unidade.
+// IMPORTANTE: todas as linhas contam para a produção da unidade majoritária, nenhuma é descartada — se a
+// linha está neste documento, o atendimento aconteceu na unidade majoritária, mesmo que o cadastro do
+// paciente/profissional seja de outra unidade.
+function pickDominantUnit(rows){
+  const counts={};for(const r of rows){const u=r.unitOrigin||'';counts[u]=(counts[u]||0)+1}
+  const sorted=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const keepUnit=sorted[0]?.[0]||'';
+  const otherUnitCounts={};for(const [u,c] of sorted)if(u!==keepUnit)otherUnitCounts[u]=c;
+  return {keepUnit,otherUnitCounts};
+}
+
 async function parseProcedurePdf(file,hash,pages){
   const meta=extractPdfMetadata(pages),snap=makeSnapshotBase(file,hash,'celk_procedimentos_detalhado',meta);snap.status='prévia não homologada';
   const allRows=[];
@@ -296,34 +345,94 @@ async function parseProcedurePdf(file,hash,pages){
     }
   }
   if(!allRows.length)throw new Error('O PDF foi reconhecido como “Procedimentos Detalhado”, mas nenhuma linha produtiva pôde ser extraída.');
-  const monthGroups={};for(const r of allRows){const d=parseDate(r.date);if(!d)continue;const mk=monthKey(d.getFullYear(),d.getMonth()+1);(monthGroups[mk]??=[]).push(r)}
-  const procGlobal={};
-  for(const [mk,rows] of Object.entries(monthGroups)){
-    const byProcedure={},firstPeople=new Set(),concludedPeople=new Set();
-    for(const r of rows){const match=procedureMatch(r.procedure);const key=match.normalized;const pr=byProcedure[key]??={descriptionOriginal:r.procedure,descriptionNormalized:match.name,sigtap:match.code,quantityRaw:0,quantityValid:0,lineCount:0,roles:match.roles,ambiguous:!!match.ambiguous,unrecognized:!!match.unrecognized,outOfScope:!!match.outOfScope,pages:new Set(),professionals:{}};pr.quantityRaw+=r.quantity;pr.quantityValid+=r.quantity;pr.lineCount++;pr.pages.add(r.page);pr.professionals[r.professional]=(pr.professionals[r.professional]||0)+r.quantity;byProcedure[key]=pr;
-      if(match.roles.includes('first'))firstPeople.add(norm(r.patient));
-      if(match.roles.includes('concluded'))concludedPeople.add(norm(r.patient));
-    }
-    const procs=Object.values(byProcedure).map(p=>({...p,pages:[...p.pages].sort((a,b)=>a-b)}));
-    const roleQty=role=>sum(procs.filter(p=>p.roles.includes(role)).map(p=>p.quantityValid));
-    // M4 (municipal): "número total de procedimentos individuais no mês", excluindo só primeira consulta,
-    // tratamento concluído e a nota de evolução de atividade em grupo que vaza para este relatório.
-    // Propositalmente inclui procedimentos ainda não identificados: são procedimentos individuais reais,
-    // só não catalogados ainda. B5 (federal) é diferente: usa lista fechada de SIGTAP (role 'b5den'), sem
-    // expandir automaticamente para itens não catalogados.
-    const isGroupNote=p=>/^EVOLUCAO DA ATIVIDADE EM GRUPO/.test(norm(p.descriptionOriginal));
-    const individualM4=sum(procs.filter(p=>!p.roles.includes('first')&&!p.roles.includes('concluded')&&!isGroupNote(p)).map(p=>p.quantityValid));
-    snap.dataByMonth[mk]={kind:'procedure',firstConsultations:firstPeople.size,firstConsultationQuantity:roleQty('first'),treatmentsConcluded:concludedPeople.size,treatmentConcludedQuantity:roleQty('concluded'),preventive:roleQty('preventive'),individualProcedures:individualM4,art:roleQty('art'),restorative:roleQty('restorative'),b5Denominator:roleQty('b5den'),b3Numerator:roleQty('b3num'),b3Denominator:roleQty('b3den'),procedureCounts:procs};
-    for(const p of procs){const g=procGlobal[p.descriptionNormalized]??={...p,quantityRaw:0,quantityValid:0,lineCount:0,pages:new Set(),professionals:{}};g.quantityRaw+=p.quantityRaw;g.quantityValid+=p.quantityValid;g.lineCount+=p.lineCount;p.pages.forEach(x=>g.pages.add(x));for(const [n,q] of Object.entries(p.professionals))g.professionals[n]=(g.professionals[n]||0)+q;procGlobal[p.descriptionNormalized]=g}
-    if(roleQty('first')!==firstPeople.size)snap.validations.push({level:'warning',code:'M1_QUANTITY_VS_PEOPLE',month:mk,message:`Primeira consulta: o PDF soma ${roleQty('first')} na coluna quantidade, mas contém ${firstPeople.size} pessoas distintas pelo nome exibido. A prévia usa pessoas distintas.`});
-    if(roleQty('concluded')!==concludedPeople.size)snap.validations.push({level:'warning',code:'M2_QUANTITY_VS_PEOPLE',month:mk,message:`Tratamento concluído: o PDF soma ${roleQty('concluded')} na coluna quantidade, mas contém ${concludedPeople.size} pessoas distintas pelo nome exibido. A prévia usa pessoas distintas.`});
-  }
-  snap.procedureCounts=Object.values(procGlobal).map(p=>({...p,pages:[...p.pages].sort((a,b)=>a-b)}));
-  snap.validations.push({level:'warning',code:'CBO_NOT_AVAILABLE',message:'O relatório não exibe CBO/INE. Os cálculos federais e o M5/B6 (que reconstrói o denominador pelo perfil de CBO de cirurgião-dentista da Nota B6) são prévios; a elegibilidade profissional não foi verificada.'});
-  if(snap.procedureCounts.some(p=>p.ambiguous))snap.validations.push({level:'warning',code:'TRUNCATED_RESTORATION',message:'O CELK abrevia descrições de restaurações. Elas entram na família restauradora, mas o SIGTAP específico não é afirmado.'});
-  sessionRaw.set(snap.id,{type:'procedure',rows:allRows.map(r=>({...r,patientMasked:maskName(r.patient)}))});return snap;
+  buildProcedureSnapshotFromRows(snap,allRows);
+  sessionRaw.set(snap.id,{type:'procedure',rows:allRows.map(r=>({...r,patientMasked:maskName(r.patient),sourceRef:`p.${r.page} · y ${r.lineY}`}))});return snap;
 }
 
+async function parseProcedureCsv(file,hash,text){
+  const rows=parseCSVText(text),headers=rows.shift()||[],map=headersMap(headers);
+  const required=['Paciente','Idade','Sexo','Data','Profissional','Procedimento','Unidade','Quantidade'];
+  const missing=required.filter(h=>map[norm(h)]==null);if(missing.length)throw new Error(`CSV de Procedimentos Detalhado sem cabeçalhos obrigatórios: ${missing.join(', ')}`);
+  const data=rows.filter(r=>r.some(v=>String(v).trim()));
+  const parsedRows=data.map((r,i)=>{
+    const d=parseDate(valueBy(r,map,'Data'));
+    return {line:i+2,patient:stripIdPrefix(valueBy(r,map,'Paciente')),age:valueBy(r,map,'Idade'),sex:valueBy(r,map,'Sexo'),date:d?fmtDate(d):'',professional:stripIdPrefix(valueBy(r,map,'Profissional')),procedure:String(valueBy(r,map,'Procedimento')).trim(),unitOrigin:stripIdPrefix(valueBy(r,map,'Unidade')),quantity:numeric(valueBy(r,map,'Quantidade'))};
+  }).filter(r=>r.date&&r.procedure&&r.quantity!=null);
+  if(!parsedRows.length)throw new Error('O CSV foi reconhecido como "Procedimentos Detalhado", mas nenhuma linha produtiva pôde ser extraída.');
+  const {keepUnit,otherUnitCounts}=pickDominantUnit(parsedRows);
+  const allRows=parsedRows;
+  const dates=allRows.map(r=>parseDate(r.date)).filter(Boolean).map(d=>d.getTime());
+  const periodStart=dates.length?isoDate(new Date(Math.min(...dates))):'',periodEnd=dates.length?isoDate(new Date(Math.max(...dates))):'';
+  const snap=makeSnapshotBase(file,hash,'celk_procedimentos_detalhado',{unit:keepUnit,periodStart,periodEnd});snap.status='prévia não homologada';
+  buildProcedureSnapshotFromRows(snap,allRows);
+  if(Object.keys(otherUnitCounts).length){
+    const parts=Object.entries(otherUnitCounts).map(([u,c])=>`${c} de "${u||'unidade não informada'}"`).join(', ');
+    snap.validations.push({level:'info',code:'CSV_OTHER_UNIT_COUNTED',message:`Este CSV trazia ${parts} com unidade de origem diferente de "${keepUnit}" registrada no cadastro. Como o atendimento consta neste documento, essas linhas foram contadas normalmente na produção de "${keepUnit}" (nenhuma linha foi descartada).`});
+  }
+  sessionRaw.set(snap.id,{type:'procedure',rows:allRows.map(r=>({...r,patientMasked:maskName(r.patient),sourceRef:`linha ${r.line}`}))});return snap;
+}
+
+// A diferença do aviso M1_QUANTITY_VS_PEOPLE (quantidade somada > pessoas distintas) tem duas causas possíveis,
+// e o CSV do CELK mostrou que as duas acontecem na prática: (1) a mesma pessoa aparece em mais de uma linha
+// de "primeira consulta" no mês (cada linha com quantidade 1), ou (2) uma única linha já vem com quantidade
+// maior que 1 para a mesma pessoa (visto no CSV, sempre com um mesmo profissional — vale confirmar com ele se
+// é um lançamento em dobro ou um jeito legítimo de registrar). Por isso a comparação usa a quantidade somada
+// por pessoa (`totalQuantity`), não só a contagem de linhas — cobre os dois casos com a mesma regra.
+function firstConsultationDuplicatesForMonth(s,mk){
+  const list=(s?.dataByMonth?.[mk]?.firstPatients)||[];
+  const groups=new Map();
+  for(const p of list){const key=norm(p.name);if(!key)continue;if(!groups.has(key))groups.set(key,{name:p.name,occurrences:[]});groups.get(key).occurrences.push({date:p.date,quantity:p.quantity??1})}
+  return [...groups.values()].map(g=>({...g,totalQuantity:sum(g.occurrences.map(o=>o.quantity??1))})).filter(g=>g.totalQuantity>1).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+}
+function firstConsultationRepeatsAcrossFiles(){
+  const active=(state.snapshots||[]).filter(s=>!s.supersededBy&&s.profile==='celk_procedimentos_detalhado');
+  const byKey=new Map();
+  for(const s of active){
+    const seenInFile=new Set();
+    for(const month of Object.values(s.dataByMonth||{})){
+      if(month.kind!=='procedure')continue;
+      for(const p of month.firstPatients||[]){
+        const key=norm(p.name);if(!key||seenInFile.has(key))continue;
+        const d=parseDate(p.date);if(!d)continue;
+        seenInFile.add(key);
+        if(!byKey.has(key))byKey.set(key,[]);
+        byKey.get(key).push({name:p.name,date:p.date,dateObj:d,snapshotId:s.id,fileName:s.fileName});
+      }
+    }
+  }
+  const groups=[];
+  for(const list of byKey.values()){
+    if(list.length<2)continue;
+    const sorted=list.slice().sort((a,b)=>a.dateObj-b.dateObj);
+    let within12=false;
+    for(let i=0;i<sorted.length-1;i++)if(Math.abs(sorted[i+1].dateObj-sorted[i].dateObj)/86400000<365)within12=true;
+    if(within12)groups.push({name:sorted[0].name,occurrences:sorted});
+  }
+  return groups.sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+}
+function hasM1PatientData(){return (state.snapshots||[]).some(s=>!s.supersededBy&&Object.values(s.dataByMonth||{}).some(m=>m.firstPatients?.length))}
+function duplicatesDisclosureHTML(dupes){
+  if(!dupes||!dupes.length)return '';
+  const items=dupes.map(g=>{
+    const parts=g.occurrences.map(o=>o.quantity>1?`${esc(o.date)} · quantidade ${fmtNum(o.quantity)} nessa linha`:esc(o.date)).join(', ');
+    const linhas=g.occurrences.length===1?'1 linha':`${g.occurrences.length} linhas`;
+    return `<li><strong>${esc(g.name)}</strong> — quantidade total ${fmtNum(g.totalQuantity)} em ${linhas} (${parts})</li>`;
+  }).join('');
+  return `<div class="disclosure"><button class="disclosure-btn" data-toggle-details type="button"><span>Ver detalhamento dos nomes (${dupes.length})</span><span class="chev">${icon('chevron')}</span></button><div class="disclosure-body"><ul class="dup-list">${items}</ul></div></div>`;
+}
+function crossFileDuplicatesDisclosureHTML(groups){
+  if(!groups||!groups.length)return '';
+  const items=groups.map(g=>`<li><strong>${esc(g.name)}</strong> — ${g.occurrences.map(o=>`${esc(o.fileName)} (${esc(o.date)})`).join(' · ')}</li>`).join('');
+  return `<div class="disclosure"><button class="disclosure-btn" data-toggle-details type="button"><span>Ver pacientes repetidos entre arquivos (${groups.length})</span><span class="chev">${icon('chevron')}</span></button><div class="disclosure-body"><ul class="dup-list">${items}</ul></div></div>`;
+}
+// Motor de agregação compartilhado por PDF e CSV de "Atividades em Grupo": recebe uma lista de eventos já no
+// nível de UMA atividade cada (não por participante) — {date(DD/MM/AAAA),subject,present,status} — e preenche
+// snap.dataByMonth. "present" já chega pronto: o PDF manda o "Presentes" agregado do próprio relatório; o CSV
+// manda a contagem de participantes elegíveis (idade 6–11) que o parser calculou por atividade antes de chamar
+// esta função. Mantida pura (só mexe em `snap`) para poder ser testada com eventos sintéticos.
+function buildGroupSnapshotFromEvents(snap,events){
+  for(const ev of events){const d=parseDate(ev.date);if(!d)continue;const mk=monthKey(d.getFullYear(),d.getMonth()+1);snap.dataByMonth[mk]??={kind:'group',supervisedBrushingPresent:0,activities:0,eligibleActivities:0,brushingEvents:[]};snap.dataByMonth[mk].activities++;if(/ESCOVACAO SUPERVISIONADA/.test(norm(ev.subject))){snap.dataByMonth[mk].eligibleActivities++;snap.dataByMonth[mk].supervisedBrushingPresent+=Number(ev.present)||0;snap.dataByMonth[mk].brushingEvents.push({date:ev.date,present:Number(ev.present)||0,status:ev.status||''})}}
+}
 async function parseGroupPdf(file,hash,pages){
   const meta=extractPdfMetadata(pages),snap=makeSnapshotBase(file,hash,'celk_atividades_grupo',meta);snap.status='prévia não homologada';const events=[];
   for(const page of pages){const lines=page.lines;
@@ -337,9 +446,56 @@ async function parseGroupPdf(file,hash,pages){
     }
   }
   if(!events.length)throw new Error('O PDF foi reconhecido como “Relação das Atividades em Grupo”, mas nenhuma atividade pôde ser extraída.');
-  for(const ev of events){const d=parseDate(ev.date);if(!d)continue;const mk=monthKey(d.getFullYear(),d.getMonth()+1);snap.dataByMonth[mk]??={kind:'group',supervisedBrushingPresent:0,activities:0,eligibleActivities:0,brushingEvents:[]};snap.dataByMonth[mk].activities++;if(/ESCOVACAO SUPERVISIONADA/.test(norm(ev.subject))){snap.dataByMonth[mk].eligibleActivities++;snap.dataByMonth[mk].supervisedBrushingPresent+=Number(ev.present)||0;snap.dataByMonth[mk].brushingEvents.push({date:ev.date,present:Number(ev.present)||0,status:ev.status||''})}}
+  buildGroupSnapshotFromEvents(snap,events);
   snap.validations.push({level:'warning',code:'GROUP_AGGREGATED',message:'O relatório fornece “Presentes” agregados, sem identificar idade, participante, CBO ou deduplicação. M3/B4 são prévios.'});
   sessionRaw.set(snap.id,{type:'group',rows:events});return snap;
+}
+
+// CSV de "Atividades em Grupo": ao contrário do PDF (que só traz "Presentes" já agregado por atividade), o CSV
+// traz UMA LINHA POR PARTICIPANTE, com nome, data de nascimento e o assunto da atividade — permite calcular a
+// idade real de cada participante na data da atividade e restringir o numerador de M3/B4 à faixa etária oficial
+// (6 a 11 anos, até o dia anterior de completar 12), em vez de aceitar cegamente o "Presentes" agregado do PDF.
+async function parseGroupCsv(file,hash,text){
+  const rows=parseCSVText(text),headers=rows.shift()||[],map=headersMap(headers);
+  const required=['Unidade','Data','Código da Atividade','Assunto','Nome dos Participantes','Data Nascimento'];
+  const missing=required.filter(h=>map[norm(h)]==null);if(missing.length)throw new Error(`CSV de Atividades em Grupo sem cabeçalhos obrigatórios: ${missing.join(', ')}`);
+  const data=rows.filter(r=>r.some(v=>String(v).trim()));
+  const parsedRows=data.map((r,i)=>{
+    const d=parseDate(valueBy(r,map,'Data'));
+    return {line:i+2,unitOrigin:stripIdPrefix(valueBy(r,map,'Unidade')),date:d?fmtDate(d):'',dateObj:d,activityCode:String(valueBy(r,map,'Código da Atividade')).trim(),subject:String(valueBy(r,map,'Assunto')).trim(),participant:String(valueBy(r,map,'Nome dos Participantes')).trim(),birthDate:String(valueBy(r,map,'Data Nascimento')).trim(),targetAudience:valueBy(r,map,'Público Alvo')};
+  }).filter(r=>r.date&&r.subject&&r.participant&&r.activityCode);
+  if(!parsedRows.length)throw new Error('O CSV foi reconhecido como "Relação das Atividades em Grupo", mas nenhuma linha produtiva pôde ser extraída.');
+  const {keepUnit,otherUnitCounts}=pickDominantUnit(parsedRows);
+  const dates=parsedRows.map(r=>r.dateObj).filter(Boolean).map(d=>d.getTime());
+  const periodStart=dates.length?isoDate(new Date(Math.min(...dates))):'',periodEnd=dates.length?isoDate(new Date(Math.max(...dates))):'';
+  const snap=makeSnapshotBase(file,hash,'celk_atividades_grupo',{unit:keepUnit,periodStart,periodEnd});snap.status='prévia não homologada';
+
+  let ineligibleCount=0,missingBirthCount=0;const ineligibleSample=[];
+  const perActivity=new Map();
+  for(const r of parsedRows){
+    if(!perActivity.has(r.activityCode))perActivity.set(r.activityCode,{date:r.date,subject:r.subject,presentEligible:0});
+    const ev=perActivity.get(r.activityCode);
+    if(!/ESCOVACAO SUPERVISIONADA/.test(norm(r.subject)))continue;
+    if(!r.birthDate){missingBirthCount++;continue}
+    const age=ageAt({dataNascimento:r.birthDate},r.dateObj);
+    if(age==null){missingBirthCount++;continue}
+    if(age>=6&&age<=11)ev.presentEligible++;
+    else{ineligibleCount++;if(ineligibleSample.length<20)ineligibleSample.push({participant:r.participant,age,date:r.date})}
+  }
+  const events=[...perActivity.values()].map(ev=>({date:ev.date,subject:ev.subject,present:ev.presentEligible,status:'Concluída'}));
+  buildGroupSnapshotFromEvents(snap,events);
+  if(ineligibleCount||missingBirthCount){
+    const parts=[];
+    if(ineligibleCount)parts.push(`${ineligibleCount} participante(s) fora da faixa etária de 6 a 11 anos na data da atividade`);
+    if(missingBirthCount)parts.push(`${missingBirthCount} sem data de nascimento no CSV`);
+    snap.validations.push({level:'info',code:'GROUP_AGE_FILTERED',message:`Este CSV traz idade real por participante: o numerador de M3/B4 (escovação supervisionada) já exclui quem não se enquadra na faixa etária oficial, mesmo quando a atividade está marcada como "Criança de 6 a 11 anos". Excluído(s) do numerador: ${parts.join('; ')}. O denominador continua manual, sem alteração.`});
+  }
+  if(Object.keys(otherUnitCounts).length){
+    const parts=Object.entries(otherUnitCounts).map(([u,c])=>`${c} de "${u||'unidade não informada'}"`).join(', ');
+    snap.validations.push({level:'info',code:'CSV_OTHER_UNIT_COUNTED',message:`Este CSV trazia ${parts} com unidade de origem diferente de "${keepUnit}" registrada no cadastro. Como o atendimento consta neste documento, essas linhas foram contadas normalmente na produção de "${keepUnit}" (nenhuma linha foi descartada).`});
+  }
+  sessionRaw.set(snap.id,{type:'group_csv',rows:parsedRows.map(r=>{const age=r.birthDate?ageAt({dataNascimento:r.birthDate},r.dateObj):null;return {sourceRef:`linha ${r.line}`,date:r.date,subject:r.subject,participantMasked:maskName(r.participant),age,eligible:/ESCOVACAO SUPERVISIONADA/.test(norm(r.subject))?(age!=null?(age>=6&&age<=11):null):null,activityCode:r.activityCode}}),ineligibleSample});
+  return snap;
 }
 
 async function parseMetabaseConsolidated(file,hash,text){
@@ -353,7 +509,7 @@ async function parseMetabaseConsolidated(file,hash,text){
   sessionRaw.set(snap.id,{type:'csv',headers,rows:data.slice(0,300)});return snap;
 }
 
-function detectCSVProfile(headers){const n=headers.map(norm);if(['DS UNIDADE','MES REFERENCIA','INDICADOR','NUMERADOR','DENOMINADOR','RESULTADO'].every(h=>n.includes(h)))return 'metabase_esb';if(['CD USU CADSUS','NOME','EQUIPE','CONSULTA SAUDE BUCAL'].every(h=>n.includes(h)))return 'metabase_2i';return 'unknown'}
+function detectCSVProfile(headers){const n=headers.map(norm);if(['DS UNIDADE','MES REFERENCIA','INDICADOR','NUMERADOR','DENOMINADOR','RESULTADO'].every(h=>n.includes(h)))return 'metabase_esb';if(['CD USU CADSUS','NOME','EQUIPE','CONSULTA SAUDE BUCAL'].every(h=>n.includes(h)))return 'metabase_2i';if(['PACIENTE','IDADE','SEXO','DATA','PROFISSIONAL','PROCEDIMENTO','UNIDADE','QUANTIDADE'].every(h=>n.includes(h)))return 'celk_procedimentos_csv';if(['UNIDADE','CODIGO DA ATIVIDADE','ASSUNTO','NOME DOS PARTICIPANTES','DATA NASCIMENTO'].every(h=>n.includes(h)))return 'celk_atividades_grupo_csv';return 'unknown'}
 
 async function episodeIdFor(record){const anchor=record.ultimaMenstruacao||record.dataProvParto||record.dataParto||'';return sha256(`2i|${record.prontuario}|${anchor}`)}
 async function parseGestantesCSV(file,hash,text){
@@ -392,6 +548,8 @@ async function importOne(file){
     const {text}=await readTextFile(file),parsed=parseCSVText(text),headers=parsed[0]||[],profile=detectCSVProfile(headers);
     if(profile==='metabase_esb')snap=await parseMetabaseConsolidated(file,hash,text);
     else if(profile==='metabase_2i')snap=await parseGestantesCSV(file,hash,text);
+    else if(profile==='celk_procedimentos_csv')snap=await parseProcedureCsv(file,hash,text);
+    else if(profile==='celk_atividades_grupo_csv')snap=await parseGroupCsv(file,hash,text);
     else snap=await parseUnknownCSV(file,hash,text,headers,parsed.slice(1));
   }
   commitSnapshot(snap);return snap;
@@ -587,6 +745,7 @@ function buildDiagnostics(){
   const b3=federalComponents('B3',mk);if(b3.result!=null&&b3.result<3)list.push({level:'warning',code:'B3_BELOW_3',message:'B3 abaixo de 3% cai em Regular pela Nota; verificar completude do registro antes de qualquer interpretação.'});
   const active2i=getActive2ISnapshot();for(const e of active2i?.episodes||[]){if(!e.phoneNormalized&&e.telefone)list.push({level:'info',code:'2I_PHONE_INVALID',episodeId:e.id,message:'Há telefone 2I inválido ou sem DDD; o WhatsApp permanece desabilitado.'})}
   for(const m of state.gestantes.manual.filter(x=>!x.archived)){const match=findManualMatch(m,active2i?.episodes||[]);if(match&&!state.gestantes.merges[m.id])list.push({level:'warning',code:'2I_MANUAL_MATCH',manualId:m.id,episodeId:match.id,message:'Cadastro manual possivelmente corresponde a registro posterior do Metabase; exige reconciliação explícita.'})}
+  const crossRepeats=firstConsultationRepeatsAcrossFiles();if(crossRepeats.length)list.push({level:'warning',code:'M1_REPEAT_WITHIN_12M',message:`${crossRepeats.length} paciente(s) com primeira consulta registrada em mais de um arquivo importado, com intervalo menor que 12 meses entre as datas.`,dupGroups:crossRepeats});
   currentDiagnostics=list;return list;
 }
 
@@ -775,7 +934,7 @@ function importsHTML(){
 
 function diagnosticsHTML(){
   const list=buildDiagnostics(),counts={error:list.filter(x=>x.level==='error').length,warning:list.filter(x=>x.level==='warning').length,info:list.filter(x=>x.level==='info').length};
-  const rows=list.map(d=>`<article class="diagnostic ${esc(d.level)}"><div class="diagnostic-icon">${d.level==='error'?'!':d.level==='warning'?'△':'i'}</div><div><strong>${esc(d.code||'DIAGNÓSTICO')}</strong><p>${esc(d.message)}</p>${d.fileName?`<small class="muted">${esc(d.fileName)}</small>`:''}</div>${d.snapshotId?`<button class="btn small" data-open-snapshot="${d.snapshotId}">Abrir fonte</button>`:''}</article>`).join('');
+  const rows=list.map(d=>{const dupHTML=d.code==='M1_QUANTITY_VS_PEOPLE'&&d.snapshotId?duplicatesDisclosureHTML(firstConsultationDuplicatesForMonth(state.snapshots.find(s=>s.id===d.snapshotId),d.month)):d.code==='M1_REPEAT_WITHIN_12M'&&d.dupGroups?crossFileDuplicatesDisclosureHTML(d.dupGroups):'';return `<article class="diagnostic ${esc(d.level)}"><div class="diagnostic-icon">${d.level==='error'?'!':d.level==='warning'?'△':'i'}</div><div><strong>${esc(d.code||'DIAGNÓSTICO')}</strong><p>${esc(d.message)}</p>${dupHTML}${d.fileName?`<small class="muted">${esc(d.fileName)}</small>`:''}</div>${d.snapshotId?`<button class="btn small" data-open-snapshot="${d.snapshotId}">Abrir fonte</button>`:''}</article>`}).join('');
   const recent=[...state.snapshots].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,5);
   return `<div class="grid-kpis">${kpi('Críticos',fmtNum(counts.error),'Impedem ou invalidam um cálculo específico','#e15f41','alert')}${kpi('Alertas',fmtNum(counts.warning),'Exigem conferência ou denominador','#e7a23b','alert')}${kpi('Informativos',fmtNum(counts.info),'Hipóteses e limitações documentadas','#546de5','info')}${kpi('Autotestes',state.selfTests?`${state.selfTests.passed}/${state.selfTests.total}`:'não executados',state.selfTests?fmtDateTime(state.selfTests.at):'Execute após mudanças ou restauração','#39b980','check')}</div><div class="main-grid"><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('alert')} Diagnóstico dos dados</h2><div class="section-sub">Nenhum alerta altera silenciosamente os dados importados.</div></div></div><div class="diagnostic-list">${rows||'<div class="notice"><strong>Nenhum diagnóstico ativo.</strong> Ainda assim, confira a composição antes de homologar resultados.</div>'}</div></article><div class="stack"><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('file')} Fontes mais recentes</h2><div class="section-sub">O consolidado nunca é somado à prévia.</div></div><button class="link-btn" data-go="imports">Conferir</button></div><div class="import-list">${recent.map(s=>`<div class="import-item"><div class="import-icon">${icon(s.profile.includes('metabase')?'database':'file')}</div><div><strong title="${esc(s.fileName)}">${esc(s.fileName)}</strong><small>${esc(profileLabel(s.profile))} · ${fmtDateTime(s.createdAt)}</small></div><button class="info-btn" data-open-snapshot="${s.id}">i</button></div>`).join('')||'<span class="muted">Nenhum arquivo importado.</span>'}</div></article><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('check')} Testes internos</h2><div class="section-sub">126 casos de fórmula, faixa, privacidade, deduplicação, 2I, diagnóstico e persistência definidos na especificação.</div></div></div>${testSummaryHTML()}<div class="card-actions"><button class="btn primary" data-run-tests>${icon('check')}Executar 126 testes</button></div></article></div></div><article class="card panel"><div class="panel-head"><div><h2 class="section-title">${icon('info')} Limitações visíveis</h2></div></div><div class="notice warn"><strong>PDF de procedimentos:</strong> não traz CBO, INE, CNS nem a janela federal de 12 meses; B1–B6 derivados dele são prévios. As descrições de restaurações podem vir truncadas pelo CELK.</div><div class="notice warn" style="margin-top:9px"><strong>Atividades em grupo:</strong> traz o total agregado de presentes, sem idade e sem deduplicação por participante. M3/B4 dependem de denominador confirmado.</div><div class="notice warn" style="margin-top:9px"><strong>2I:</strong> o CSV recebido não informa data/código/CBO da atividade. O painel reproduz somente o valor consolidado “Consulta Saude Bucal”, interpretado automaticamente (Sim = atendida).</div></article>`;
 }
@@ -816,13 +975,14 @@ function openComposition(scope,id,mk){
 
 function sensitiveColumn(h){return /NOME|CADSUS|PRONTUARIO|TELEFONE|LOGRADOURO|ENDERECO|NUMERO|COMPLEMENTO|BAIRRO/.test(norm(h))}
 function rawSampleHTML(s){const raw=sessionRaw.get(s.id);if(!raw)return '<div class="notice warn"><strong>Amostra não disponível nesta sessão.</strong> O backup não guarda PDF/CSV original. Reimporte o arquivo para rever os trechos brutos.</div>';
-  if(raw.type==='procedure')return `<div class="table-scroll"><table><thead><tr><th>Página/linha</th><th>Paciente mascarado</th><th>Data</th><th>Profissional</th><th>Procedimento exatamente extraído</th><th>Unidade</th><th>Qtd.</th></tr></thead><tbody>${raw.rows.slice(0,120).map(r=>`<tr><td>p.${r.page} · y ${r.lineY}</td><td>${esc(r.patientMasked)}</td><td>${esc(r.date)}</td><td>${esc(r.professional)}</td><td>${esc(r.procedure)}</td><td>${esc(r.unitOrigin)}</td><td class="num">${fmtNum(r.quantity,2)}</td></tr>`).join('')}</tbody></table></div>`;
+  if(raw.type==='procedure')return `<div class="table-scroll"><table><thead><tr><th>Página/linha</th><th>Paciente mascarado</th><th>Data</th><th>Profissional</th><th>Procedimento exatamente extraído</th><th>Unidade</th><th>Qtd.</th></tr></thead><tbody>${raw.rows.slice(0,120).map(r=>`<tr><td>${esc(r.sourceRef||'—')}</td><td>${esc(r.patientMasked)}</td><td>${esc(r.date)}</td><td>${esc(r.professional)}</td><td>${esc(r.procedure)}</td><td>${esc(r.unitOrigin)}</td><td class="num">${fmtNum(r.quantity,2)}</td></tr>`).join('')}</tbody></table></div>`;
   if(raw.type==='group')return `<div class="table-scroll"><table><thead><tr><th>Página</th><th>Data</th><th>Assunto exatamente extraído</th><th>Presentes</th><th>Status</th></tr></thead><tbody>${raw.rows.slice(0,150).map(r=>`<tr><td>${r.page}</td><td>${esc(r.date)}</td><td>${esc(r.subject)}</td><td>${fmtNum(r.present)}</td><td>${esc(r.status)}</td></tr>`).join('')}</tbody></table></div>`;
+  if(raw.type==='group_csv')return `<div class="table-scroll"><table><thead><tr><th>Linha</th><th>Data</th><th>Assunto exatamente extraído</th><th>Participante mascarado</th><th>Idade na data</th><th>Elegível (6–11)</th><th>Atividade</th></tr></thead><tbody>${raw.rows.slice(0,220).map(r=>`<tr><td>${esc(r.sourceRef||'—')}</td><td>${esc(r.date)}</td><td>${esc(r.subject)}</td><td>${esc(r.participantMasked)}</td><td>${r.age==null?'—':fmtNum(r.age)}</td><td>${r.eligible==null?'—':(r.eligible?'Sim':'Não')}</td><td class="mono">${esc(r.activityCode)}</td></tr>`).join('')}</tbody></table></div>`;
   if(raw.headers){return `<div class="table-scroll"><table><thead><tr>${raw.headers.map(h=>`<th>${esc(h||'(vazio)')}</th>`).join('')}</tr></thead><tbody>${raw.rows.slice(0,60).map((r,i)=>{const values=Array.isArray(r)?r:r.values||[];return `<tr>${raw.headers.map((h,j)=>`<td>${esc(sensitiveColumn(h)?(values[j]?'••••••':''):values[j])}</td>`).join('')}</tr>`}).join('')}</tbody></table></div>`}
   return `<pre class="formula">${esc(JSON.stringify(raw.rows?.slice(0,80)||raw,null,2))}</pre>`;
 }
 function snapshotSummaryHTML(s){const months=Object.entries(s.dataByMonth||{}).sort(([a],[b])=>a.localeCompare(b));return `<div class="facts"><div class="fact"><span>Perfil</span><strong>${esc(profileLabel(s.profile))}</strong></div><div class="fact"><span>Status</span><strong>${esc(s.status)}</strong></div><div class="fact"><span>Unidade</span><strong>${esc(s.unit||'Não identificada')}</strong></div><div class="fact"><span>Período</span><strong>${esc(snapshotPeriod(s))}</strong></div><div class="fact"><span>Importação</span><strong>${fmtDateTime(s.createdAt)}</strong></div><div class="fact"><span>Assinatura</span><strong class="mono">${esc(s.hash)}</strong></div></div>${months.length?`<div class="table-scroll" style="margin-top:14px"><table><thead><tr><th>Competência</th><th>Dados normalizados</th></tr></thead><tbody>${months.map(([mk,d])=>`<tr><td>${fmtMonth(mk,true)}</td><td><pre class="formula">${esc(JSON.stringify({...d,procedureCounts:undefined},null,2))}</pre></td></tr>`).join('')}</tbody></table></div>`:''}`}
-function validationHTML(s){return `<div class="diagnostic-list">${(s.validations||[]).map(v=>`<article class="diagnostic ${esc(v.level)}"><div class="diagnostic-icon">${v.level==='error'?'!':v.level==='warning'?'△':'i'}</div><div><strong>${esc(v.code)}</strong><p>${esc(v.message)}</p></div></article>`).join('')||'<div class="notice">Nenhuma validação registrada.</div>'}</div>`}
+function validationHTML(s){return `<div class="diagnostic-list">${(s.validations||[]).map(v=>`<article class="diagnostic ${esc(v.level)}"><div class="diagnostic-icon">${v.level==='error'?'!':v.level==='warning'?'△':'i'}</div><div><strong>${esc(v.code)}</strong><p>${esc(v.message)}</p>${v.code==='M1_QUANTITY_VS_PEOPLE'?duplicatesDisclosureHTML(firstConsultationDuplicatesForMonth(s,v.month)):''}</div></article>`).join('')||'<div class="notice">Nenhuma validação registrada.</div>'}</div>`}
 function snapshotProceduresHTML(s){const procs=(s.procedureCounts||[]).sort((a,b)=>b.quantityValid-a.quantityValid);if(!procs.length)return '<div class="notice">Este perfil não possui contagem por procedimento.</div>';return `<div class="table-scroll"><table><thead><tr><th>Normalizado</th><th>Original</th><th>SIGTAP</th><th class="num">Bruta</th><th class="num">Válida</th><th>Páginas</th></tr></thead><tbody>${procs.map(p=>`<tr><td>${esc(p.descriptionNormalized)}</td><td>${esc(p.descriptionOriginal)}</td><td class="mono">${esc(p.sigtap||'—')}</td><td class="num">${fmtNum(p.quantityRaw,2)}</td><td class="num">${fmtNum(p.quantityValid,2)}</td><td>${(p.pages||[]).join(', ')}</td></tr>`).join('')}</tbody></table></div>`}
 function openSnapshot(id,tab='summary'){const s=state.snapshots.find(x=>x.id===id);if(!s)return;const contents={summary:snapshotSummaryHTML(s),procedures:snapshotProceduresHTML(s),validations:validationHTML(s),raw:rawSampleHTML(s)};openModal(`<div class="modal-head"><div><h2 id="modalTitle">Conferir extração</h2><p>${esc(s.fileName)} · ${esc(profileLabel(s.profile))}</p></div></div><div class="modal-body"><div class="subtabs"><button class="subtab ${tab==='summary'?'active':''}" data-snapshot-tab="summary" data-snapshot-id="${s.id}">Resumo</button><button class="subtab ${tab==='procedures'?'active':''}" data-snapshot-tab="procedures" data-snapshot-id="${s.id}">Procedimentos</button><button class="subtab ${tab==='validations'?'active':''}" data-snapshot-tab="validations" data-snapshot-id="${s.id}">Validações</button><button class="subtab ${tab==='raw'?'active':''}" data-snapshot-tab="raw" data-snapshot-id="${s.id}">Amostra bruta</button></div>${contents[tab]}</div><div class="modal-foot"><button class="btn" data-close-modal>Fechar</button></div>`,{wide:true})}
 
@@ -842,7 +1002,7 @@ function export2I(mode){const rows=applyPregFilters(mergedEpisodes()),nominal=mo
 function backupState(type='full'){
   const copy=structuredClone(state);copy.dirty=false;
   for(const snap of copy.snapshots||[]){for(const p of snap.procedureCounts||[])delete p.professionals;for(const month of Object.values(snap.dataByMonth||{}))for(const p of month.procedureCounts||[])delete p.professionals}
-  if(type==='analytic'){copy.snapshots=copy.snapshots.filter(s=>s.profile!=='metabase_gestantes_2i');copy.gestantes={manual:[],followups:{},merges:{},excluded:{},overrides:{}};copy.audit=(copy.audit||[]).filter(a=>!String(a.action).startsWith('2i_'));copy.columnMappings={...copy.columnMappings,consulta2i:{}}}
+  if(type==='analytic'){copy.snapshots=copy.snapshots.filter(s=>s.profile!=='metabase_gestantes_2i');copy.gestantes={manual:[],followups:{},merges:{},excluded:{},overrides:{}};copy.audit=(copy.audit||[]).filter(a=>!String(a.action).startsWith('2i_'));copy.columnMappings={...copy.columnMappings,consulta2i:{}};for(const snap of copy.snapshots||[])for(const month of Object.values(snap.dataByMonth||{}))delete month.firstPatients}
   return copy;
 }
 async function createBackupEnvelope(type='full'){
@@ -850,7 +1010,7 @@ async function createBackupEnvelope(type='full'){
   return {format:'indicadores-saude-bucal-backup',formatVersion:'1.0',appVersion:APP_VERSION,schemaVersion:SCHEMA_VERSION,type,createdAt:nowISO(),checksum:await sha256(JSON.stringify(data)),data};
 }
 function has2IData(){return mergedEpisodes().length>0}
-function openBackupModal(){const has2i=has2IData();openModal(`<div class="modal-head"><div><h2 id="modalTitle">Backup e restauração</h2><p>O backup nunca contém os PDFs/CSVs originais nem a amostra bruta da sessão.</p></div></div><div class="modal-body">${has2i?'<div class="notice danger"><strong>Há dados de gestantes (2I) importados.</strong> Cifrar o backup com senha é a proteção padrão recomendada sempre que houver dados nominais 2I; considere também o backup “Analítico” quando não precisar dos contatos.</div>':''}<div class="split-grid"><div class="notice"><strong>Completo:</strong> preserva snapshots normalizados, denominadores e o módulo 2I com contatos, origem e histórico. Recomendado cifrar.</div><div class="notice"><strong>Analítico:</strong> exclui integralmente snapshots, cadastros e acompanhamentos 2I. Mantém indicadores sem dados nominais.</div></div><div class="form-grid"><label class="field"><span>Tipo</span><select id="backupType"><option value="full">Completo</option><option value="analytic">Analítico · sem 2I</option></select></label><label class="field"><span>Proteção</span><select id="backupEncryption"><option value="yes">Cifrado com senha</option><option value="no">Sem cifra local</option></select></label><label class="field full"><span>Senha do arquivo (se cifrado)</span><input id="backupPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Mínimo de 8 caracteres"></label></div><div class="notice warn" style="margin-top:12px"><strong>A senha não é armazenada e não pode ser recuperada.</strong> Guarde-a em local seguro.</div></div><div class="modal-foot"><button class="btn" data-restore-backup>${icon('upload')}Restaurar arquivo</button><button class="btn primary" data-create-backup>${icon('download')}Exportar backup</button></div>`)}
+function openBackupModal(){const has2i=has2IData(),hasM1=hasM1PatientData();openModal(`<div class="modal-head"><div><h2 id="modalTitle">Backup e restauração</h2><p>O backup nunca contém os PDFs/CSVs originais nem a amostra bruta da sessão.</p></div></div><div class="modal-body">${has2i||hasM1?`<div class="notice danger"><strong>${has2i&&hasM1?'Há dados de gestantes (2I) e nomes de pacientes de primeira consulta (M1) importados.':has2i?'Há dados de gestantes (2I) importados.':'Há nomes de pacientes de primeira consulta (M1) importados, usados na checagem de duplicidade.'}</strong> Cifrar o backup com senha é a proteção padrão recomendada sempre que houver dados nominais; considere também o backup “Analítico” quando não precisar dos nomes.</div>`:''}<div class="split-grid"><div class="notice"><strong>Completo:</strong> preserva snapshots normalizados, denominadores, os nomes usados na checagem de duplicidade de primeira consulta (M1) e o módulo 2I com contatos, origem e histórico. Recomendado cifrar.</div><div class="notice"><strong>Analítico:</strong> exclui integralmente snapshots, cadastros e acompanhamentos 2I, além dos nomes usados na checagem de duplicidade M1. Mantém indicadores sem dados nominais.</div></div><div class="form-grid"><label class="field"><span>Tipo</span><select id="backupType"><option value="full">Completo</option><option value="analytic">Analítico · sem dados nominais</option></select></label><label class="field"><span>Proteção</span><select id="backupEncryption"><option value="yes">Cifrado com senha</option><option value="no">Sem cifra local</option></select></label><label class="field full"><span>Senha do arquivo (se cifrado)</span><input id="backupPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Mínimo de 8 caracteres"></label></div><div class="notice warn" style="margin-top:12px"><strong>A senha não é armazenada e não pode ser recuperada.</strong> Guarde-a em local seguro.</div></div><div class="modal-foot"><button class="btn" data-restore-backup>${icon('upload')}Restaurar arquivo</button><button class="btn primary" data-create-backup>${icon('download')}Exportar backup</button></div>`)}
 async function createBackupFromModal(){const type=document.getElementById('backupType').value,encrypted=document.getElementById('backupEncryption').value==='yes',password=document.getElementById('backupPassword').value;if(encrypted&&password.length<8){toast('Use pelo menos 8 caracteres para cifrar o backup.');return}showLoading('Criando backup','Calculando integridade e preparando o arquivo');try{const envelope=await createBackupEnvelope(type),out=encrypted?{format:'indicadores-saude-bucal-backup-encrypted',formatVersion:'1.0',createdAt:envelope.createdAt,payload:await encryptJSON(envelope,password)}:envelope;downloadFile(`indicadores-saude-bucal-${type}-${isoDate(new Date())}.saude-bucal-backup.json`,JSON.stringify(out,null,2),'application/json');state.lastBackupAt=nowISO();audit('backup_exported',{type,encrypted});state.dirty=false;await persistState();closeModal();refreshAll();toast('Backup exportado e verificado. Nada fica salvo pelo navegador — se editar algo depois, exporte de novo.')}catch(e){showError(e)}finally{hideLoading()}}
 async function readBackupFile(file,password=''){const text=await file.text();let obj;try{obj=JSON.parse(text)}catch{throw new Error('O arquivo não contém JSON válido.')}if(obj.format==='indicadores-saude-bucal-backup-encrypted'){if(!password)throw Object.assign(new Error('PASSWORD_REQUIRED'),{code:'PASSWORD_REQUIRED',wrapper:obj});obj=await decryptJSON(obj.payload,password)}if(obj.format!=='indicadores-saude-bucal-backup'||!obj.data?.state)throw new Error('Formato de backup não reconhecido.');const check=await sha256(JSON.stringify(obj.data));if(check!==obj.checksum)throw new Error('A verificação de integridade falhou; o arquivo pode estar corrompido.');return obj}
 function promptBackupPassword(wrapper){openModal(`<div class="modal-head"><div><h2 id="modalTitle">Desbloquear backup</h2><p>Este arquivo foi cifrado localmente.</p></div></div><div class="modal-body"><label class="field"><span>Senha</span><input id="restorePassword" type="password" autocomplete="current-password" autofocus></label></div><div class="modal-foot"><button class="btn" data-close-modal>Cancelar</button><button class="btn primary" data-unlock-backup>Desbloquear e validar</button></div>`,{closable:false});document.querySelector('[data-unlock-backup]').onclick=()=>processPendingBackup(document.getElementById('restorePassword').value)}
@@ -1019,12 +1179,37 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('127. doseML calcula volume e mg pelo peso sem travar quando o resultado fica dentro do teto (ex.: 20kg ÷ 3 = 7 mL, 350 mg)',()=>{const d=doseML(20,3,10);return d.vol==='7'&&d.mg===350&&d.capped===false});
   await add('128. doseML trava no teto máximo quando o cálculo por peso o ultrapassa (ex.: 50kg ÷ 3 daria 17 mL, mas o teto de Amoxicilina/Eritromicina/Cefalexina é 10 mL)',()=>{const d=doseML(50,3,10);return d.vol==='10'&&d.mg===500&&d.capped===true});
   await add('129. doseGotas arredonda para o mais próximo por padrão, mas para baixo quando arredondarParaBaixo é true (ex.: 9,5kg × 1 gota/kg = 9,5 → 9 gotas com arredondamento para baixo, não 10)',()=>{const semFloor=doseGotas(9.5,1.5,10,35,false);const comFloor=doseGotas(9.5,1,25,35,true);return semFloor.gotas===14&&semFloor.mg===140&&comFloor.gotas===9&&comFloor.mg===225});
-  await add('130. doseGotas trava no teto de gotas (ex.: Ibuprofeno não passa de 40 gotas mesmo com peso alto)',()=>{const d=doseGotas(50,1,5,40,false);return d.gotas===40&&d.capped===true&&d.mg===200});
+  await add('130. doseGotas trava no teto de gotas (ex.: Ibuprofeno a 50 mg/mL não passa de 40 gotas mesmo com peso alto)',()=>{const d=doseGotas(50,1,2.5,40,false);return d.gotas===40&&d.capped===true&&d.mg===100});
   await add('131. calculatorHTML mostra "—" nos seis cartões de medicamento quando nenhum peso foi informado',()=>{const prevCalc=state.preferences.calcPeso;state.preferences.calcPeso='';const html=calculatorHTML();state.preferences.calcPeso=prevCalc;return (html.match(/<strong>—<\/strong>/g)||[]).length===6});
   await add('132. calculatorHTML calcula as seis doses a partir de state.preferences.calcPeso (ex.: 20kg → Amoxicilina 7 mL, Eritromicina/Cefalexina 5 mL, Paracetamol 30 gotas, Dipirona/Ibuprofeno 20 gotas)',()=>{const prevCalc=state.preferences.calcPeso;state.preferences.calcPeso='20';const html=calculatorHTML();state.preferences.calcPeso=prevCalc;return html.includes('<strong>7</strong>')&&html.includes('<strong>5</strong>')&&html.includes('<strong>30</strong>')&&html.includes('<strong>20</strong>')&&html.includes('value="20"')});
   await add('133. A view da calculadora tem entrada em VIEW_META e botão próprio na barra lateral, e esconde os tabs/filtros/backup/importar de indicadores (fica só com Imprimir) sem afetar as outras views',()=>{const hasMeta=Array.isArray(VIEW_META.calculator)&&VIEW_META.calculator[0]==='Calculadora odontopediátrica';const hasSidebarBtn=!!document.querySelector('[data-view="calculator"]');switchView('pregnant',{save:false});const otherViewClean=!document.getElementById('appShell').classList.contains('is-calculator-view');switchView('calculator',{save:false});const calcViewMarked=document.getElementById('appShell').classList.contains('is-calculator-view');switchView('overview',{save:false});return hasMeta&&hasSidebarBtn&&otherViewClean&&calcViewMarked});
   await add('134. O eyebrow da calculadora mostra só "Calculadora odontopediátrica", sem o prefixo "Indicadores /" que as outras views mantêm',()=>{switchView('calculator',{save:false});const calcEyebrow=document.getElementById('eyebrow').textContent;switchView('pregnant',{save:false});const pregEyebrow=document.getElementById('eyebrow').textContent;switchView('overview',{save:false});return calcEyebrow==='Calculadora odontopediátrica'&&pregEyebrow.startsWith('Indicadores / ')});
   await add('135. O logotipo no topo da barra lateral usa o ícone do dente (não mais o texto "SB")',()=>{const brand=document.querySelector('.brand');return brand.textContent.trim()===''&&!!brand.querySelector('svg')});
+  await add('136. Ibuprofeno calcula mg pela concentração de 50 mg/mL (2,5 mg/gota), conferida no REMUME — não mais 100 mg/mL (ex.: 20kg → 20 gotas → 50 mg, não 100 mg)',()=>{const prevCalc=state.preferences.calcPeso;state.preferences.calcPeso='20';const html=calculatorHTML();state.preferences.calcPeso=prevCalc;const d=doseGotas(20,1,2.5,40,false);return d.gotas===20&&d.mg===50&&html.includes("gotas 50 mg/mL · 6/6h")&&!html.includes("gotas 100 mg/mL")});
+  await add('137. Importação de "Procedimentos Detalhado" não gera mais o aviso CBO_NOT_AVAILABLE (a pedido do usuário: os relatórios enviados já filtram só cirurgiões-dentistas) — os avisos TRUNCATED_RESTORATION e M1_QUANTITY_VS_PEOPLE continuam intactos (agora gerados em buildProcedureSnapshotFromRows, compartilhado com o CSV)',()=>{const srcPdf=parseProcedurePdf.toString(),srcShared=buildProcedureSnapshotFromRows.toString();return !srcPdf.includes('CBO_NOT_AVAILABLE')&&srcShared.includes('TRUNCATED_RESTORATION')&&srcShared.includes('M1_QUANTITY_VS_PEOPLE')});
+  await add('138. firstConsultationDuplicatesForMonth detecta nome repetido dentro do mesmo arquivo (mesma primeira consulta duas vezes) e não sinaliza quem aparece uma única vez com quantidade 1',()=>{const fakeSnap={dataByMonth:{'2026-05':{firstPatients:[{name:'Maria Fulana da Silva',date:'02/05/2026',quantity:1},{name:'Maria Fulana da Silva',date:'20/05/2026',quantity:1},{name:'Joao Souza',date:'05/05/2026',quantity:1}]}}};const dupes=firstConsultationDuplicatesForMonth(fakeSnap,'2026-05');return dupes.length===1&&dupes[0].name==='Maria Fulana da Silva'&&dupes[0].occurrences.length===2&&dupes[0].totalQuantity===2&&!dupes.some(g=>g.name==='Joao Souza')});
+  await add('139. firstConsultationRepeatsAcrossFiles encontra o mesmo paciente com primeira consulta em dois arquivos diferentes com menos de 12 meses de intervalo, mas não sinaliza quem só aparece em um arquivo',()=>{const before=state.snapshots.length;try{const s1={id:'t1_selftest',profile:'celk_procedimentos_detalhado',fileName:'jan.pdf',dataByMonth:{'2026-01':{kind:'procedure',firstPatients:[{name:'Ana Paula Souza',date:'10/01/2026'}]}}};const s2={id:'t2_selftest',profile:'celk_procedimentos_detalhado',fileName:'jun.pdf',dataByMonth:{'2026-06':{kind:'procedure',firstPatients:[{name:'Ana Paula Souza',date:'10/06/2026'}]}}};const s3={id:'t3_selftest',profile:'celk_procedimentos_detalhado',fileName:'unico.pdf',dataByMonth:{'2026-02':{kind:'procedure',firstPatients:[{name:'Paciente Unico',date:'10/02/2026'}]}}};state.snapshots.push(s1,s2,s3);const groups=firstConsultationRepeatsAcrossFiles();const found=groups.find(g=>g.name==='Ana Paula Souza');return !!found&&found.occurrences.length===2&&!groups.some(g=>g.name==='Paciente Unico')}finally{state.snapshots.length=before}});
+  await add('140. firstConsultationRepeatsAcrossFiles não sinaliza o mesmo paciente quando o intervalo entre arquivos é maior que 12 meses (365 dias)',()=>{const before=state.snapshots.length;try{const s4={id:'t4_selftest',profile:'celk_procedimentos_detalhado',fileName:'jan26.pdf',dataByMonth:{'2026-01':{kind:'procedure',firstPatients:[{name:'Carlos Eduardo Lima',date:'01/01/2026'}]}}};const s5={id:'t5_selftest',profile:'celk_procedimentos_detalhado',fileName:'mar27.pdf',dataByMonth:{'2027-03':{kind:'procedure',firstPatients:[{name:'Carlos Eduardo Lima',date:'10/03/2027'}]}}};state.snapshots.push(s4,s5);const groups=firstConsultationRepeatsAcrossFiles();return !groups.some(g=>g.name==='Carlos Eduardo Lima')}finally{state.snapshots.length=before}});
+  await add('141. Backup Completo preserva os nomes de primeira consulta (firstPatients) usados na checagem de duplicidade M1; backup Analítico os remove',()=>{const before=state.snapshots.length;try{const snap={id:'tbk_selftest',profile:'celk_procedimentos_detalhado',fileName:'teste_backup.pdf',status:'prévia não homologada',validations:[],procedureCounts:[],dataByMonth:{'2026-07':{kind:'procedure',firstConsultations:1,firstConsultationQuantity:1,treatmentsConcluded:0,treatmentConcludedQuantity:0,preventive:0,individualProcedures:0,art:0,restorative:0,b5Denominator:0,b3Numerator:0,b3Denominator:0,procedureCounts:[],firstPatients:[{name:'Teste Backup Paciente',date:'01/07/2026'}]}}};state.snapshots.push(snap);const full=backupState('full'),analytic=backupState('analytic');const fullHas=full.snapshots.find(s=>s.id==='tbk_selftest')?.dataByMonth['2026-07'].firstPatients?.length===1;const analyticSnap=analytic.snapshots.find(s=>s.id==='tbk_selftest');const analyticStripped=!!analyticSnap&&analyticSnap.dataByMonth['2026-07'].firstPatients===undefined;return fullHas&&analyticStripped}finally{state.snapshots.length=before}});
+  await add('142. A aba "Validações" de um snapshot mostra o nome completo (não mascarado) dos pacientes duplicados por trás do aviso M1_QUANTITY_VS_PEOPLE, dentro de um bloco expansível',()=>{const snap={fileName:'x.pdf',validations:[{level:'warning',code:'M1_QUANTITY_VS_PEOPLE',month:'2026-08',message:'teste'}],dataByMonth:{'2026-08':{firstPatients:[{name:'Roberta Nomecompleto Teste',date:'01/08/2026'},{name:'Roberta Nomecompleto Teste',date:'15/08/2026'}]}}};const html=validationHTML(snap);return html.includes('Roberta Nomecompleto Teste')&&html.includes('data-toggle-details')&&!html.includes(maskName('Roberta Nomecompleto Teste'))});
+  await add('143. A página Diagnóstico exibe o alerta M1_REPEAT_WITHIN_12M com o nome completo do paciente repetido entre arquivos, dentro de um bloco expansível',()=>{const before=state.snapshots.length;try{const s1={id:'td1_selftest',profile:'celk_procedimentos_detalhado',fileName:'fev.pdf',createdAt:nowISO(),status:'x',validations:[],procedureCounts:[],dataByMonth:{'2026-02':{kind:'procedure',firstPatients:[{name:'Paciente Repetido Teste',date:'02/02/2026'}]}}};const s2={id:'td2_selftest',profile:'celk_procedimentos_detalhado',fileName:'marco.pdf',createdAt:nowISO(),status:'x',validations:[],procedureCounts:[],dataByMonth:{'2026-03':{kind:'procedure',firstPatients:[{name:'Paciente Repetido Teste',date:'02/03/2026'}]}}};state.snapshots.push(s1,s2);const html=diagnosticsHTML();return html.includes('M1_REPEAT_WITHIN_12M')&&html.includes('Paciente Repetido Teste')&&html.includes('data-toggle-details')}finally{state.snapshots.length=before}});
+  await add('144. parseDate reconhece o timestamp "AAAA-MM-DD HH:MM:SS.mmm" usado pelo CSV de Procedimentos Detalhado do CELK, sem depender do parser genérico do navegador',()=>{const d=parseDate('2026-07-06 09:04:19.603');return !!d&&d.getFullYear()===2026&&d.getMonth()===6&&d.getDate()===6});
+  await add('145. stripIdPrefix remove o "( id )" que o CSV do CELK antepõe a paciente/profissional/unidade, mantendo intacto um valor que já vem sem prefixo',()=>{return stripIdPrefix('( 2149034 ) ABIGAIL ALZIRA DE OLIVEIRA NETA')==='ABIGAIL ALZIRA DE OLIVEIRA NETA'&&stripIdPrefix('( 257607 ) CS MONTE SERRAT')==='CS MONTE SERRAT'&&stripIdPrefix('SEM PREFIXO')==='SEM PREFIXO'});
+  await add('146. detectCSVProfile reconhece o CSV de "Procedimentos Detalhado" (Paciente/Idade/Sexo/Data/Profissional/Procedimento/Unidade/Quantidade) sem confundir com os dois perfis de CSV já suportados',()=>{const headers=['Paciente','Idade','Sexo','Data','Profissional','Procedimento','Unidade','Quantidade',''];return detectCSVProfile(headers)==='celk_procedimentos_csv'&&detectCSVProfile(['Cd Usu Cadsus','Nome','Equipe','Consulta Saude Bucal'])==='metabase_2i'&&detectCSVProfile(['Ds Unidade','Mes Referencia','Indicador','Numerador','Denominador','Resultado'])==='metabase_esb'});
+  await add('147. pickDominantUnit escolhe a unidade majoritária de um CSV como unidade do snapshot e apenas reporta (sem excluir) quantas linhas tinham outra unidade de origem registrada (o PDF nunca mistura unidade porque cada relatório já é de uma unidade só)',()=>{const rows=[{unitOrigin:'CS MONTE SERRAT'},{unitOrigin:'CS MONTE SERRAT'},{unitOrigin:'CS MONTE SERRAT'},{unitOrigin:'CS CAPOEIRAS'}];const {keepUnit,otherUnitCounts}=pickDominantUnit(rows);return keepUnit==='CS MONTE SERRAT'&&otherUnitCounts['CS CAPOEIRAS']===1&&Object.keys(otherUnitCounts).length===1});
+  await add('148. buildProcedureSnapshotFromRows (motor compartilhado por PDF e CSV) calcula M1/M2/M4 corretamente a partir de linhas sintéticas, sem depender de página/coordenadas do PDF',()=>{const snap={dataByMonth:{},procedureCounts:[],validations:[]};const rows=[{patient:'Fulana da Silva',date:'05/06/2026',professional:'Caio',procedure:'PRIMEIRA CONSULTA ODONTOLOGICA PROGRAMÁTICA',quantity:1},{patient:'Beltrano Souza',date:'10/06/2026',professional:'Caio',procedure:'PRIMEIRA CONSULTA ODONTOLOGICA PROGRAMÁTICA',quantity:1},{patient:'Fulana da Silva',date:'20/06/2026',professional:'Caio',procedure:'TRATAMENTO CONCLUIDO',quantity:1},{patient:'Beltrano Souza',date:'12/06/2026',professional:'Caio',procedure:'RESTAURAÇÃO DE DENTE PERMANENTE ANTERIOR COM RESINA COMPOSTA',quantity:1},{patient:'Ciclana Lima',date:'15/06/2026',professional:'Caio',procedure:'AFERIÇÃO DE PRESSÃO ARTERIAL',quantity:1}];buildProcedureSnapshotFromRows(snap,rows);const m=snap.dataByMonth['2026-06'];return m.firstConsultations===2&&m.firstConsultationQuantity===2&&m.treatmentsConcluded===1&&m.restorative===1&&m.individualProcedures===2&&!snap.validations.some(v=>v.code==='M1_QUANTITY_VS_PEOPLE')&&snap.procedureCounts.some(p=>p.ambiguous)});
+  await add('149. buildProcedureSnapshotFromRows dispara M1_QUANTITY_VS_PEOPLE quando a mesma pessoa aparece duas vezes como primeira consulta no mesmo mês, e guarda os dois registros em firstPatients',()=>{const snap={dataByMonth:{},procedureCounts:[],validations:[]};const rows=[{patient:'Fulana da Silva',date:'05/07/2026',professional:'Caio',procedure:'PRIMEIRA CONSULTA ODONTOLOGICA PROGRAMÁTICA',quantity:1},{patient:'Fulana da Silva',date:'20/07/2026',professional:'Caio',procedure:'PRIMEIRA CONSULTA ODONTOLOGICA PROGRAMÁTICA',quantity:1}];buildProcedureSnapshotFromRows(snap,rows);const m=snap.dataByMonth['2026-07'];return m.firstConsultations===1&&m.firstConsultationQuantity===2&&m.firstPatients.length===2&&snap.validations.some(v=>v.code==='M1_QUANTITY_VS_PEOPLE'&&v.month==='2026-07')});
+  await add('150. Importação de CSV com o perfil "celk_procedimentos_csv" é despachada para parseProcedureCsv, que gera o aviso informativo CSV_OTHER_UNIT_COUNTED (não exclui nada) quando há mais de uma unidade de origem no arquivo',()=>{const srcImport=importOne.toString(),srcParse=parseProcedureCsv.toString();return srcImport.includes('celk_procedimentos_csv')&&srcImport.includes('parseProcedureCsv')&&srcParse.includes('CSV_OTHER_UNIT_COUNTED')});
+  await add('150b. parseProcedureCsv conta TODAS as linhas do arquivo na produção da unidade majoritária, inclusive as de pacientes/profissionais com outra unidade de origem registrada — nenhuma linha é descartada (correção explícita: se está no mesmo documento, o atendimento foi na unidade majoritária)',async()=>{const csv=['Paciente,Idade,Sexo,Data,Profissional,Procedimento,Unidade,Quantidade','( 1 ) Fulana da Silva,30,F,2026-07-05 09:00:00.000,( 9 ) Caio,PRIMEIRA CONSULTA ODONTOLOGICA PROGRAMÁTICA,( 100 ) CS MONTE SERRAT,1.0','( 2 ) Beltrano Souza,40,M,2026-07-06 09:00:00.000,( 9 ) Caio,PRIMEIRA CONSULTA ODONTOLOGICA PROGRAMÁTICA,( 100 ) CS MONTE SERRAT,1.0','( 3 ) Ciclana Lima,50,F,2026-07-07 09:00:00.000,( 9 ) Caio,PRIMEIRA CONSULTA ODONTOLOGICA PROGRAMÁTICA,( 200 ) CS OUTRA UNIDADE,1.0'].join('\n');const fakeFile={name:'teste.csv'};const snap=await parseProcedureCsv(fakeFile,'hash_selftest_150b',csv);const m=snap.dataByMonth['2026-07'];const v=snap.validations.find(v=>v.code==='CSV_OTHER_UNIT_COUNTED');return snap.unit==='CS MONTE SERRAT'&&m.firstConsultations===3&&m.firstConsultationQuantity===3&&!!v&&v.message.includes('CS OUTRA UNIDADE')&&!v.message.toLowerCase().includes('ignorad')&&v.message.toLowerCase().includes('nenhuma linha foi descartada')});
+  await add('151. A amostra bruta de um snapshot de procedimentos mostra a referência da linha de origem (sourceRef) tanto para PDF ("p.X · y Y") quanto para CSV ("linha N")',()=>{const fakeId='rawtest_selftest';sessionRaw.set(fakeId,{type:'procedure',rows:[{sourceRef:'linha 5',patientMasked:'F•••• S••••',date:'05/07/2026',professional:'Caio',procedure:'TESTE',unitOrigin:'CS MONTE SERRAT',quantity:1}]});try{const html=rawSampleHTML({id:fakeId});return html.includes('linha 5')}finally{sessionRaw.delete(fakeId)}});
+  await add('152. firstConsultationDuplicatesForMonth também sinaliza quem tem uma única linha de "primeira consulta", mas com quantidade maior que 1 nela — achado real ao importar o CSV do CELK (mesma pessoa, mesma linha, quantidade 2), sem precisar de nome repetido em linhas diferentes',()=>{const fakeSnap={dataByMonth:{'2026-07':{firstPatients:[{name:'Alana Vaz de Jesus',date:'14/07/2026',quantity:2},{name:'Outra Pessoa Unica',date:'10/07/2026',quantity:1}]}}};const dupes=firstConsultationDuplicatesForMonth(fakeSnap,'2026-07');const alana=dupes.find(g=>g.name==='Alana Vaz de Jesus');return !!alana&&alana.occurrences.length===1&&alana.totalQuantity===2&&!dupes.some(g=>g.name==='Outra Pessoa Unica')});
+  await add('153. Backup Completo preserva a quantidade por linha dentro de firstPatients (necessária para explicar a diferença do M1_QUANTITY_VS_PEOPLE); backup Analítico remove firstPatients inteiro, então a quantidade some junto',()=>{const before=state.snapshots.length;try{const snap={id:'tbkq_selftest',profile:'celk_procedimentos_detalhado',fileName:'teste_backup_qty.csv',status:'prévia não homologada',validations:[],procedureCounts:[],dataByMonth:{'2026-07':{kind:'procedure',firstConsultations:1,firstConsultationQuantity:2,treatmentsConcluded:0,treatmentConcludedQuantity:0,preventive:0,individualProcedures:0,art:0,restorative:0,b5Denominator:0,b3Numerator:0,b3Denominator:0,procedureCounts:[],firstPatients:[{name:'Teste Quantidade',date:'01/07/2026',quantity:2}]}}};state.snapshots.push(snap);const full=backupState('full');const fullQty=full.snapshots.find(s=>s.id==='tbkq_selftest')?.dataByMonth['2026-07'].firstPatients?.[0]?.quantity;return fullQty===2}finally{state.snapshots.length=before}});
+  await add('154. detectCSVProfile reconhece o CSV de "Relação das Atividades em Grupo" (Unidade/Código da Atividade/Assunto/Nome dos Participantes/Data Nascimento) sem confundir com os três perfis de CSV já suportados',()=>{const headers=['Unidade','Cnes','INE','Nome da Equipe','Data','Turno','Código da Atividade','Situação','Público Alvo','Temas','Práticas','Profissionais','Tipo de Atividade','Nr. INEP','Assunto','Local Atividade','Nome dos Participantes','CNS','CPF','Data Nascimento','Sexo'];return detectCSVProfile(headers)==='celk_atividades_grupo_csv'&&detectCSVProfile(['Paciente','Idade','Sexo','Data','Profissional','Procedimento','Unidade','Quantidade'])==='celk_procedimentos_csv'&&detectCSVProfile(['Cd Usu Cadsus','Nome','Equipe','Consulta Saude Bucal'])==='metabase_2i'&&detectCSVProfile(['Ds Unidade','Mes Referencia','Indicador','Numerador','Denominador','Resultado'])==='metabase_esb'});
+  await add('155. buildGroupSnapshotFromEvents (motor compartilhado por PDF e CSV de Atividades em Grupo) soma "present" por evento de escovação supervisionada e conta toda atividade em "activities", a partir de eventos sintéticos já no nível de uma atividade',()=>{const snap={dataByMonth:{}};const events=[{date:'10/06/2026',subject:'Escovação Supervisionada',present:5,status:'Concluída'},{date:'11/06/2026',subject:'Reunião de Equipe',present:null,status:'Concluída'}];buildGroupSnapshotFromEvents(snap,events);const m=snap.dataByMonth['2026-06'];return m.activities===2&&m.eligibleActivities===1&&m.supervisedBrushingPresent===5&&m.brushingEvents.length===1});
+  await add('156. parseGroupCsv calcula a idade real de cada participante na data da atividade (não usa Idade/Público Alvo do CSV) e só conta no numerador de M3/B4 quem está entre 6 e 11 anos — inclusive o caso-limite de completar 12 anos no próprio dia da atividade, que já fica de fora',async()=>{const csv=['Unidade,Data,Código da Atividade,Assunto,Nome dos Participantes,Data Nascimento','CS MONTE SERRAT,2026-06-10 09:00:00.0,ACT1,Escovação Supervisionada,Participante A,2018-06-01','CS MONTE SERRAT,2026-06-10 09:00:00.0,ACT1,escovação supervisionada,Participante B,2014-06-15','CS MONTE SERRAT,2026-06-10 09:00:00.0,ACT1,Escovação Supervisionada,Participante C,2014-06-01','CS MONTE SERRAT,2026-06-10 09:00:00.0,ACT1,Escovação Supervisionada,Participante D,2021-01-01','CS MONTE SERRAT,2026-06-11 10:00:00.0,ACT2,Reunião de Equipe,Participante E,1980-01-01'].join('\n');const fakeFile={name:'grupo_teste.csv'};const snap=await parseGroupCsv(fakeFile,'hash_selftest_156',csv);const m=snap.dataByMonth['2026-06'];const v=snap.validations.find(x=>x.code==='GROUP_AGE_FILTERED');return m.activities===2&&m.eligibleActivities===1&&m.supervisedBrushingPresent===2&&!!v&&v.message.includes('2 participante')});
+  await add('157. Importação de CSV com o perfil "celk_atividades_grupo_csv" é despachada para parseGroupCsv, que grava o snapshot com o MESMO profile do PDF (celk_atividades_grupo) — mesma dedução já usada em Procedimentos Detalhado, para PDF e CSV do mesmo relatório se substituírem em vez de somar em dobro',()=>{const srcImport=importOne.toString(),srcParse=parseGroupCsv.toString();return srcImport.includes('celk_atividades_grupo_csv')&&srcImport.includes('parseGroupCsv')&&srcParse.includes("'celk_atividades_grupo'")});
+  await add('158. A amostra bruta de um snapshot de Atividades em Grupo importado via CSV mostra o participante mascarado, a idade calculada e a elegibilidade (6–11), sem expor o nome completo',()=>{const fakeId='rawtest_group_selftest';sessionRaw.set(fakeId,{type:'group_csv',rows:[{sourceRef:'linha 3',date:'10/06/2026',subject:'Escovação Supervisionada',participantMasked:'P•••••••• A',age:8,eligible:true,activityCode:'ACT1'}]});try{const html=rawSampleHTML({id:fakeId});return html.includes('linha 3')&&html.includes('P•••••••• A')&&html.includes('Sim')&&!html.includes('Participante A')}finally{sessionRaw.delete(fakeId)}});
+  await add('159. parseGroupCsv também conta (sem excluir) linhas com outra unidade cadastrada, igual à correção da v1.34 em Procedimentos Detalhado — mesmo padrão reaproveitado via pickDominantUnit',async()=>{const csv=['Unidade,Data,Código da Atividade,Assunto,Nome dos Participantes,Data Nascimento','CS MONTE SERRAT,2026-06-10 09:00:00.0,ACT1,Escovação Supervisionada,Participante A,2018-06-01','CS MONTE SERRAT,2026-06-10 09:00:00.0,ACT1,Escovação Supervisionada,Participante B,2018-06-01','CS OUTRA UNIDADE,2026-06-10 09:00:00.0,ACT1,Escovação Supervisionada,Participante C,2018-06-01'].join('\n');const fakeFile={name:'grupo_teste2.csv'};const snap=await parseGroupCsv(fakeFile,'hash_selftest_159',csv);const m=snap.dataByMonth['2026-06'];const v=snap.validations.find(x=>x.code==='CSV_OTHER_UNIT_COUNTED');return snap.unit==='CS MONTE SERRAT'&&m.supervisedBrushingPresent===3&&!!v&&v.message.includes('CS OUTRA UNIDADE')});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -1041,7 +1226,7 @@ function calcDoseCard({titulo,sub,idLabel,pill,accent,need,teto,unidade,dose}){
 function calculatorHTML(){
   const peso=parseFloat(state.preferences.calcPeso);const valid=!isNaN(peso)&&peso>0;
   const amox=valid?doseML(peso,3,10):null,eritro=valid?doseML(peso,4,10):null,cefa=valid?doseML(peso,4,10):null;
-  const paracetamol=valid?doseGotas(peso,1.5,10,35,false):null,dipirona=valid?doseGotas(peso,1,25,35,true):null,ibuprofeno=valid?doseGotas(peso,1,5,40,false):null;
+  const paracetamol=valid?doseGotas(peso,1.5,10,35,false):null,dipirona=valid?doseGotas(peso,1,25,35,true):null,ibuprofeno=valid?doseGotas(peso,1,2.5,40,false):null;
   return `<article class="card panel">
     <div class="weight-panel">
       <div class="field weight-field"><label for="calcPeso">Peso da criança</label><input type="number" id="calcPeso" inputmode="decimal" min="0" step="0.5" placeholder="— kg" value="${state.preferences.calcPeso?esc(state.preferences.calcPeso):''}"></div>
@@ -1064,9 +1249,10 @@ function calculatorHTML(){
     <div class="indicator-grid">
       ${calcDoseCard({titulo:'Paracetamol',sub:'gotas 200 mg/mL · 6/6h',idLabel:'ANALGÉSICO',pill:null,accent:'#3dc1d3',need:'6/6h — 4x ao dia',teto:35,unidade:'gotas',dose:paracetamol})}
       ${calcDoseCard({titulo:'Dipirona',sub:'gotas 500 mg/mL · 6/6h',idLabel:'ANALGÉSICO',pill:null,accent:'#3dc1d3',need:'6/6h — 4x ao dia',teto:35,unidade:'gotas',dose:dipirona})}
-      ${calcDoseCard({titulo:'Ibuprofeno',sub:'gotas 100 mg/mL · 6/6h',idLabel:'ANTI-INFLAMATÓRIO',pill:{cls:'warn',label:'AINE'},accent:'#e7a23b',need:'6/6h — 4x ao dia, se risco de inflamação extensa',teto:40,unidade:'gotas',dose:ibuprofeno})}
+      ${calcDoseCard({titulo:'Ibuprofeno',sub:'gotas 50 mg/mL · 6/6h',idLabel:'ANTI-INFLAMATÓRIO',pill:{cls:'warn',label:'AINE'},accent:'#e7a23b',need:'6/6h — 4x ao dia, se risco de inflamação extensa',teto:40,unidade:'gotas',dose:ibuprofeno})}
     </div>
     <div class="notice"><strong>Sobre o paracetamol:</strong> o guia de referência dá uma faixa de 1 a 1,5 gota/kg/dose — esta página usa o topo da faixa (1,5), coerente com o critério de "sempre o teto máximo" combinado com você. Avise se preferir a base (1 gota/kg).</div>
+    <div class="notice"><strong>Sobre o ibuprofeno:</strong> a concentração foi conferida no REMUME municipal (50 mg/mL) e a fórmula foi ajustada para essa apresentação — a versão anterior desta calculadora assumia 100 mg/mL, o que subdosava pela metade.</div>
     <div class="notice warn" style="margin-top:10px"><strong>Calculadora de apoio à prescrição.</strong> Confira clinicamente antes de prescrever — a barra fica vermelha e o cartão mostra "Dose máxima" quando o peso já ultrapassa o teto de segurança combinado.</div>
     <div class="footnotes">
       <div class="subhead" style="margin:0 0 8px">Referências</div>
@@ -1119,7 +1305,7 @@ function setupEvents(){
     if(el.dataset.copyName){const e=mergedEpisodes().find(x=>x.id===el.dataset.copyName);if(e)await navigator.clipboard.writeText(e.nome||'');return toast('Nome copiado.')}
     if(el.dataset.openWhatsapp){const e=mergedEpisodes().find(x=>x.id===el.dataset.openWhatsapp);if(e?.phoneNormalized)window.open(`https://wa.me/${e.phoneNormalized}`,'_blank','noopener,noreferrer');return}
     if(el.dataset.followup){const [id,next]=el.dataset.followup.split('|');return setFollowup(id,next)}if(el.dataset.mergeManual){const [m,e]=el.dataset.mergeManual.split('|');return mergeManual(m,e)}if(el.dataset.editManual){closeDrawer();return openManualPregnant(el.dataset.editManual)}if(el.dataset.addFollowupNote){const ta=document.getElementById('followupNoteInput');return addFollowupNote(el.dataset.addFollowupNote,ta?ta.value:'')}if(el.dataset.saveAllFields)return saveAllFieldsOverride(el.dataset.saveAllFields);if(el.dataset.archiveManual){const m=state.gestantes.manual.find(x=>x.id===el.dataset.archiveManual);if(m){m.archived=true;audit('2i_manual_archived',{manualId:m.id});closeDrawer();refreshAll();toast('Cadastro manual arquivado.')}return}if(el.dataset.excludeEpisode){closeDrawer();return openExcludeEpisode(el.dataset.excludeEpisode)}if(el.dataset.restoreEpisode)return restoreEpisode(el.dataset.restoreEpisode);
-    if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading('Executando 135 testes','Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
+    if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading('Executando 160 testes','Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
     if(el.hasAttribute('data-create-backup'))return createBackupFromModal();if(el.hasAttribute('data-restore-backup'))return document.getElementById('backupInput').click();if(el.hasAttribute('data-unlock-backup'))return processPendingBackup(document.getElementById('restorePassword')?.value||'');
   });
   document.getElementById('importBtn').onclick=()=>document.getElementById('fileInput').click();document.getElementById('fileInput').onchange=e=>importFiles(e.target.files);document.getElementById('backupBtn').onclick=openBackupModal;document.getElementById('printBtn').onclick=()=>window.print();document.getElementById('saveBtn').onclick=openBackupModal;
