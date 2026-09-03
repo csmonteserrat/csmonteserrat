@@ -21,7 +21,7 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '1.36';
+const APP_VERSION = '1.37';
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -707,6 +707,16 @@ function quarterMunicipal(id,year=state.preferences.year,q=state.preferences.qua
   if(id==='M1'){const result=mean(valid.map(v=>v.result));return {id,months,values,result,classification:classifyM1(result),label:'prévia analítica',validMonths:valid.length}}
   const scores=valid.map(v=>v.score).filter(v=>v!=null),score=mean(scores),rawMean=mean(valid.map(v=>v.result)),auditScore=scoreMunicipal(id,rawMean),remaining=4-valid.length,target=Number(state.preferences.targetScore)||100,needed=remaining?((4*target-sum(scores))/remaining):null;return {id,months,values,score,rawMean,auditScore,validMonths:valid.length,needed,status:needed==null?'Quadrimestre completo':needed>100?'Matematicamente impossível':needed<=0?'Já assegurado':'Ainda possível',diverges:score!=null&&auditScore!=null&&Math.abs(score-auditScore)>.01};
 }
+function quarterFederal(id,year=state.preferences.year,q=state.preferences.quarter){
+  const months=quarterMonths(year,q),values=months.map(m=>federalComponents(id,m));
+  return {id,months,values};
+}
+function cumulativeFederal(id,months){
+  const vals=months.map(m=>federalComponents(id,m)).filter(v=>v.result!=null);
+  if(!vals.length)return {numerator:null,denominator:null,result:null,validMonths:0};
+  const numerator=sum(vals.map(v=>v.numerator)),denominator=sum(vals.map(v=>v.denominator));
+  return {numerator,denominator,result:denominator>0?100*numerator/denominator:null,validMonths:vals.length};
+}
 function comparisonForMonth(mk){const rows=[];for(const [m,b] of [['M1','B1'],['M2','B2'],['M3','B4'],['M4','B5'],['M5','B6']]){const a=municipalComponents(m,mk),f=federalComponents(b,mk);rows.push({municipal:m,federal:b,name:RULESETS.municipal.indicators[m].name,municipalResult:a.result,federalResult:f.result,municipalStatus:m==='M1'?a.classification:a.score!=null?`${fmtNum(a.score,1)} pts`:'—',federalStatus:f.classification||'—'})}return rows}
 
 /* ---------- PREVIEW: leitura por meta (substitui a pontuação 0–100 na Visão Geral) ---------- */
@@ -885,7 +895,7 @@ function indicatorCard(comp,scope='municipal'){
   return `<article class="card indicator-card" style="--accent:${accent}"><div class="topline"></div><div class="indicator-head"><div><div class="indicator-id">${comp.id} · ${isM?'MUNICIPAL':'FEDERAL'}</div><div class="indicator-name">${esc(rule.name)}</div></div><button class="info-btn" data-composition="${scope}|${comp.id}|${comp.mk}" aria-label="Como foi calculado?">i</button></div><div class="indicator-result"><strong>${fmtPct(comp.result)}</strong>${resultPill}</div><div class="numerator-row"><span>Numerador <strong>${fmtNum(comp.numerator,0)}</strong></span><span>·</span><span>Denominador <strong>${fmtNum(comp.denominator,2)}</strong></span></div>${isM?divergenceNotice(comp):''}${ruler}${denomRequired?denomInline(comp.id,scope,comp.mk):denomShared?sharedDenomNote(comp.mirrorOf):''}<div class="indicator-footer"><div class="need">${footerNeed}</div>${dataQuality(comp)}</div></article>`
 }
 /* ---------- Apuração do quadrimestre sem pontos (leitura por meta) ---------- */
-function pctDecimals(id){return id==='M1'?2:1}
+function pctDecimals(id){return id==='M1'||id==='B1'?2:1}
 function zoneClass(id,result){
   if(result==null)return null;
   if(id==='M1'){const b=m1Band(result);if(!b)return null;return b.label==='Ótimo'||b.label==='Bom'?'zone-good':b.label==='Suficiente'?'zone-warn':'zone-bad'}
@@ -925,6 +935,39 @@ function quadrimestralOutlook(id,q){
   if(ratio<=2)return {cls:'warn',label:'Precisa acelerar o ritmo',detail:`Precisa de ${fmtNum(requiredPerMonth,1)} ${unit.plural}/mês; acima da média já registrada de ${fmtNum(avgMonthlyPace,1)}/mês.`};
   return {cls:'bad',label:'Ritmo exigido muito acima do histórico',detail:`Precisa de ${fmtNum(requiredPerMonth,1)} ${unit.plural}/mês, mas o histórico do quadrimestre é de só ${fmtNum(avgMonthlyPace,1)}/mês — bater a meta exigiria um ritmo bem fora do padrão.`};
 }
+/* ---------- Apuração do quadrimestre federal (paleta própria — nunca reaproveita as cores municipais) ---------- */
+function federalZoneClass(id,result){
+  if(result==null)return null;
+  const label=classifyFederal(id,result);if(!label)return null;
+  if(label.startsWith('Ótimo'))return 'fed-otimo';
+  if(label.startsWith('Bom'))return 'fed-bom';
+  if(label.startsWith('Suficiente'))return 'fed-suficiente';
+  return 'fed-regular';
+}
+function federalShortLabel(label){return label&&label.includes('·')?label.split('·')[0].trim():label}
+function federalMonthBoxes(id,values){
+  const ref=state.preferences.month;
+  return `<div class="month-strip">${values.map(v=>{
+    const isCurrent=v.mk===ref,isFuture=v.mk>ref;
+    if(v.result==null){
+      const cls=isFuture?'future':'missing',label=isFuture?'mês futuro':'sem dado';
+      return `<div class="month-box ${cls}${isCurrent?' current':''}"><span>${fmtMonth(v.mk)}</span><strong>—</strong><small>${label}</small></div>`;
+    }
+    const zc=federalZoneClass(id,v.result)||'',label=federalShortLabel(classifyFederal(id,v.result));
+    return `<div class="month-box ${zc}${isCurrent?' current':''}"><span>${fmtMonth(v.mk)}</span><strong>${fmtPct(v.result,pctDecimals(id))}</strong><small>${esc(label)}</small></div>`;
+  }).join('')}</div>`;
+}
+function federalQuadrimestralOutlook(id,q){
+  const ref=state.preferences.month,cum=cumulativeFederal(id,q.months);
+  if(cum.result==null){
+    const remainingMonths=q.months.filter(m=>m>ref).length;
+    return remainingMonths===0
+      ?{cls:'bad',label:'Sem dados suficientes',detail:'Quadrimestre encerrado sem dados suficientes para apurar o acumulado.'}
+      :{cls:'neutral',label:'Sem dados suficientes',detail:'Ainda não há dados suficientes no quadrimestre para calcular o acumulado.'};
+  }
+  const label=classifyFederal(id,cum.result),cls=statusClass(label);
+  return {cls,label:federalShortLabel(label),detail:`Resultado acumulado do quadrimestre: ${fmtPct(cum.result,pctDecimals(id))} (${fmtNum(cum.numerator,0)} ÷ ${fmtNum(cum.denominator,2)}), classificado como ${label} pela Nota ${id}. Cálculo de conveniência da ferramenta (soma dos numeradores/denominadores dos meses com dado) — a Nota não define regra oficial de consolidação quadrimestral.`};
+}
 function overviewHTML(){
   if(!state.snapshots.length)return emptyState('Importe os primeiros relatórios','Use o PDF “Procedimentos Detalhado” durante o mês, o relatório de atividades em grupo para M3/B4 e o CSV do Metabase como referência consolidada.');
   const mk=state.preferences.month,diag=buildDiagnostics(),pregExpanded=visibleByExclusion(mergedEpisodes()),attended=pregExpanded.filter(isAttended).length;
@@ -940,7 +983,8 @@ function municipalHTML(){
 }
 
 function federalHTML(){
-  const mk=state.preferences.month,ids=['B1','B2','B4','B5','B6','B3'];return `<div class="notice warn"><strong>Série federal mensal.</strong> As Notas B1–B6 não informam como consolidar matematicamente os quatro meses; a ferramenta não inventa resultado federal quadrimestral. Cálculos derivados dos PDFs CELK ficam marcados como prévios quando INE/CBO/CNS não estão disponíveis.</div><div class="indicator-grid" style="margin-top:16px">${ids.map(id=>indicatorCard(federalComponents(id,mk),'federal')).join('')}</div>`
+  const mk=state.preferences.month,ids=['B1','B2','B4','B5','B6','B3'],qs=ids.map(id=>quarterFederal(id));
+  return `<div class="notice warn"><strong>Série federal mensal.</strong> As Notas B1–B6 não definem oficialmente como consolidar os quatro meses do quadrimestre — o acumulado da tabela abaixo é um cálculo de conveniência da ferramenta (soma dos numeradores/denominadores dos meses com dado, reclassificada pelas mesmas faixas de cada Nota), não uma regra normativa. Cálculos derivados dos PDFs CELK ficam marcados como prévios quando INE/CBO/CNS não estão disponíveis.</div><div class="indicator-grid" style="margin-top:16px">${ids.map(id=>indicatorCard(federalComponents(id,mk),'federal')).join('')}</div><article class="card table-card"><div class="table-head"><div><h2 class="section-title">${icon('trend')} Apuração do quadrimestre</h2><div class="section-sub">Meses sem arquivo são distintos de meses com denominador zero. "Mês em foco" segue a competência selecionada acima (${fmtMonth(mk,true)}). O acumulado do quadrimestre é cálculo de conveniência — ver aviso acima.</div></div></div><div class="legend-row">${legendDot('#1a5fb4','Ótimo')}${legendDot('#3e93c9','Bom')}${legendDot('#c99423','Suficiente')}${legendDot('#a83246','Regular')}${legendDot('#d7dbe6','Sem dado')}${legendDot('#eef0f5','Mês futuro',true)}</div><div class="table-scroll"><table><thead><tr><th>Indicador</th><th>Série mensal</th><th>Parcial <span class="muted" style="font-weight:500">(média simples do quadrimestre)</span></th><th>Acumulado do quadrimestre</th></tr></thead><tbody>${qs.map(q=>{const id=q.id,dec=pctDecimals(id),parts=q.values.map(v=>v.result==null?0:v.result),partial=sum(parts)/4,breakdown=parts.map(p=>fmtPct(p,dec)).join(' + '),pzc=federalZoneClass(id,partial)||'',outlook=federalQuadrimestralOutlook(id,q);return `<tr><td><strong>${q.id}</strong><br><span class="muted">${esc(RULESETS.federal.indicators[q.id].name)}</span></td><td style="min-width:310px">${federalMonthBoxes(id,q.values)}</td><td><strong class="${pzc}">${fmtPct(partial,dec)}</strong><div class="muted" style="font-size:10.5px;margin-top:4px">${breakdown} ÷ 4</div></td><td>${pill(outlook.label,outlook.cls)}<div class="muted" style="font-size:10.5px;margin-top:6px;line-height:1.4;max-width:280px">${esc(outlook.detail)}</div></td></tr>`}).join('')}</tbody></table></div></article>`
 }
 
 function isPriority2I(e){return !isAttended(e)&&pregnancyStage(e)==='ativa'&&gestationalWeeks(e)!=null&&gestationalWeeks(e)>=28}
@@ -1257,6 +1301,10 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('164. A página Diagnóstico mostra M1_REPEAT_WITHIN_12M e M2_REPEAT_WITHIN_12M com o bloco expansível marcando qual ocorrência foi excluída do numerador e qual foi contada',()=>{const before=state.snapshots.length;const u=state.preferences.unit;try{const s1={id:'tdiag1_selftest',profile:'celk_procedimentos_detalhado',unit:u,fileName:'a.pdf',createdAt:nowISO(),status:'x',validations:[],procedureCounts:[],dataByMonth:{'2026-01':{kind:'procedure',firstPatients:[{name:'Diag Primeira',date:'10/01/2026'}],concludedPatients:[{name:'Diag Concluida',date:'10/01/2026'}]}}};const s2={id:'tdiag2_selftest',profile:'celk_procedimentos_detalhado',unit:u,fileName:'b.pdf',createdAt:nowISO(),status:'x',validations:[],procedureCounts:[],dataByMonth:{'2026-03':{kind:'procedure',firstPatients:[{name:'Diag Primeira',date:'10/03/2026'}],concludedPatients:[{name:'Diag Concluida',date:'10/03/2026'}]}}};state.snapshots.push(s1,s2);const html=diagnosticsHTML();return html.includes('M1_REPEAT_WITHIN_12M')&&html.includes('M2_REPEAT_WITHIN_12M')&&html.includes('Diag Primeira')&&html.includes('Diag Concluida')&&html.includes('excluída do numerador')&&html.includes('contada')}finally{state.snapshots.length=before}});
   await add('165. Backup Completo preserva concludedPatients (necessário para a dedução de 12 meses de M2); backup Analítico remove firstPatients e concludedPatients dos dois',()=>{const before=state.snapshots.length;try{const snap={id:'tbk2_selftest',profile:'celk_procedimentos_detalhado',fileName:'teste_backup2.pdf',status:'prévia não homologada',validations:[],procedureCounts:[],dataByMonth:{'2026-07':{kind:'procedure',firstConsultations:1,firstConsultationQuantity:1,treatmentsConcluded:1,treatmentConcludedQuantity:1,preventive:0,individualProcedures:0,art:0,restorative:0,b5Denominator:0,b3Numerator:0,b3Denominator:0,procedureCounts:[],firstPatients:[{name:'Teste Backup Paciente',date:'01/07/2026'}],concludedPatients:[{name:'Teste Backup Concluido',date:'01/07/2026'}]}}};state.snapshots.push(snap);const full=backupState('full'),analytic=backupState('analytic');const fullOk=full.snapshots.find(s=>s.id==='tbk2_selftest')?.dataByMonth['2026-07'].concludedPatients?.length===1;const analyticSnap=analytic.snapshots.find(s=>s.id==='tbk2_selftest');const analyticOk=!!analyticSnap&&analyticSnap.dataByMonth['2026-07'].firstPatients===undefined&&analyticSnap.dataByMonth['2026-07'].concludedPatients===undefined;return fullOk&&analyticOk}finally{state.snapshots.length=before}});
   await add('166. hasM1PatientData (aciona o aviso de dado nominal no modal de backup) também detecta quando só há concludedPatients, sem firstPatients',()=>{const before=state.snapshots.length;try{const snap={id:'thas1_selftest',profile:'celk_procedimentos_detalhado',fileName:'teste.pdf',status:'x',validations:[],procedureCounts:[],dataByMonth:{'2026-07':{kind:'procedure',firstPatients:[],concludedPatients:[{name:'Só Concluido',date:'01/07/2026'}]}}};state.snapshots.push(snap);return hasM1PatientData()===true}finally{state.snapshots.length=before}});
+  await add('167. federalMonthBoxes usa a paleta federal própria (federalZoneClass → fed-otimo/fed-bom/fed-suficiente/fed-regular), nunca as classes zone-good/zone-warn/zone-bad do municipal — mantém a decisão de paleta federal própria confirmada na v1.21',()=>{const src=federalMonthBoxes.toString();return src.includes('federalZoneClass')&&!src.includes('zoneClass(')&&federalZoneClass('B1',1.5)==='fed-otimo'&&federalZoneClass('B1',0.9)==='fed-bom'&&federalZoneClass('B1',0.4)==='fed-suficiente'&&federalZoneClass('B1',0.1)==='fed-regular'});
+  await add('168. federalMonthBoxes marca o mês selecionado como "current", meses futuros como "mês futuro" e meses passados sem dado como "sem dado" — mesmo padrão do apuracaoMonthBoxes municipal (teste 94)',()=>{const ref=state.preferences.month,{year,month}=parseMonthKey(ref),prev=monthKey(month===1?year-1:year,month===1?12:month-1),next=monthKey(month===12?year+1:year,month===12?1:month+1);const html=federalMonthBoxes('B1',[{mk:prev,result:null},{mk:ref,result:1.5},{mk:next,result:null}]);return html.includes('month-box missing')&&html.includes('sem dado')&&html.includes('fed-otimo current')&&html.includes('month-box future')&&html.includes('mês futuro')});
+  await add('169. federalQuadrimestralOutlook devolve rótulo/classe de pill válidos para os 6 indicadores federais, com ou sem dados carregados, e o detalhe deixa explícito que o acumulado é cálculo de conveniência da ferramenta (a Nota não define regra oficial de consolidação)',()=>{const classes=['success','bad','neutral','warn','good'];return ['B1','B2','B3','B4','B5','B6'].every(id=>{const q=quarterFederal(id),r=federalQuadrimestralOutlook(id,q);return classes.includes(r.cls)&&typeof r.label==='string'&&r.label.length>0&&typeof r.detail==='string'&&(r.detail.includes('conveniência')||r.detail.includes('dados suficientes'))})});
+  await add('170. federalHTML agora inclui a tabela "Apuração do quadrimestre" (acumulado federal), com o aviso do topo atualizado para deixar claro que é cálculo de conveniência, sem mais afirmar que a ferramenta "não inventa resultado federal quadrimestral"',()=>{const html=federalHTML();return html.includes('Apuração do quadrimestre')&&html.includes('Acumulado do quadrimestre')&&!html.includes('não inventa resultado federal quadrimestral')&&html.includes('cálculo de conveniência')});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -1352,7 +1400,7 @@ function setupEvents(){
     if(el.dataset.copyName){const e=mergedEpisodes().find(x=>x.id===el.dataset.copyName);if(e)await navigator.clipboard.writeText(e.nome||'');return toast('Nome copiado.')}
     if(el.dataset.openWhatsapp){const e=mergedEpisodes().find(x=>x.id===el.dataset.openWhatsapp);if(e?.phoneNormalized)window.open(`https://wa.me/${e.phoneNormalized}`,'_blank','noopener,noreferrer');return}
     if(el.dataset.followup){const [id,next]=el.dataset.followup.split('|');return setFollowup(id,next)}if(el.dataset.mergeManual){const [m,e]=el.dataset.mergeManual.split('|');return mergeManual(m,e)}if(el.dataset.editManual){closeDrawer();return openManualPregnant(el.dataset.editManual)}if(el.dataset.addFollowupNote){const ta=document.getElementById('followupNoteInput');return addFollowupNote(el.dataset.addFollowupNote,ta?ta.value:'')}if(el.dataset.saveAllFields)return saveAllFieldsOverride(el.dataset.saveAllFields);if(el.dataset.archiveManual){const m=state.gestantes.manual.find(x=>x.id===el.dataset.archiveManual);if(m){m.archived=true;audit('2i_manual_archived',{manualId:m.id});closeDrawer();refreshAll();toast('Cadastro manual arquivado.')}return}if(el.dataset.excludeEpisode){closeDrawer();return openExcludeEpisode(el.dataset.excludeEpisode)}if(el.dataset.restoreEpisode)return restoreEpisode(el.dataset.restoreEpisode);
-    if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading('Executando 167 testes','Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
+    if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading('Executando 171 testes','Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
     if(el.hasAttribute('data-create-backup'))return createBackupFromModal();if(el.hasAttribute('data-restore-backup'))return document.getElementById('backupInput').click();if(el.hasAttribute('data-unlock-backup'))return processPendingBackup(document.getElementById('restorePassword')?.value||'');
   });
   document.getElementById('importBtn').onclick=()=>document.getElementById('fileInput').click();document.getElementById('fileInput').onchange=e=>importFiles(e.target.files);document.getElementById('backupBtn').onclick=openBackupModal;document.getElementById('printBtn').onclick=()=>window.print();document.getElementById('saveBtn').onclick=openBackupModal;
@@ -1366,5 +1414,5 @@ function setupEvents(){
   let dragDepth=0;window.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;document.getElementById('dropOverlay').classList.add('open')});window.addEventListener('dragover',e=>e.preventDefault());window.addEventListener('dragleave',e=>{e.preventDefault();if(--dragDepth<=0){dragDepth=0;document.getElementById('dropOverlay').classList.remove('open')}});window.addEventListener('drop',e=>{e.preventDefault();dragDepth=0;document.getElementById('dropOverlay').classList.remove('open');if(e.dataTransfer.files.length)importFiles(e.dataTransfer.files)});
 }
 
-async function bootstrap(){hydrateIcons();setupEvents();state=migrateState(state);activeView=state.preferences.view||'overview';refreshAll();window.__APP_TEST_API__={version:APP_VERSION,importFiles,runSelfTests,getState:()=>state,getProcedureMonth:mk=>aggregateProcedureMonth(mk),getGroupMonth:mk=>aggregateGroupMonth(mk),getConsolidatedMonth:mk=>aggregateConsolidatedMonth(mk),getEpisodes:()=>getActive2ISnapshot()?.episodes||[],calculations:{municipalComponents,federalComponents,quarterMunicipal},reset:async()=>{state=defaultState();sessionRaw=new Map();await persistState();refreshAll()}}}
+async function bootstrap(){hydrateIcons();setupEvents();state=migrateState(state);activeView=state.preferences.view||'overview';refreshAll();window.__APP_TEST_API__={version:APP_VERSION,importFiles,runSelfTests,getState:()=>state,getProcedureMonth:mk=>aggregateProcedureMonth(mk),getGroupMonth:mk=>aggregateGroupMonth(mk),getConsolidatedMonth:mk=>aggregateConsolidatedMonth(mk),getEpisodes:()=>getActive2ISnapshot()?.episodes||[],calculations:{municipalComponents,federalComponents,quarterMunicipal,quarterFederal,federalQuadrimestralOutlook},reset:async()=>{state=defaultState();sessionRaw=new Map();await persistState();refreshAll()}}}
 bootstrap();

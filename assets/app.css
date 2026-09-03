@@ -52,9 +52,14 @@ a{color:inherit}
 .month-box.zone-good{background:#eafaf3;border-color:#39b980}.month-box.zone-good strong{color:#1f8f63}
 .month-box.zone-warn{background:#fdf5e8;border-color:#e7a23b}.month-box.zone-warn strong{color:#9c6a1d}
 .month-box.zone-bad{background:#fcecea;border-color:#e15f41}.month-box.zone-bad strong{color:#af3f27}
+.month-box.fed-otimo{background:#e5eefa;border-color:#1a5fb4}.month-box.fed-otimo strong{color:#1a5fb4}
+.month-box.fed-bom{background:#e6f2f9;border-color:#3e93c9}.month-box.fed-bom strong{color:#3e93c9}
+.month-box.fed-suficiente{background:#faf1de;border-color:#c99423}.month-box.fed-suficiente strong{color:#c99423}
+.month-box.fed-regular{background:#f8e6e9;border-color:#a83246}.month-box.fed-regular strong{color:#a83246}
 .month-box.current{position:relative;box-shadow:0 0 0 2px var(--primary) inset}
 .month-box.current:after{content:"em foco";position:absolute;top:-9px;right:6px;background:var(--primary);color:#fff;font-size:8.5px;font-weight:700;padding:2px 6px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em}
 strong.zone-good{color:#1f8f63}strong.zone-warn{color:#9c6a1d}strong.zone-bad{color:#af3f27}
+strong.fed-otimo{color:#1a5fb4}strong.fed-bom{color:#3e93c9}strong.fed-suficiente{color:#c99423}strong.fed-regular{color:#a83246}
 .legend-row{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0 4px;font-size:11px;color:var(--muted)}.legend-item{display:inline-flex;align-items:center;gap:5px}.legend-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none}
 .notice{background:#fff;border:1px solid var(--border);border-left:4px solid var(--primary);border-radius:14px;padding:13px 15px;font-size:11.5px;color:var(--muted);line-height:1.55}.notice.warn{border-left-color:var(--amber);background:#fffdf8}.notice.danger{border-left-color:var(--red);background:#fffafa}.notice.success{border-left-color:var(--green);background:#f7fcf9}.notice strong{color:var(--text)}
 .priority-flag{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#b9442f;margin-top:5px;text-transform:uppercase;letter-spacing:.02em}.priority-flag svg{width:11px;height:11px}
