@@ -21,7 +21,7 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '1.39';
+const APP_VERSION = '1.40';
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -801,20 +801,43 @@ function cumulativeMunicipal(id,months){
   const numerator=sum(vals.map(v=>v.numerator)),denominator=sum(vals.map(v=>v.denominator));
   return {numerator,denominator,result:denominator>0?100*numerator/denominator:null,validMonths:vals.length};
 }
+// M1/M3 (denominador de população/faixa etária) — o "resultado do quadrimestre" é a MÉDIA das 4 percentagens mensais
+// (mesma base da coluna "Parcial" da tabela de apuração), nunca a soma cumulativa de cumulativeMunicipal (que fica
+// numa escala de até 4x uma percentagem mensal, incompatível com uma meta definida em escala mensal). Reaproveitada
+// tanto pela Visão Geral (metaProgress/metaCard) quanto pela tabela de apuração (quadrimestralOutlook) — v1.40.
+// Recebe `values` já calculados (não `months`) para nunca divergir de quem já tem essa lista pronta (quarterMunicipal).
+function quarterAverageProgress(id,values){
+  const validMonths=values.filter(v=>v.result!=null).length;
+  if(!validMonths)return {result:null,numerator:null,denominator:null,validMonths:0};
+  const parts=values.map(v=>v.result==null?0:v.result),partial=sum(parts)/4;
+  const ref=state.preferences.month,denomRef=municipalComponents(id,ref).denominator,currentNumerator=sum(values.map(v=>v.numerator||0));
+  return {result:partial,numerator:currentNumerator,denominator:denomRef,validMonths};
+}
+function gapCountForAverage(currentNumerator,denomRef,targetPct){return denomRef>0?Math.max(0,Math.ceil((targetPct/100)*4*denomRef-currentNumerator)):null}
 function metaGap(id,numerator,denominator){
   if(numerator==null||!(denominator>0))return null;
   if(id==='M1')return remainingForM1(numerator,denominator,1.25);
   return remainingInclusive(numerator,denominator,metaTarget(id),['M4','M5'].includes(id));
 }
 function metaProgress(id,mk){
-  const comp=municipalComponents(id,mk),months=quarterMonths(state.preferences.year,state.preferences.quarter),cum=cumulativeMunicipal(id,months),meta=metaTarget(id);
-  const monthGap=metaGap(id,comp.numerator,comp.denominator),quarterGap=metaGap(id,cum.numerator,cum.denominator);
-  return {id,meta,month:{...comp,gap:monthGap,achieved:monthGap===0},quarter:{...cum,gap:quarterGap,achieved:quarterGap===0,validMonths:cum.validMonths}};
+  const comp=municipalComponents(id,mk),months=quarterMonths(state.preferences.year,state.preferences.quarter),meta=metaTarget(id);
+  const monthGap=metaGap(id,comp.numerator,comp.denominator);
+  let quarterEntry;
+  if(['M1','M3'].includes(id)){
+    const avg=quarterAverageProgress(id,months.map(m=>municipalComponents(id,m))),achieved=avg.result!=null&&avg.result>=meta;
+    const gap=achieved?0:(avg.validMonths?gapCountForAverage(avg.numerator,avg.denominator,meta):null);
+    quarterEntry={result:avg.result,numerator:avg.numerator,denominator:avg.denominator,validMonths:avg.validMonths,gap,achieved};
+  }else{
+    const cum=cumulativeMunicipal(id,months),quarterGap=metaGap(id,cum.numerator,cum.denominator);
+    quarterEntry={...cum,gap:quarterGap,achieved:quarterGap===0,validMonths:cum.validMonths};
+  }
+  return {id,meta,month:{...comp,gap:monthGap,achieved:monthGap===0},quarter:quarterEntry};
 }
-function metaLine(entry,unit,missingText,scopeWord){
+function metaLine(entry,unit,missingText,scopeWord,ended=false){
   if(entry.result==null)return missingText;
   if(entry.achieved)return `<strong>Meta garantida</strong> — não depende de mais nenhum ${unit.singular} ${scopeWord}.`;
-  return `Faltam <strong>${fmtNum(entry.gap,0)}</strong> ${entry.gap===1?unit.singular:unit.plural} para bater a meta ${scopeWord==='agora'?'este mês':'no quadrimestre'}.`;
+  const verb=ended?(entry.gap===1?'Faltou':'Faltaram'):'Faltam',periodWord=scopeWord==='agora'?'este mês':'no quadrimestre';
+  return `${verb} <strong>${fmtNum(entry.gap,0)}</strong> ${entry.gap===1?unit.singular:unit.plural} para bater a meta ${periodWord}.${ended?' Não há mais tempo para recuperar.':''}`;
 }
 function m1Band(result){return result==null?null:RULESETS.municipal.indicators.M1.bands.find(b=>b.test(result))}
 function metaRulerHTML(id,result){
@@ -829,18 +852,19 @@ function metaRulerHTML(id,result){
 }
 function metaCard(id,mk,scope){
   const p=metaProgress(id,mk),rule=RULESETS.municipal.indicators[id],unit=META_UNIT_LABEL[id],entry=scope==='quarter'?p.quarter:p.month;
+  const ended=scope==='quarter'?isQuarterOver(quarterMonths(state.preferences.year,state.preferences.quarter)):isMonthOver(mk);
   const metaLabel=id==='M1'?'faixas oficiais (Ótimo >1,25%)':fmtPct(p.meta,p.meta<2?1:0);
   const band=id==='M1'?m1Band(entry.result):null;
-  const label=id==='M1'?(band?.label||'Sem dado'):(entry.result==null?'Sem dado':entry.achieved?(scope==='quarter'?'Meta garantida':'Meta batida'):(scope==='quarter'?'Ainda falta':'Abaixo da meta'));
-  const state=id==='M1'?(band?statusClass(band.label):'neutral'):(entry.result==null?'neutral':entry.achieved?'success':'warn');
+  const label=id==='M1'?(band?.label||'Sem dado'):(entry.result==null?'Sem dado':entry.achieved?(scope==='quarter'?'Meta garantida':'Meta batida'):(scope==='quarter'?(ended?'Meta não atingida':'Ainda falta'):'Abaixo da meta'));
+  const cardState=id==='M1'?(band?statusClass(band.label):'neutral'):(entry.result==null?'neutral':entry.achieved?'success':'warn');
   const missing=entry.result==null?(scope==='month'&&entry.denomRecord===null&&['M1','M3'].includes(id)?'Denominador do mês ainda não confirmado.':scope==='quarter'?'Ainda sem meses suficientes com dado confirmado.':'Sem relatório desta competência ainda.'):'';
   const scopeLabel=scope==='quarter'?`Quadrimestre · acumulado (${entry.validMonths}/4 meses)`:'Este mês';
-  return `<article class="card indicator-card meta-card" style="--accent:${state==='success'?'#39b980':state==='warn'?'#e7a23b':state==='good'?'#3dc1d3':state==='bad'?'#e15f41':'#a2a9bb'}"><div class="topline"></div>
+  return `<article class="card indicator-card meta-card" style="--accent:${cardState==='success'?'#39b980':cardState==='warn'?'#e7a23b':cardState==='good'?'#3dc1d3':cardState==='bad'?'#e15f41':'#a2a9bb'}"><div class="topline"></div>
 <div class="indicator-head"><div><div class="indicator-id">${id} · MUNICIPAL</div><div class="indicator-name">${esc(rule.name)}</div></div><button class="info-btn" data-composition="municipal|${id}|${mk}" aria-label="Como foi calculado?">i</button></div>
-<div class="indicator-result"><strong>${fmtPct(entry.result)}</strong>${pill(label,state)}</div>
+<div class="indicator-result"><strong>${fmtPct(entry.result)}</strong>${pill(label,cardState)}</div>
 <div class="numerator-row"><span>${esc(scopeLabel)} · meta <strong>${metaLabel}</strong></span></div>
 ${metaRulerHTML(id,entry.result)}
-<div class="need">${metaLine(entry,unit,missing,scope==='quarter'?'no quadrimestre':'agora')}</div>
+<div class="need">${metaLine(entry,unit,missing,scope==='quarter'?'no quadrimestre':'agora',ended)}</div>
 </article>`;
 }
 function metaGoalsHit(mk,scope){
@@ -991,21 +1015,23 @@ function quarterPartial(q){const parts=q.values.map(v=>v.result==null?0:v.result
 // O quadrimestre "já fechou" quando a data real de hoje (a do computador que acessa a ferramenta) passa do último dia
 // do último mês do quadrimestre — não quando o "mês em foco" (filtro selecionado) chega lá. Isso decide o tempo verbal
 // da "Projeção do quadrimestre": passado ("faltou") depois de fechado, futuro ("ainda faltam") enquanto ainda corre.
-function isQuarterOver(months){const last=months.at(-1),[y,m]=last.split('-').map(Number),endOfLastMonth=new Date(y,m,0,23,59,59,999);return new Date()>endOfLastMonth}
+function isMonthOver(mk){const [y,m]=mk.split('-').map(Number);return new Date()>new Date(y,m,0,23,59,59,999)}
+function isQuarterOver(months){return isMonthOver(months.at(-1))}
 function quadrimestralOutlook(id,q){
   const unit=META_UNIT_LABEL[id],meta=metaTarget(id),ref=state.preferences.month,dec=pctDecimals(id),ended=isQuarterOver(q.months);
   if(['M1','M3'].includes(id)){
     // M1/M3 têm denominador de população/faixa etária — não é um fluxo mensal, então não faz sentido somar as 4
     // percentagens mensais (escalas diferentes de um alvo mensal, ver v1.38). A meta quadrimestral desses dois é a
     // MÉDIA simples dos 4 meses (mesma base já mostrada na coluna "Parcial", mês sem dado conta como 0%), comparada
-    // ao mesmo alvo percentual mensal. Pedido explícito do usuário (v1.39).
-    const validMonths=q.values.filter(v=>v.result!=null);
-    if(!validMonths.length)return ended
+    // ao mesmo alvo percentual mensal. Pedido explícito do usuário (v1.39) — mesma conta de quarterAverageProgress,
+    // reaproveitada aqui também para nunca divergir do que a Visão Geral (metaProgress/metaCard) mostra.
+    const avg=quarterAverageProgress(id,q.values);
+    if(!avg.validMonths)return ended
       ?{cls:'bad',label:'Meta vencida e não cumprida',detail:'Quadrimestre encerrado sem dados suficientes para apurar o resultado.'}
       :{cls:'neutral',label:'Sem dados suficientes',detail:'Ainda não há dados no quadrimestre para projetar a meta.'};
-    const partial=quarterPartial(q),cutoff=id==='M1'?0.25:RULESETS.municipal.indicators[id].cutoff;
-    const denomRef=municipalComponents(id,ref).denominator,currentNumerator=sum(q.values.map(v=>v.numerator||0));
-    const gapCount=target=>denomRef>0?Math.max(0,Math.ceil((target/100)*4*denomRef-currentNumerator)):null;
+    const partial=avg.result,cutoff=id==='M1'?0.25:RULESETS.municipal.indicators[id].cutoff;
+    const denomRef=avg.denominator,currentNumerator=avg.numerator;
+    const gapCount=target=>gapCountForAverage(currentNumerator,denomRef,target);
     const units=n=>n===1?unit.singular:unit.plural;
     if(partial>=meta)return {cls:'success',label:'Meta garantida',detail:ended?`O quadrimestre fechou com média de ${fmtPct(partial,dec)} (Parcial), acima da meta de ${fmtPct(meta,dec)}.`:`O quadrimestre já está com média de ${fmtPct(partial,dec)} (Parcial), acima da meta de ${fmtPct(meta,dec)} — não depende mais dos meses restantes.`};
     const gapMeta=gapCount(meta),gapCutoff=partial<cutoff?gapCount(cutoff):null;
@@ -1415,6 +1441,57 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('181. isQuarterOver decide pela data real do sistema (não pelo "mês em foco" selecionado) se o quadrimestre já terminou',()=>{return isQuarterOver(['2020-01','2020-02','2020-03','2020-04'])===true&&isQuarterOver(['2099-01','2099-02','2099-03','2099-04'])===false});
   await add('182. quadrimestralOutlook (M1/M3) decide "meta garantida" pela MÉDIA dos 4 meses (mesma base da coluna Parcial) — não pela soma cumulativa, que inflaria um denominador fixo até 4x e bateria a meta indevidamente (pedido explícito do usuário, v1.39)',()=>{const q={id:'M1',months:['2020-01','2020-02','2020-03','2020-04'],values:[{result:.4,numerator:8,denominator:2000},{result:.4,numerator:8,denominator:2000},{result:.4,numerator:8,denominator:2000},{result:.4,numerator:8,denominator:2000}]};const outlook=quadrimestralOutlook('M1',q);return quarterPartial(q)===.4&&outlook.label!=='Meta garantida'&&outlook.cls!=='success'});
   await add('183. Projeção do quadrimestre troca o tempo verbal conforme a data real de hoje (não o "mês em foco"): passado ("Faltou"/quadrimestre encerrado) depois do último mês, futuro ("Ainda faltam") enquanto ainda há tempo',()=>{const beforeDen=state.denominators.length,u=state.preferences.unit,mk=state.preferences.month;try{state.denominators.push({id:'tden183_selftest',indicator:'M1',scope:'municipal',value:2000,start:mk,end:mk,unit:u,origin:'teste',confirmed:true,updatedAt:nowISO(),ruleVersion:RULE_VERSION});const base={result:.4,numerator:8,denominator:2000};const past=quadrimestralOutlook('M1',{id:'M1',months:['2020-01','2020-02','2020-03','2020-04'],values:[base,base,base,base]});const future=quadrimestralOutlook('M1',{id:'M1',months:['2099-01','2099-02','2099-03','2099-04'],values:[base,base,base,base]});return past.label==='Meta vencida e não cumprida'&&/Falt(ou|aram)/.test(past.detail)&&future.label!=='Meta vencida e não cumprida'&&future.detail.includes('Ainda faltam')}finally{state.denominators.length=beforeDen}});
+  await add('184. metaProgress (Visão Geral) usa a MÉDIA do quadrimestre para M1 — mesma base de quadrimestralOutlook — mesmo com denominador diferente em cada mês, e não a soma cumulativa sobre um denominador fixo (bug reportado pelo usuário: a Visão Geral continuava com o erro do M1 no quadrimestre depois do v1.39, que só tinha corrigido a tabela do painel Municipal)',()=>{
+    const beforeSnaps=state.snapshots.length,beforeDenoms=state.denominators.length,u=state.preferences.unit,prevMonth=state.preferences.month;
+    try{
+      const months=quarterMonths(state.preferences.year,state.preferences.quarter),ref=months[months.length-1];
+      state.preferences.month=ref;
+      state.denominators.push({id:'tden184_ref',indicator:'M1',scope:'municipal',value:2000,start:ref,end:ref,unit:u,origin:'teste',confirmed:true,updatedAt:nowISO(),ruleVersion:RULE_VERSION});
+      for(const mk of months)if(mk!==ref)state.denominators.push({id:`tden184_${mk}`,indicator:'M1',scope:'municipal',value:1000,start:mk,end:mk,unit:u,origin:'teste',confirmed:true,updatedAt:nowISO(),ruleVersion:RULE_VERSION});
+      const base={firstConsultations:1,firstConsultationQuantity:1,treatmentsConcluded:0,treatmentConcludedQuantity:0,preventive:0,individualProcedures:0,art:0,restorative:0,b5Denominator:0,b3Numerator:0,b3Denominator:0,procedureCounts:[],concludedPatients:[]};
+      months.forEach((mk,i)=>{state.snapshots.push({id:`tm184_${mk}`,profile:'celk_procedimentos_detalhado',unit:u,fileName:`${mk}.csv`,createdAt:nowISO(),dataByMonth:{[mk]:{...base,kind:'procedure',firstPatients:[{name:`Paciente184 ${i}`,date:`10/${mk.slice(5)}/${mk.slice(0,4)}`}]}}})});
+      const p=metaProgress('M1',ref);
+      const expectedAvg=(100/2000+100/1000+100/1000+100/1000)/4,buggySum=100*4/2000;
+      return Math.abs(p.quarter.result-expectedAvg)<1e-9&&Math.abs(p.quarter.result-buggySum)>0.01;
+    }finally{state.snapshots.length=beforeSnaps;state.denominators.length=beforeDenoms;state.preferences.month=prevMonth}
+  });
+  await add('185. metaCard (Visão Geral, escopo quadrimestre) classifica M1 pela faixa da MÉDIA — a soma cumulativa antiga inflaria o resultado até 4x sobre um denominador fixo e classificaria "Ótimo" indevidamente; a média correta mantém "Suficiente"',()=>{
+    const beforeSnaps=state.snapshots.length,beforeDenoms=state.denominators.length,u=state.preferences.unit,prevMonth=state.preferences.month;
+    try{
+      const months=quarterMonths(state.preferences.year,state.preferences.quarter),ref=months[months.length-1];
+      state.preferences.month=ref;
+      for(const mk of months)state.denominators.push({id:`tden185_${mk}`,indicator:'M1',scope:'municipal',value:2000,start:mk,end:mk,unit:u,origin:'teste',confirmed:true,updatedAt:nowISO(),ruleVersion:RULE_VERSION});
+      const base={firstConsultationQuantity:8,treatmentsConcluded:0,treatmentConcludedQuantity:0,preventive:0,individualProcedures:0,art:0,restorative:0,b5Denominator:0,b3Numerator:0,b3Denominator:0,procedureCounts:[],concludedPatients:[]};
+      months.forEach((mk,i)=>{const patients=Array.from({length:8},(_,j)=>({name:`Paciente185 ${i}-${j}`,date:`10/${mk.slice(5)}/${mk.slice(0,4)}`}));state.snapshots.push({id:`tm185_${mk}`,profile:'celk_procedimentos_detalhado',unit:u,fileName:`${mk}.csv`,createdAt:nowISO(),dataByMonth:{[mk]:{...base,kind:'procedure',firstConsultations:8,firstPatients:patients}}})});
+      const p=metaProgress('M1',ref);
+      if(Math.abs(p.quarter.result-.4)>0.01)return false;
+      const html=metaCard('M1',ref,'quarter');
+      // a legenda estática da meta de M1 sempre cita "Ótimo >1,25%" (faixas oficiais) — a verificação precisa
+      // ser sobre o pill de classificação em si (">Suficiente<"/">Ótimo<"), não sobre a substring solta no HTML.
+      return html.includes('>Suficiente<')&&!html.includes('>Ótimo<');
+    }finally{state.snapshots.length=beforeSnaps;state.denominators.length=beforeDenoms;state.preferences.month=prevMonth}
+  });
+  await add('186. metaCard (Visão Geral) troca o tempo verbal e o rótulo conforme a data real de hoje, não o "mês em foco": quadrimestre encerrado usa "Faltou/Faltaram" + "Não há mais tempo para recuperar." + rótulo "Meta não atingida"; quadrimestre em curso usa "Faltam" e o rótulo "Ainda falta", sem a frase de encerramento',()=>{
+    const beforeSnaps=state.snapshots.length,beforeDenoms=state.denominators.length,u=state.preferences.unit,prevMonth=state.preferences.month,prevYear=state.preferences.year,prevQuarter=state.preferences.quarter;
+    try{
+      // M4 (não M1): o rótulo "Ainda falta"/"Meta não atingida" só existe na ramificação não-M1 de metaCard —
+      // M1 sempre usa o rótulo de faixa (Ótimo/Bom/Suficiente/Regular), então precisa de outro indicador para testar o rótulo.
+      const setupQuarter=(year,quarter)=>{
+        const months=quarterMonths(year,quarter),ref=months[months.length-1];
+        state.preferences.year=year;state.preferences.quarter=quarter;state.preferences.month=ref;
+        const base={firstConsultations:0,firstConsultationQuantity:0,treatmentsConcluded:0,treatmentConcludedQuantity:0,preventive:0,individualProcedures:10,art:0,restorative:0,b5Denominator:0,b3Numerator:0,b3Denominator:0,procedureCounts:[],firstPatients:[],concludedPatients:[]};
+        months.forEach((mk,i)=>state.snapshots.push({id:`tm186_${year}_${mk}`,profile:'celk_procedimentos_detalhado',unit:u,fileName:`${mk}.csv`,createdAt:nowISO(),dataByMonth:{[mk]:{...base,kind:'procedure'}}}));
+        return ref;
+      };
+      const refPast=setupQuarter(2020,1);
+      const pastHtml=metaCard('M4',refPast,'quarter');
+      const pastOk=/Falt(ou|aram)/.test(pastHtml)&&pastHtml.includes('Não há mais tempo para recuperar.')&&pastHtml.includes('>Meta não atingida<');
+      const refFuture=setupQuarter(2099,1);
+      const futureHtml=metaCard('M4',refFuture,'quarter');
+      const futureOk=futureHtml.includes('Faltam')&&!futureHtml.includes('Não há mais tempo para recuperar.')&&futureHtml.includes('>Ainda falta<');
+      return pastOk&&futureOk;
+    }finally{state.snapshots.length=beforeSnaps;state.denominators.length=beforeDenoms;state.preferences.month=prevMonth;state.preferences.year=prevYear;state.preferences.quarter=prevQuarter}
+  });
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -1510,7 +1587,7 @@ function setupEvents(){
     if(el.dataset.copyName){const e=mergedEpisodes().find(x=>x.id===el.dataset.copyName);if(e)await navigator.clipboard.writeText(e.nome||'');return toast('Nome copiado.')}
     if(el.dataset.openWhatsapp){const e=mergedEpisodes().find(x=>x.id===el.dataset.openWhatsapp);if(e?.phoneNormalized)window.open(`https://wa.me/${e.phoneNormalized}`,'_blank','noopener,noreferrer');return}
     if(el.dataset.followup){const [id,next]=el.dataset.followup.split('|');return setFollowup(id,next)}if(el.dataset.mergeManual){const [m,e]=el.dataset.mergeManual.split('|');return mergeManual(m,e)}if(el.dataset.editManual){closeDrawer();return openManualPregnant(el.dataset.editManual)}if(el.dataset.addFollowupNote){const ta=document.getElementById('followupNoteInput');return addFollowupNote(el.dataset.addFollowupNote,ta?ta.value:'')}if(el.dataset.saveAllFields)return saveAllFieldsOverride(el.dataset.saveAllFields);if(el.dataset.archiveManual){const m=state.gestantes.manual.find(x=>x.id===el.dataset.archiveManual);if(m){m.archived=true;audit('2i_manual_archived',{manualId:m.id});closeDrawer();refreshAll();toast('Cadastro manual arquivado.')}return}if(el.dataset.excludeEpisode){closeDrawer();return openExcludeEpisode(el.dataset.excludeEpisode)}if(el.dataset.restoreEpisode)return restoreEpisode(el.dataset.restoreEpisode);
-    if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading('Executando 183 testes','Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
+    if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading('Executando 186 testes','Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
     if(el.hasAttribute('data-create-backup'))return createBackupFromModal();if(el.hasAttribute('data-restore-backup'))return document.getElementById('backupInput').click();if(el.hasAttribute('data-unlock-backup'))return processPendingBackup(document.getElementById('restorePassword')?.value||'');
   });
   document.getElementById('importBtn').onclick=()=>document.getElementById('fileInput').click();document.getElementById('fileInput').onchange=e=>importFiles(e.target.files);document.getElementById('backupBtn').onclick=openBackupModal;document.getElementById('printBtn').onclick=()=>window.print();document.getElementById('saveBtn').onclick=openBackupModal;
@@ -1524,5 +1601,5 @@ function setupEvents(){
   let dragDepth=0;window.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;document.getElementById('dropOverlay').classList.add('open')});window.addEventListener('dragover',e=>e.preventDefault());window.addEventListener('dragleave',e=>{e.preventDefault();if(--dragDepth<=0){dragDepth=0;document.getElementById('dropOverlay').classList.remove('open')}});window.addEventListener('drop',e=>{e.preventDefault();dragDepth=0;document.getElementById('dropOverlay').classList.remove('open');if(e.dataTransfer.files.length)importFiles(e.dataTransfer.files)});
 }
 
-async function bootstrap(){hydrateIcons();setupEvents();state=migrateState(state);activeView=state.preferences.view||'overview';refreshAll();window.__APP_TEST_API__={version:APP_VERSION,importFiles,runSelfTests,getState:()=>state,getProcedureMonth:mk=>aggregateProcedureMonth(mk),getGroupMonth:mk=>aggregateGroupMonth(mk),getConsolidatedMonth:mk=>aggregateConsolidatedMonth(mk),getEpisodes:()=>getActive2ISnapshot()?.episodes||[],calculations:{municipalComponents,federalComponents,quarterMunicipal,quarterFederal,federalQuadrimestralOutlook,quadrimestralOutlook},reset:async()=>{state=defaultState();sessionRaw=new Map();await persistState();refreshAll()}}}
+async function bootstrap(){hydrateIcons();setupEvents();state=migrateState(state);activeView=state.preferences.view||'overview';refreshAll();window.__APP_TEST_API__={version:APP_VERSION,importFiles,runSelfTests,getState:()=>state,getProcedureMonth:mk=>aggregateProcedureMonth(mk),getGroupMonth:mk=>aggregateGroupMonth(mk),getConsolidatedMonth:mk=>aggregateConsolidatedMonth(mk),getEpisodes:()=>getActive2ISnapshot()?.episodes||[],calculations:{municipalComponents,federalComponents,quarterMunicipal,quarterFederal,federalQuadrimestralOutlook,quadrimestralOutlook,metaProgress,metaCard,quarterMonths,nowISO,isMonthOver,isQuarterOver},reset:async()=>{state=defaultState();sessionRaw=new Map();await persistState();refreshAll()}}}
 bootstrap();
