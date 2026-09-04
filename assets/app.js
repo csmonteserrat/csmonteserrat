@@ -21,7 +21,7 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.3';
 const SELF_TEST_COUNT = 191;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
@@ -841,29 +841,43 @@ function metaLine(entry,unit,missingText,scopeWord,ended=false){
   return `${verb} <strong>${fmtNum(entry.gap,0)}</strong> ${entry.gap===1?unit.singular:unit.plural} para bater a meta ${periodWord}.${ended?' Não há mais tempo para recuperar.':''}`;
 }
 function m1Band(result){return result==null?null:RULESETS.municipal.indicators.M1.bands.find(b=>b.test(result))}
+function zoneRulerHTML(segs,pos){
+  return `<div class="zone-ruler"><div class="zone-ruler-track">${segs.map(s=>`<span style="width:${s.w}%;background:${s.c}"></span>`).join('')}</div>${pos==null?'':`<i class="zone-ruler-marker" style="left:${pos}%"></i>`}</div><div class="zone-legend">${segs.map(s=>`<span class="zone-legend-item"><i style="background:${s.c}"></i>${esc(s.l)}</span>`).join('')}</div>`;
+}
 function metaRulerHTML(id,result){
+  if(result==null)return `<div class="zone-ruler"><div class="zone-ruler-track zone-ruler-track--empty"><span style="width:100%"></span></div></div>`;
   if(id==='M1'){
-    const max=1.7,marks=[{v:.25,l:'0,25'},{v:.75,l:'0,75'},{v:1.25,l:'1,25'}];
-    const band=m1Band(result),color=band?band.color:'#a2a9bb',pct=result==null?0:clamp(result/max*100);
-    return `<div class="ruler"><div class="ruler-track"><div class="ruler-fill" style="width:${pct}%;background:${color}"></div></div>${marks.map(m=>`<i class="ruler-mark" style="left:${m.v/max*100}%"></i><span class="ruler-label" style="left:${m.v/max*100}%">${m.l}%</span>`).join('')}</div>`;
+    const max=1.7,bounds=[0,.25,.75,1.25,max];
+    const labels=['Regular','Suficiente','Bom','Ótimo'],colors=['var(--mz-regular)','var(--mz-suficiente)','var(--mz-bom)','var(--mz-otimo)'];
+    const segs=labels.map((l,i)=>({w:(bounds[i+1]-bounds[i])/max*100,c:colors[i],l}));
+    return zoneRulerHTML(segs,clamp(result/max*100));
   }
-  const r=RULESETS.municipal.indicators[id],max=r.meta*1.3,cutPct=clamp(r.cutoff/max*100),metaPct=clamp(r.meta/max*100);
-  const color=result==null?'#a2a9bb':result>=r.meta?'#2cc08b':result>=r.cutoff?'#f7821f':'#f0483e',pct=result==null?0:clamp(result/max*100);
-  return `<div class="ruler"><div class="ruler-track"><div class="ruler-fill" style="width:${pct}%;background:${color}"></div></div><i class="ruler-mark" style="left:${cutPct}%"></i><span class="ruler-label" style="left:${cutPct}%">corte</span><i class="ruler-mark meta" style="left:${metaPct}%"></i><span class="ruler-label meta" style="left:${metaPct}%">meta</span></div>`;
+  const r=RULESETS.municipal.indicators[id],max=r.meta*1.3;
+  const segs=[{w:clamp(r.cutoff/max*100),c:'var(--mz-regular)',l:'Abaixo do corte'},{w:clamp((r.meta-r.cutoff)/max*100),c:'var(--mz-suficiente)',l:'Entre corte e meta'},{w:clamp((max-r.meta)/max*100),c:'var(--mz-otimo)',l:'Meta batida'}];
+  return zoneRulerHTML(segs,clamp(result/max*100));
+}
+function overviewTint(cardState){
+  if(cardState==='success')return {bg:'var(--mz-otimo-soft)',accent:'var(--mz-otimo)',pill:'mz-otimo'};
+  if(cardState==='good')return {bg:'var(--mz-bom-soft)',accent:'var(--mz-bom)',pill:'mz-bom'};
+  if(cardState==='warn')return {bg:'var(--mz-suficiente-soft)',accent:'var(--mz-suficiente)',pill:'mz-suficiente'};
+  if(cardState==='bad')return {bg:'var(--mz-regular-soft)',accent:'var(--mz-regular)',pill:'mz-regular'};
+  return {bg:'var(--inner)',accent:'var(--muted)',pill:'mz-neutral'};
 }
 function metaCard(id,mk,scope){
   const p=metaProgress(id,mk),rule=RULESETS.municipal.indicators[id],unit=META_UNIT_LABEL[id],entry=scope==='quarter'?p.quarter:p.month;
   const ended=scope==='quarter'?isQuarterOver(quarterMonths(state.preferences.year,state.preferences.quarter)):isMonthOver(mk);
   const metaLabel=id==='M1'?'faixas oficiais (Ótimo >1,25%)':fmtPct(p.meta,p.meta<2?1:0);
   const band=id==='M1'?m1Band(entry.result):null;
-  const label=id==='M1'?(band?.label||'Sem dado'):(entry.result==null?'Sem dado':entry.achieved?(scope==='quarter'?'Meta garantida':'Meta batida'):(scope==='quarter'?(ended?'Meta não atingida':'Ainda falta'):'Abaixo da meta'));
+  const label=id==='M1'?(band?.label||'Sem dados'):(entry.result==null?'Sem dados':entry.achieved?(scope==='quarter'?'Meta garantida':'Meta batida'):(scope==='quarter'?(ended?'Meta não atingida':'Ainda falta'):'Abaixo da meta'));
   const cardState=id==='M1'?(band?statusClass(band.label):'neutral'):(entry.result==null?'neutral':entry.achieved?'success':'warn');
-  const missing=entry.result==null?(scope==='month'&&entry.denomRecord===null&&['M1','M3'].includes(id)?'Denominador do mês ainda não confirmado.':scope==='quarter'?'Ainda sem meses suficientes com dado confirmado.':'Sem relatório desta competência ainda.'):'';
+  const noData=entry.result==null;
+  const missing=noData?(scope==='month'&&entry.denomRecord===null&&['M1','M3'].includes(id)?'Denominador do mês ainda não confirmado.':scope==='quarter'?'Ainda sem meses suficientes com dado confirmado.':'Sem relatório desta competência ainda.'):'';
   const scopeLabel=scope==='quarter'?`Quadrimestre · acumulado (${entry.validMonths}/4 meses)`:'Este mês';
-  return `<article class="card indicator-card meta-card" style="--accent:${cardState==='success'?'#2cc08b':cardState==='warn'?'#f7821f':cardState==='good'?'#2f80ed':cardState==='bad'?'#f0483e':'#a2a9bb'}"><div class="topline"></div>
+  const tint=overviewTint(cardState);
+  return `<article class="card indicator-card overview-card${noData?' no-data':''}" style="--accent:${tint.accent};background:${tint.bg}">
 <div class="indicator-head"><div><div class="indicator-id">${id} · MUNICIPAL</div><div class="indicator-name">${esc(rule.name)}</div></div><button class="info-btn" data-composition="municipal|${id}|${mk}" aria-label="Como foi calculado?">i</button></div>
-<div class="indicator-result"><strong>${fmtPct(entry.result)}</strong>${pill(label,cardState)}</div>
-<div class="numerator-row"><span>${esc(scopeLabel)} · meta <strong>${metaLabel}</strong></span></div>
+<div class="indicator-result"><strong>${fmtPct(entry.result)}</strong>${pill(label,tint.pill)}</div>
+<div class="numerator-row"><span>${esc(scopeLabel)}</span><span>meta <strong>${metaLabel}</strong></span></div>
 ${metaRulerHTML(id,entry.result)}
 <div class="need">${metaLine(entry,unit,missing,scope==='quarter'?'no quadrimestre':'agora',ended)}</div>
 </article>`;
@@ -955,6 +969,7 @@ function openClearGestantesModal(){
 /* ---------- Componentes de interface ---------- */
 
 function kpi(label,value,desc,accent='#7551e9',iconName='trend'){return `<article class="card kpi" style="--accent:${accent}"><div class="stripe"></div><div class="kpi-head"><div class="kpi-label">${esc(label)}</div><div class="soft-icon">${icon(iconName)}</div></div><div class="kpi-value">${value}</div><div class="kpi-desc">${desc}</div></article>`}
+function overviewStat(label,value,desc,accent,accentSoft,iconName){return `<div class="stat-card" style="--stat-accent:${accent};--stat-bg:${accentSoft}"><div class="stat-head"><span class="stat-icon">${icon(iconName)}</span><span class="stat-label">${esc(label)}</span></div><div class="stat-value">${value}</div><div class="stat-desc">${desc}</div></div>`}
 function pill(label,cls){return `<span class="pill ${cls||statusClass(label)}">${esc(label||'Indeterminado')}</span>`}
 const ROLE_INDICATOR_MAP={first:[['M1','Numerador'],['B1','Numerador'],['M2','Denominador'],['B2','Denominador']],concluded:[['M2','Numerador'],['B2','Numerador']],preventive:[['M4','Numerador'],['B5','Numerador']],m4den:[['M4','Denominador']],art:[['M5','Numerador'],['B6','Numerador']],restorative:[['M5','Denominador'],['B6','Denominador']],b3num:[['B3','Numerador']],b3den:[['B3','Denominador']],b5den:[['B5','Denominador']]};
 const INDICATOR_ORDER=['M1','M2','M3','M4','M5','B1','B2','B3','B4','B5','B6'];
@@ -1099,7 +1114,8 @@ function overviewHTML(){
   const scope=state.preferences.overviewScope==='quarter'?'quarter':'month';
   const goals=metaGoalsHit(mk,scope);
   const goalsLabel=scope==='quarter'?'Metas garantidas no quadrimestre':'Metas batidas este mês';
-  return `<div class="grid-kpis">${kpi('Competência em foco',fmtMonth(mk,true),`Q${state.preferences.quarter} de ${state.preferences.year}`,'#546de5','clock')}${kpi(goalsLabel,goals.total?`${goals.hit} de ${goals.total}`:'—',goals.total?`${goals.total} indicador(es) com dado nesse recorte`:'Nenhum indicador com dado ainda','#39b980','trend')}${kpi('Gestantes',pregExpanded.length?fmtPct(100*attended/pregExpanded.length,1):'—',`${attended} gestante(s) com meta batida do total de ${pregExpanded.length} na lista operacional`,'#3dc1d3','heart')}${kpi('Diagnósticos',fmtNum(diag.length),`${diag.filter(d=>d.level==='error').length} crítico(s) · ${diag.filter(d=>d.level==='warning').length} alerta(s)`,'#e7a23b','alert')}</div><div class="scope-toggle-row"><div class="scope-toggle" role="tablist" aria-label="Ver indicadores por"><button class="scope-btn ${scope==='month'?'active':''}" data-overview-scope="month">Por mês</button><button class="scope-btn ${scope==='quarter'?'active':''}" data-overview-scope="quarter">Por quadrimestre</button></div><span class="muted" style="font-size:11.5px">${scope==='month'?`Resultado de ${fmtMonth(mk,true)} contra a meta mensal.`:`Acumulado de Q${state.preferences.quarter}/${state.preferences.year} contra a mesma meta.`}</span></div><div class="indicator-grid" style="margin-top:12px">${['M1','M2','M3','M4','M5'].map(id=>metaCard(id,mk,scope)).join('')}</div>`
+  const sideStats=`${overviewStat('Competência em foco',fmtMonth(mk,true),`Q${state.preferences.quarter} de ${state.preferences.year}`,'var(--primary)','var(--primary-soft)','clock')}${overviewStat(goalsLabel,goals.total?`${goals.hit} de ${goals.total}`:'—',goals.total?`${goals.total} indicador(es) com dado nesse recorte`:'Nenhum indicador com dado ainda','var(--mz-suficiente)','var(--mz-suficiente-soft)','trend')}${overviewStat('Gestantes',pregExpanded.length?fmtPct(100*attended/pregExpanded.length,1):'—',`${attended} gestante(s) com meta batida do total de ${pregExpanded.length} na lista operacional`,'var(--mz-otimo)','var(--mz-otimo-soft)','heart')}${overviewStat('Diagnósticos',fmtNum(diag.length),`${diag.filter(d=>d.level==='error').length} crítico(s) · ${diag.filter(d=>d.level==='warning').length} alerta(s)`,'var(--mz-regular)','var(--mz-regular-soft)','alert')}`;
+  return `<div class="overview-layout"><div class="overview-main"><div class="scope-toggle-row"><div class="scope-toggle" role="tablist" aria-label="Ver indicadores por"><button class="scope-btn ${scope==='month'?'active':''}" data-overview-scope="month">Por mês</button><button class="scope-btn ${scope==='quarter'?'active':''}" data-overview-scope="quarter">Por quadrimestre</button></div><span class="muted" style="font-size:11.5px">${scope==='month'?`Resultado de ${fmtMonth(mk,true)} contra a meta mensal.`:`Acumulado de Q${state.preferences.quarter}/${state.preferences.year} contra a mesma meta.`}</span></div><div class="indicator-grid" style="margin-top:12px">${['M1','M2','M3','M4','M5'].map(id=>metaCard(id,mk,scope)).join('')}</div></div><div class="overview-side">${sideStats}</div></div>`
 }
 
 function municipalHTML(){
@@ -1474,9 +1490,12 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
       const p=metaProgress('M1',ref);
       if(Math.abs(p.quarter.result-.4)>0.01)return false;
       const html=metaCard('M1',ref,'quarter');
-      // a legenda estática da meta de M1 sempre cita "Ótimo >1,25%" (faixas oficiais) — a verificação precisa
-      // ser sobre o pill de classificação em si (">Suficiente<"/">Ótimo<"), não sobre a substring solta no HTML.
-      return html.includes('>Suficiente<')&&!html.includes('>Ótimo<');
+      // a legenda estática da meta de M1 sempre cita "Ótimo >1,25%" (faixas oficiais) e, desde o redesign da
+      // Visão Geral (v2.2), a régua de zona também lista as 4 faixas por nome (Regular/Suficiente/Bom/Ótimo)
+      // como legenda fixa — então ">Ótimo<" sozinho aparece no HTML mesmo quando a classificação real é
+      // "Suficiente". A verificação precisa ser sobre a classe do pill de classificação em si, que é única
+      // por faixa (mz-suficiente vs. mz-otimo), não sobre uma substring solta de texto.
+      return html.includes('pill mz-suficiente')&&!html.includes('pill mz-otimo');
     }finally{state.snapshots.length=beforeSnaps;state.denominators.length=beforeDenoms;state.preferences.month=prevMonth}
   });
   await add('186. metaCard (Visão Geral) troca o tempo verbal e o rótulo conforme a data real de hoje, não o "mês em foco": quadrimestre encerrado usa "Faltou/Faltaram" + "Não há mais tempo para recuperar." + rótulo "Meta não atingida"; quadrimestre em curso usa "Faltam" e o rótulo "Ainda falta", sem a frase de encerramento',()=>{
