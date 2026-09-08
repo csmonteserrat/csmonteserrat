@@ -137,6 +137,34 @@ strong.fed-otimo{color:var(--fz-navy)}strong.fed-bom{color:#0f8fb3}strong.fed-su
 .footnote-list a{color:var(--primary)}
 sup a{color:var(--primary);text-decoration:none;font-weight:700}
 .is-calculator-view .source-strip,.is-calculator-view #backupBtn,.is-calculator-view #importBtn{display:none}
+.proc-panel{padding:14px 16px}
+.proc-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.proc-row+.proc-row{margin-top:11px}
+.proc-label{font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);flex:0 0 auto}
+.proc-chip{border:1px solid var(--border);background:#fff;color:var(--text);font-size:11.8px;font-weight:600;padding:7px 12px;border-radius:20px}
+.proc-chip.active{background:var(--primary);border-color:var(--primary);color:#fff}
+.proc-tabs{display:inline-flex;background:var(--inner);border-radius:11px;padding:3px;gap:2px}
+.proc-tabs button{border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:650;padding:7px 14px;border-radius:9px}
+.proc-tabs button.active{background:var(--primary);color:#fff}
+.proc-badge{background:var(--red);color:#fff;font-size:9px;font-weight:800;border-radius:9px;min-width:16px;height:16px;display:inline-grid;place-items:center;padding:0 4px;margin-left:6px}
+.proc-line-pill{display:inline-block;background:var(--primary-soft);color:var(--primary);font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;margin-bottom:8px}
+.bars-chart{display:flex;align-items:flex-end;gap:14px;height:210px;padding:20px 4px 0;overflow-x:auto}
+.bars-chart .bar-col{flex:1 1 0;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:34px}
+.bars-chart .bar-val{font-size:11.3px;font-weight:700;color:var(--text);white-space:nowrap}
+.bars-chart .bar{width:100%;max-width:52px;border-radius:8px 8px 0 0}
+.bars-chart .bar-name{font-size:10px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.participation{margin-top:14px}
+.participation-track{display:flex;height:9px;border-radius:8px;overflow:hidden;background:var(--bg)}
+.participation-track span{display:block;height:100%}
+.participation-legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:11px;font-size:11.3px;color:var(--text)}
+.participation-legend i{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:6px;vertical-align:middle}
+.participation-legend b{color:var(--muted);font-weight:600;margin-left:4px}
+.grouped-bars{display:flex;align-items:flex-end;gap:20px;height:150px;padding:14px 6px 0;overflow-x:auto}
+.grouped-bars .grp{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto}
+.grouped-bars .grp-bars{display:flex;align-items:flex-end;gap:4px;height:110px}
+.grouped-bars .grp-bars i{display:block;width:12px;border-radius:3px 3px 0 0}
+.grouped-bars .grp-label{font-size:10px;color:var(--muted)}
+@media(max-width:800px){.proc-panel .proc-row{gap:6px}}
 @media(max-width:1180px){.indicator-grid{grid-template-columns:repeat(2,1fr)}.grid-kpis{grid-template-columns:repeat(2,1fr)}.main-grid{grid-template-columns:1fr}.profile>div:last-child{display:none}.overview-layout{grid-template-columns:1fr}.overview-side{display:grid;grid-template-columns:repeat(2,1fr)}}
 @media(max-width:800px){.app-shell{grid-template-columns:80px 1fr}.sidebar{margin:10px 0 10px 10px;padding:14px 8px}.brand-text,.side-btn-label,.side-footer{display:none}.brand-row{justify-content:center;padding:0}.side-btn{justify-content:center;padding:0}.workspace{padding:18px}.topbar{padding:0 14px}.privacy-chip,.profile{display:none}.search-box{width:100%}.titlebar{flex-direction:column}.actions{justify-content:flex-start}.source-strip{align-items:stretch;flex-direction:column}.filters .filter{flex:1}.split-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}}
 @media(max-width:560px){.indicator-grid,.grid-kpis{grid-template-columns:1fr}.overview-side{grid-template-columns:1fr}.month-strip{grid-template-columns:repeat(2,1fr)}.actions{width:100%}.actions .btn{flex:1}.workspace{padding:14px}.subtab{padding:8px}.facts{grid-template-columns:1fr}.mapping-row{grid-template-columns:1fr}.import-item{grid-template-columns:38px 1fr}.import-actions{grid-column:1/-1}.titlebar h1{font-size:20px}}
