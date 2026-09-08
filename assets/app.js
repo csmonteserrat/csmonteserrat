@@ -21,8 +21,8 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.4';
-const SELF_TEST_COUNT = 200;
+const APP_VERSION = '2.5';
+const SELF_TEST_COUNT = 205;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -75,10 +75,22 @@ const CODES = {
   B3_DEN:['0101020058','0101020066','0101020074','0101020082','0101020090','0101020120','0307010015','0307010031','0307010066','0307010074','0307010082','0307010104','0307010112','0307010120','0307020010','0307020029','0307020070','0307030024','0307030040','0307030059','0307030067','0307030075','0307030083','0307050017','0414020138','0414020146']
 };
 
+// nonDental: a fonte lança essas linhas na coluna "Procedimento" do relatório, mas o próprio usuário
+// (cirurgião-dentista) confirmou que não são procedimentos odontológicos de fato — só registros
+// administrativos/de atendimento (consulta, visita, apoio matricial) ou já contados em outro lugar
+// (primeira consulta/tratamento concluído, que viram M1/M2 por campos próprios, não pela contagem de
+// "procedimentos"). Continuam entrando no denominador de M4 (role m4den) e no "Resumo por procedimento"
+// de Configurações — nada normativo mudou — mas saem do recorte de %, gráficos e tabelas da página
+// Procedimentos (Agrupar por Procedimento/Dentista/Histórico mensal/Ano), que é uma leitura clínica dos
+// procedimentos realizados, não um espelho 1:1 de toda linha do relatório. Ver groupProcedureItems.
+// groupActivity: marca a única exceção que, além de sair da conta de "procedimentos", também alimenta a
+// aba "Atividades coletivas" (Assunto), lado a lado com a evolução de Escovação Supervisionada — ver
+// buildProcedureSnapshotFromRows (groupSubjectFromProcedures) e aggregateGroupMonth.
 const PROCEDURE_RULES = [
-  {re:/^PRIMEIRA CONSULTA ODONTOLOGICA/,code:'03.01.01.015-3',name:'Primeira consulta odontológica programada',roles:['first']},
-  {re:/^TRATAMENTO CONCLUIDO/,code:'',name:'Tratamento concluído (campo Conduta)',roles:['concluded']},
-  {re:/ORIENTA(?:C|Ç)AO (?:DE|EM) HIGIENE BUCAL/,code:'01.01.02.010-4',name:'Orientação de higiene bucal',roles:['preventive','m4den','b5den']},
+  {re:/^PRIMEIRA CONSULTA ODONTOLOGICA/,code:'03.01.01.015-3',name:'Primeira consulta odontológica programada',roles:['first'],nonDental:true},
+  {re:/^TRATAMENTO CONCLUIDO/,code:'',name:'Tratamento concluído (campo Conduta)',roles:['concluded'],nonDental:true},
+  {re:/ATIVIDADE EDUCATIVA\s+ORIENTA(?:C|Ç)AO EM GRUPO/,code:'',name:'Atividade educativa / orientação em grupo na atenção primária',roles:['m4den'],nonDental:true,groupActivity:true},
+  {re:/ORIENTA(?:C|Ç)AO (?:DE|EM) HIGIENE BUCAL/,code:'01.01.02.010-4',name:'Orientação em higiene bucal',roles:['preventive','m4den','b5den']},
   {re:/ORIENTA(?:C|Ç)AO DE HIGIENIZA(?:C|Ç)AO DE/,code:'01.01.02.012-0',name:'Orientação de higienização de próteses',roles:['preventive','m4den','b5den','b3den']},
   {re:/APLICA(?:C|Ç)AO DE CARIOSTATICO/,code:'01.01.02.005-8',name:'Aplicação de cariostático',roles:['preventive','m4den','b5den','b3den']},
   {re:/APLICA(?:C|Ç)AO DE SELANTE/,code:'01.01.02.006-6',name:'Aplicação de selante',roles:['preventive','m4den','b5den','b3den']},
@@ -86,10 +98,13 @@ const PROCEDURE_RULES = [
   {re:/EVIDENCIA(?:C|Ç)AO DE PLACA/,code:'01.01.02.008-2',name:'Evidenciação de placa bacteriana',roles:['preventive','m4den','b5den','b3den']},
   {re:/PROFILAXIA\s+REMO(?:C|Ç)AO DA PLACA/,code:'03.07.03.004-0',name:'Profilaxia/remoção da placa',roles:['preventive','m4den','b5den','b3den']},
   {re:/RETIRADA DE PONTOS DE CIRURGIAS/,code:'',name:'Retirada de pontos de cirurgias (por paciente)',roles:['m4den']},
-  {re:/^ATENDIMENTO ODONTOLOGICO$/,code:'',name:'Atendimento odontológico (registro geral de atendimento)',roles:['m4den']},
-  {re:/ATENDIMENTO DE URGENCIA/,code:'',name:'Atendimento de urgência em atenção',roles:['m4den']},
+  {re:/^ATENDIMENTO ODONTOLOGICO$/,code:'',name:'Atendimento odontológico (registro geral de atendimento)',roles:['m4den'],nonDental:true},
+  {re:/^ATENDIMENTO$/,code:'',name:'Atendimento (registro genérico)',roles:['m4den'],nonDental:true},
+  {re:/ATENDIMENTO DE URGENCIA/,code:'',name:'Atendimento de urgência em atenção',roles:['m4den'],nonDental:true},
   {re:/AFERICAO DE PRESSAO ARTERIAL/,code:'',name:'Aferição de pressão arterial',roles:['m4den']},
-  {re:/CONSULTA DE PROFISSIONAIS DE NIVEL/,code:'',name:'Consulta de profissionais de nível superior',roles:['m4den']},
+  {re:/CONSULTA DE PROFISSIONAIS DE NIVEL/,code:'',name:'Consulta de profissionais de nível superior',roles:['m4den'],nonDental:true},
+  {re:/ATIVIDADE DE APOIO MATRICIAL/,code:'',name:'Atividade de apoio matricial em cuidados paliativos',roles:['m4den'],nonDental:true},
+  {re:/^VISITA DOMICILIAR/,code:'',name:'Visita domiciliar/institucional por profissional de nível superior',roles:['m4den'],nonDental:true},
   {re:/CURETAGEM PERIAPICAL/,code:'',name:'Curetagem periapical',roles:['m4den']},
   {re:/ODONTOSECCAO RADILECTOMIA/,code:'',name:'Odontossecção / radiculectomia',roles:['m4den']},
   {re:/EXCISAO E OU SUTURA SIMPLES/,code:'',name:'Excisão e/ou sutura simples',roles:['m4den']},
@@ -304,13 +319,18 @@ function buildProcedureSnapshotFromRows(snap,allRows){
   const procGlobal={};
   for(const [mk,rows] of Object.entries(monthGroups)){
     const byProcedure={},firstPeople=new Set(),concludedPeople=new Set(),firstPatients=[],concludedPatients=[],byCross={},visitSeen=new Set(),visitsList=[];
-    for(const r of rows){const match=procedureMatch(r.procedure);const key=match.normalized;const pr=byProcedure[key]??={descriptionOriginal:r.procedure,descriptionNormalized:match.name,sigtap:match.code,quantityRaw:0,quantityValid:0,lineCount:0,roles:match.roles,ambiguous:!!match.ambiguous,unrecognized:!!match.unrecognized,outOfScope:!!match.outOfScope,pages:new Set(),professionals:{}};pr.quantityRaw+=r.quantity;pr.quantityValid+=r.quantity;pr.lineCount++;pr.pages.add(r.page);pr.professionals[r.professional]=(pr.professionals[r.professional]||0)+r.quantity;byProcedure[key]=pr;
-      const crossKey=`${key}${r.professional||''}${sexLabel(r.sex)}${ageBandLabel(r.age)}`;const cr=byCross[crossKey]??={procKey:key,procLabel:match.name,professional:r.professional||'',sex:sexLabel(r.sex),age:ageBandLabel(r.age),quantity:0};cr.quantity+=r.quantity;byCross[crossKey]=cr;
+    const groupActivityDates=new Set();let groupActivityPresent=0,groupActivitySubject='';
+    for(const r of rows){const match=procedureMatch(r.procedure);const key=norm(match.name);const pr=byProcedure[key]??={descriptionOriginal:r.procedure,descriptionVariants:new Set(),descriptionNormalized:match.name,sigtap:match.code,quantityRaw:0,quantityValid:0,lineCount:0,roles:match.roles,ambiguous:!!match.ambiguous,unrecognized:!!match.unrecognized,outOfScope:!!match.outOfScope,nonDental:!!match.nonDental,pages:new Set(),professionals:{}};pr.descriptionVariants.add(r.procedure);pr.quantityRaw+=r.quantity;pr.quantityValid+=r.quantity;pr.lineCount++;pr.pages.add(r.page);pr.professionals[r.professional]=(pr.professionals[r.professional]||0)+r.quantity;byProcedure[key]=pr;
+      if(!match.nonDental){const crossKey=`${key}${r.professional||''}${sexLabel(r.sex)}${ageBandLabel(r.age)}`;const cr=byCross[crossKey]??={procKey:key,procLabel:match.name,professional:r.professional||'',sex:sexLabel(r.sex),age:ageBandLabel(r.age),quantity:0};cr.quantity+=r.quantity;byCross[crossKey]=cr}
+      if(match.groupActivity){groupActivityDates.add(r.date);groupActivityPresent+=r.quantity;groupActivitySubject=match.name}
       const vKey=`${norm(r.patient)}|${r.date}`;if(r.patient&&r.date&&!visitSeen.has(vKey)){visitSeen.add(vKey);visitsList.push({patient:norm(r.patient),date:r.date})}
       if(match.roles.includes('first')){firstPeople.add(norm(r.patient));firstPatients.push({name:r.patient,date:r.date,quantity:r.quantity})}
       if(match.roles.includes('concluded')){concludedPeople.add(norm(r.patient));concludedPatients.push({name:r.patient,date:r.date,quantity:r.quantity})}
     }
-    const procs=Object.values(byProcedure).map(p=>({...p,pages:[...p.pages].filter(x=>x!=null).sort((a,b)=>a-b)}));
+    // Quando duas grafias diferentes se fundiram na mesma chave canônica (>1 variante), mostra o nome
+    // canônico (ex.: "Orientação em higiene bucal") em vez de uma grafia bruta escolhida ao acaso; com só
+    // 1 variante, preserva o texto exatamente como veio do relatório, sem mudança de comportamento.
+    const procs=Object.values(byProcedure).map(({descriptionVariants,...p})=>({...p,descriptionOriginal:descriptionVariants.size>1?p.descriptionNormalized:[...descriptionVariants][0],pages:[...p.pages].filter(x=>x!=null).sort((a,b)=>a-b)}));
     const roleQty=role=>sum(procs.filter(p=>p.roles.includes(role)).map(p=>p.quantityValid));
     // M4 (municipal): "número total de procedimentos individuais no mês", excluindo só primeira consulta,
     // tratamento concluído e a nota de evolução de atividade em grupo que vaza para este relatório.
@@ -319,7 +339,7 @@ function buildProcedureSnapshotFromRows(snap,allRows){
     // expandir automaticamente para itens não catalogados.
     const isGroupNote=p=>/^EVOLUCAO DA ATIVIDADE EM GRUPO/.test(norm(p.descriptionOriginal));
     const individualM4=sum(procs.filter(p=>!p.roles.includes('first')&&!p.roles.includes('concluded')&&!isGroupNote(p)).map(p=>p.quantityValid));
-    snap.dataByMonth[mk]={kind:'procedure',firstConsultations:firstPeople.size,firstConsultationQuantity:roleQty('first'),treatmentsConcluded:concludedPeople.size,treatmentConcludedQuantity:roleQty('concluded'),preventive:roleQty('preventive'),individualProcedures:individualM4,art:roleQty('art'),restorative:roleQty('restorative'),b5Denominator:roleQty('b5den'),b3Numerator:roleQty('b3num'),b3Denominator:roleQty('b3den'),procedureCounts:procs,firstPatients,concludedPatients,crossRows:Object.values(byCross),visitsList,visitCount:visitsList.length};
+    snap.dataByMonth[mk]={kind:'procedure',firstConsultations:firstPeople.size,firstConsultationQuantity:roleQty('first'),treatmentsConcluded:concludedPeople.size,treatmentConcludedQuantity:roleQty('concluded'),preventive:roleQty('preventive'),individualProcedures:individualM4,art:roleQty('art'),restorative:roleQty('restorative'),b5Denominator:roleQty('b5den'),b3Numerator:roleQty('b3num'),b3Denominator:roleQty('b3den'),procedureCounts:procs,firstPatients,concludedPatients,crossRows:Object.values(byCross),visitsList,visitCount:visitsList.length,groupSubjectFromProcedures:groupActivityDates.size?[{subject:groupActivitySubject,activities:groupActivityDates.size,present:groupActivityPresent}]:[]};
     for(const p of procs){const g=procGlobal[p.descriptionNormalized]??={...p,quantityRaw:0,quantityValid:0,lineCount:0,pages:new Set(),professionals:{}};g.quantityRaw+=p.quantityRaw;g.quantityValid+=p.quantityValid;g.lineCount+=p.lineCount;p.pages.forEach(x=>g.pages.add(x));for(const [n,q] of Object.entries(p.professionals))g.professionals[n]=(g.professionals[n]||0)+q;procGlobal[p.descriptionNormalized]=g}
     if(roleQty('first')!==firstPeople.size)snap.validations.push({level:'warning',code:'M1_QUANTITY_VS_PEOPLE',month:mk,message:`Primeira consulta: a fonte soma ${roleQty('first')} na coluna quantidade, mas contém ${firstPeople.size} pessoas distintas pelo nome exibido. A prévia usa pessoas distintas.`});
     if(roleQty('concluded')!==concludedPeople.size)snap.validations.push({level:'warning',code:'M2_QUANTITY_VS_PEOPLE',month:mk,message:`Tratamento concluído: a fonte soma ${roleQty('concluded')} na coluna quantidade, mas contém ${concludedPeople.size} pessoas distintas pelo nome exibido. A prévia usa pessoas distintas.`});
@@ -682,9 +702,20 @@ function aggregateProcedureMonth(mk,unit=state.preferences.unit){
   out.treatmentsConcludedBeforeDedup=out.treatmentsConcluded;out.treatmentsConcluded=concludedRec.countedByMonth[mk]||0;out.treatmentsConcludedExcluded=concludedRec.excludedByMonth[mk]||[];
   return out;
 }
-function aggregateGroupMonth(mk,unit=state.preferences.unit){const snaps=latestSnapshots('celk_atividades_grupo',mk,unit);if(!snaps.length)return null;
+// Além do relatório dedicado "Atividades em Grupo" (celk_atividades_grupo, fonte oficial de M3/B4 —
+// supervisedBrushingPresent/eligibleActivities/brushingEvents/snapshots continuam vindo só dele), o relatório
+// "Procedimentos Detalhado" pode conter a linha "Atividade educativa / orientação em grupo na atenção
+// primária" (marcada com groupActivity em PROCEDURE_RULES). Essa linha não é uma atividade de grupo completa
+// (não tem escovação supervisionada), mas o usuário pediu que ela apareça nesta aba, ao lado da evolução das
+// escovações — por isso ela entra em subjectCounts/activities (via groupSubjectFromProcedures), mesmo quando
+// não existe nenhum import de Atividades em Grupo para o mês.
+function aggregateGroupMonth(mk,unit=state.preferences.unit){const snaps=latestSnapshots('celk_atividades_grupo',mk,unit);
+  const procSnaps=latestSnapshots('celk_procedimentos_detalhado',mk,unit);
+  const procSubjects=procSnaps.flatMap(s=>s.dataByMonth[mk]?.groupSubjectFromProcedures||[]);
+  if(!snaps.length&&!procSubjects.length)return null;
   const bySubject={};for(const s of snaps)for(const sc of s.dataByMonth[mk].subjectCounts||[]){const key=norm(sc.subject);const a=bySubject[key]??={subject:sc.subject,activities:0,present:0};a.activities+=sc.activities;a.present+=sc.present}
-  return {supervisedBrushingPresent:sum(snaps.map(s=>s.dataByMonth[mk].supervisedBrushingPresent)),eligibleActivities:sum(snaps.map(s=>s.dataByMonth[mk].eligibleActivities)),activities:sum(snaps.map(s=>s.dataByMonth[mk].activities)),brushingEvents:snaps.flatMap(s=>s.dataByMonth[mk].brushingEvents||[]).sort((a,b)=>(parseDate(a.date)?.getTime()||0)-(parseDate(b.date)?.getTime()||0)),subjectCounts:Object.values(bySubject),snapshots:snaps}}
+  for(const sc of procSubjects){const key=norm(sc.subject);const a=bySubject[key]??={subject:sc.subject,activities:0,present:0};a.activities+=sc.activities;a.present+=sc.present}
+  return {supervisedBrushingPresent:sum(snaps.map(s=>s.dataByMonth[mk].supervisedBrushingPresent)),eligibleActivities:sum(snaps.map(s=>s.dataByMonth[mk].eligibleActivities)),activities:sum(snaps.map(s=>s.dataByMonth[mk].activities))+sum(procSubjects.map(sc=>sc.activities)),brushingEvents:snaps.flatMap(s=>s.dataByMonth[mk].brushingEvents||[]).sort((a,b)=>(parseDate(a.date)?.getTime()||0)-(parseDate(b.date)?.getTime()||0)),subjectCounts:Object.values(bySubject),snapshots:snaps}}
 /* ---------- Página Procedimentos: agregação por ano, cruzamentos e paleta de categorias ---------- */
 const PROC_BASE_PALETTE=['#17b9ec','#7551e9','#2cc08b','#f7821f','#a855f7'];
 // Paleta não fica travada em 5 cores (pode haver mais de 5 procedimentos/dentistas): usa as 5 cores fixas
@@ -692,13 +723,27 @@ const PROC_BASE_PALETTE=['#17b9ec','#7551e9','#2cc08b','#f7821f','#a855f7'];
 // status (continua só identificando categoria, igual às 5 primeiras).
 function procPalette(n){const out=[];for(let i=0;i<n;i++){if(i<PROC_BASE_PALETTE.length)out.push(PROC_BASE_PALETTE[i]);else out.push(`hsl(${(210+(i-PROC_BASE_PALETTE.length)*47)%360} 72% 58%)`)}return out}
 function procYearsAvailable(profile,unit=state.preferences.unit){const years=new Set();for(const s of state.snapshots){if(s.profile!==profile)continue;if(unit&&s.unit!==unit)continue;for(const mk of Object.keys(s.dataByMonth||{}))years.add(parseMonthKey(mk).year)}return [...years].sort((a,b)=>b-a)}
+// Anos disponíveis para a aba "Atividades coletivas": une os anos do relatório dedicado
+// (celk_atividades_grupo) com os anos em que o relatório "Procedimentos Detalhado" trouxe a linha "Atividade
+// educativa / orientação em grupo" (groupSubjectFromProcedures) — assim a aba mostra dados mesmo quando só
+// existe o relatório de procedimentos importado, sem nenhum "Relação das Atividades em Grupo".
+function groupSourceYearsAvailable(unit=state.preferences.unit){
+  const years=new Set(procYearsAvailable('celk_atividades_grupo',unit));
+  for(const s of state.snapshots){if(s.profile!=='celk_procedimentos_detalhado')continue;if(unit&&s.unit!==unit)continue;
+    for(const [mk,d] of Object.entries(s.dataByMonth||{}))if((d.groupSubjectFromProcedures||[]).length)years.add(parseMonthKey(mk).year);
+  }
+  return [...years].sort((a,b)=>b-a);
+}
 function procMonthsOfYear(year){return Array.from({length:12},(_,i)=>monthKey(year,i+1))}
 function aggregateProcedureYear(year,unit=state.preferences.unit,{onlyMonth=''}={}){
   const months=onlyMonth?[onlyMonth]:procMonthsOfYear(year);
   const out={year,firstConsultations:0,treatmentsConcluded:0,procedureCounts:[],crossRows:[],visitsList:[],monthsWithData:[]};
   const byProc={},byCross={};
+  // aggregateProcedureYear alimenta só a página Procedimentos (groupProcedureItems, fullYearProcedureOptions,
+  // procLabelFor) — por isso filtra nonDental aqui. aggregateProcedureMonth (usado por Configurações e pelo
+  // drill-down M4/M5/B3/B5) continua completo, sem esse filtro.
   for(const mk of months){const agg=aggregateProcedureMonth(mk,unit);if(!agg)continue;out.monthsWithData.push(mk);out.firstConsultations+=agg.firstConsultations;out.treatmentsConcluded+=agg.treatmentsConcluded;out.visitsList.push(...agg.visitsList);
-    for(const p of agg.procedureCounts){const a=byProc[p.descriptionNormalized]??={...p,quantityValid:0,professionals:{}};a.quantityValid+=p.quantityValid;for(const [n,q] of Object.entries(p.professionals||{}))a.professionals[n]=(a.professionals[n]||0)+q;byProc[p.descriptionNormalized]=a}
+    for(const p of agg.procedureCounts.filter(x=>!x.nonDental)){const a=byProc[p.descriptionNormalized]??={...p,quantityValid:0,professionals:{}};a.quantityValid+=p.quantityValid;for(const [n,q] of Object.entries(p.professionals||{}))a.professionals[n]=(a.professionals[n]||0)+q;byProc[p.descriptionNormalized]=a}
     for(const c of agg.crossRows){const ck=`${c.procKey}${c.professional}${c.sex}${c.age}`;const a=byCross[ck]??={...c,quantity:0};a.quantity+=c.quantity;byCross[ck]=a}
   }
   out.procedureCounts=Object.values(byProc);out.crossRows=Object.values(byCross);
@@ -731,14 +776,14 @@ function groupProcedureItems(yearAgg,groupBy,filters,unit=state.preferences.unit
   }
   if(groupBy==='age'){const bands=['0-5','6-11','12-17','18-59','60+'];const byA={};for(const c of filteredCross){if(!c.age)continue;byA[c.age]=(byA[c.age]||0)+c.quantity}return bands.filter(b=>byA[b]).map(b=>({key:b,label:b+' anos',value:byA[b]}));}
   if(groupBy==='sex'){const byS={};for(const c of filteredCross){if(!c.sex)continue;byS[c.sex]=(byS[c.sex]||0)+c.quantity}return Object.entries(byS).map(([label,value])=>({key:label,label,value})).sort((a,b)=>b.value-a.value);}
-  if(groupBy==='month'){return yearAgg.monthsWithData.map(mk=>{const monthAgg=aggregateProcedureMonth(mk,unit);const rows=applyCrossFilters(monthAgg.crossRows,filters);const value=filterActive?sum(rows.map(r=>r.quantity)):sum(monthAgg.procedureCounts.map(p=>p.quantityValid));return {key:mk,label:fmtMonth(mk),value}});}
+  if(groupBy==='month'){return yearAgg.monthsWithData.map(mk=>{const monthAgg=aggregateProcedureMonth(mk,unit);const rows=applyCrossFilters(monthAgg.crossRows,filters);const value=filterActive?sum(rows.map(r=>r.quantity)):sum(monthAgg.procedureCounts.filter(p=>!p.nonDental).map(p=>p.quantityValid));return {key:mk,label:fmtMonth(mk),value}});}
   if(groupBy==='year'){const years=procYearsAvailable('celk_procedimentos_detalhado',unit);return years.map(y=>{const agg=y===yearAgg.year?yearAgg:aggregateProcedureYear(y,unit);const rows=applyCrossFilters(agg.crossRows,filters);const value=filterActive?sum(rows.map(r=>r.quantity)):sum(agg.procedureCounts.map(p=>p.quantityValid));return {key:String(y),label:String(y),value}}).sort((a,b)=>a.key-b.key);}
   return [];
 }
 function groupGroupItems(yearAgg,groupBy,unit=state.preferences.unit){
   if(groupBy==='procedure')return yearAgg.subjectCounts.map(s=>({key:norm(s.subject),label:s.subject,value:s.activities,present:s.present})).sort((a,b)=>b.value-a.value);
   if(groupBy==='month')return yearAgg.monthsWithData.map(mk=>{const agg=aggregateGroupMonth(mk,unit);return {key:mk,label:fmtMonth(mk),value:agg.activities}});
-  if(groupBy==='year'){const years=procYearsAvailable('celk_atividades_grupo',unit);return years.map(y=>{const agg=y===yearAgg.year?yearAgg:aggregateGroupYear(y,unit);return {key:String(y),label:String(y),value:agg.activities}}).sort((a,b)=>a.key-b.key);}
+  if(groupBy==='year'){const years=groupSourceYearsAvailable(unit);return years.map(y=>{const agg=y===yearAgg.year?yearAgg:aggregateGroupYear(y,unit);return {key:String(y),label:String(y),value:agg.activities}}).sort((a,b)=>a.key-b.key);}
   return [];
 }
 // Avaliação do paciente: reaproveita aggregateProcedureMonth (já com a dedução oficial de 12 meses de
@@ -1710,6 +1755,55 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
       return hiddenOk&&shownOk;
     }finally{state.snapshots.length=beforeSnaps;Object.assign(state.preferences,prevPrefs)}
   });
+  await add('201. buildProcedureSnapshotFromRows funde "ORIENTAÇÃO DE HIGIENE BUCAL" e "ORIENTAÇÃO EM HIGIENE BUCAL" (duas grafias do mesmo procedimento no relatório) numa única linha, somando as quantidades e exibindo o nome canônico "Orientação em higiene bucal"',()=>{
+    const snap={dataByMonth:{},procedureCounts:[],validations:[]};
+    const rows=[{patient:'Fulana',date:'05/06/2026',professional:'Caio',procedure:'ORIENTAÇÃO DE HIGIENE BUCAL',quantity:2},{patient:'Beltrano',date:'06/06/2026',professional:'Caio',procedure:'ORIENTAÇÃO EM HIGIENE BUCAL',quantity:3}];
+    buildProcedureSnapshotFromRows(snap,rows);
+    const m=snap.dataByMonth['2026-06'];
+    const merged=m.procedureCounts.filter(p=>p.descriptionNormalized==='Orientação em higiene bucal');
+    return merged.length===1&&merged[0].quantityValid===5&&merged[0].descriptionOriginal==='Orientação em higiene bucal';
+  });
+  await add('202. buildProcedureSnapshotFromRows marca "ATENDIMENTO" e "CONSULTA DE PROFISSIONAIS DE NÍVEL SUPERIOR..." (itens da lista que o usuário identificou como não sendo procedimentos odontológicos) como nonDental: eles não entram em crossRows (cruzamento avançado da página Procedimentos), mas continuam contando no M4 (individualProcedures)',()=>{
+    const snap={dataByMonth:{},procedureCounts:[],validations:[]};
+    const rows=[{patient:'Fulana',date:'05/06/2026',professional:'Caio',procedure:'ATENDIMENTO',quantity:1,sex:'F',age:30},{patient:'Beltrano',date:'06/06/2026',professional:'Caio',procedure:'CONSULTA DE PROFISSIONAIS DE NÍVEL SUPERIOR NA ATENÇÃO PRIMÁRIA (EXCETO MÉDICO)',quantity:1,sex:'M',age:40},{patient:'Ciclana',date:'07/06/2026',professional:'Caio',procedure:'APLICAÇÃO TÓPICA DE FLÚOR',quantity:1,sex:'F',age:10}];
+    buildProcedureSnapshotFromRows(snap,rows);
+    const m=snap.dataByMonth['2026-06'];
+    const nonDentalFlags=m.procedureCounts.filter(p=>p.nonDental).length;
+    const crossHasNonDental=m.crossRows.some(c=>/ATENDIMENTO|CONSULTA DE PROFISSIONAIS/.test(norm(c.procLabel)));
+    return nonDentalFlags===2&&!crossHasNonDental&&m.crossRows.length===1&&m.individualProcedures===3;
+  });
+  await add('203. aggregateProcedureYear e groupProcedureItems (Agrupar por Procedimento/Dentista) excluem os itens nonDental da página Procedimentos, mesmo que aggregateProcedureMonth (usado em Configurações › Importações e no drill-down M4/M5/B3/B5) continue trazendo todos, sem filtro',()=>{
+    const prevSnaps=state.snapshots.length,u=state.preferences.unit;
+    try{
+      const base={firstConsultations:0,firstConsultationQuantity:0,treatmentsConcluded:0,treatmentConcludedQuantity:0,preventive:0,individualProcedures:2,art:0,restorative:0,b5Denominator:0,b3Numerator:0,b3Denominator:0,firstPatients:[],concludedPatients:[],visitsList:[]};
+      const dental={descriptionOriginal:'Aplicação tópica de flúor',descriptionNormalized:'Aplicação tópica de flúor',sigtap:'',quantityRaw:4,quantityValid:4,lineCount:1,roles:['preventive','m4den'],ambiguous:false,unrecognized:false,outOfScope:false,nonDental:false,pages:[],professionals:{'Dra. Teste 203':4}};
+      const admin={descriptionOriginal:'Atendimento',descriptionNormalized:'Atendimento (registro genérico)',sigtap:'',quantityRaw:7,quantityValid:7,lineCount:1,roles:['m4den'],ambiguous:false,unrecognized:false,outOfScope:false,nonDental:true,pages:[],professionals:{'Dra. Teste 203':7}};
+      state.snapshots.push({id:'tm203',profile:'celk_procedimentos_detalhado',unit:u,fileName:'m203.csv',createdAt:nowISO(),dataByMonth:{'2020-07':{...base,kind:'procedure',procedureCounts:[dental,admin],crossRows:[{procKey:dental.descriptionNormalized,procLabel:dental.descriptionOriginal,professional:'Dra. Teste 203',sex:'',age:'',quantity:4}]}}});
+      const monthAgg=aggregateProcedureMonth('2020-07',u);
+      const yearAgg=aggregateProcedureYear(2020,u);
+      const procItems=groupProcedureItems(yearAgg,'procedure',{},u);
+      const dentistItems=groupProcedureItems(yearAgg,'dentist',{},u);
+      const dentistRow=dentistItems.find(d=>d.key==='Dra. Teste 203');
+      return monthAgg.procedureCounts.length===2&&yearAgg.procedureCounts.length===1&&!procItems.some(i=>i.key===admin.descriptionNormalized)&&!!dentistRow&&dentistRow.value===4;
+    } finally { state.snapshots.length=prevSnaps; }
+  });
+  await add('204. Uma linha "ATIVIDADE EDUCATIVA / ORIENTAÇÃO EM GRUPO NA ATENÇÃO PRIMÁRIA" no relatório Procedimentos Detalhado alimenta aggregateGroupMonth (aba Atividades coletivas, ao lado da evolução de escovação supervisionada) mesmo sem nenhum snapshot de "Relação das Atividades em Grupo" importado',()=>{
+    const snap={dataByMonth:{},procedureCounts:[],validations:[]};
+    const rows=[{patient:'Fulana',date:'03/06/2026',professional:'Caio',procedure:'ATIVIDADE EDUCATIVA / ORIENTAÇÃO EM GRUPO NA ATENÇÃO PRIMÁRIA',quantity:12},{patient:'Beltrano',date:'03/06/2026',professional:'Caio',procedure:'ATIVIDADE EDUCATIVA / ORIENTAÇÃO EM GRUPO NA ATENÇÃO PRIMÁRIA',quantity:8},{patient:'Ciclana',date:'17/06/2026',professional:'Caio',procedure:'ATIVIDADE EDUCATIVA / ORIENTAÇÃO EM GRUPO NA ATENÇÃO PRIMÁRIA',quantity:5}];
+    buildProcedureSnapshotFromRows(snap,rows);
+    const prevSnaps=state.snapshots.length,u=state.preferences.unit;
+    try{
+      state.snapshots.push({id:'tm204',profile:'celk_procedimentos_detalhado',unit:u,fileName:'m204.csv',createdAt:nowISO(),dataByMonth:snap.dataByMonth});
+      const hasNoGroupSnap=!latestSnapshots('celk_atividades_grupo','2026-06',u).length;
+      const agg=aggregateGroupMonth('2026-06',u);
+      const subj=agg?.subjectCounts?.find(s=>norm(s.subject)===norm('Atividade educativa / orientação em grupo na atenção primária'));
+      return hasNoGroupSnap&&!!agg&&agg.activities===2&&!!subj&&subj.present===25;
+    } finally { state.snapshots.length=prevSnaps; }
+  });
+  await add('205. procBarsChartHTML inclui um atributo title com "nome: quantidade" em cada barra, para o hover mostrar o item mesmo com muitos procedimentos diferentes no gráfico (pedido do usuário após avaliação real com dados importados)',()=>{
+    const html=procBarsChartHTML([{key:'a',label:'Aplicação tópica de flúor',value:42},{key:'b',label:'Profilaxia',value:17}],procPalette(2));
+    return html.includes('title="Aplicação tópica de flúor: 42"')&&html.includes('title="Profilaxia: 17"');
+  });
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -1769,7 +1863,9 @@ function calculatorHTML(){
 function procBarsChartHTML(items,palette){
   if(!items.length)return '<div class="notice">Sem dados para este recorte.</div>';
   const max=Math.max(1,...items.map(i=>i.value));
-  return `<div class="bars-chart">${items.map((it,i)=>`<div class="bar-col"><span class="bar-val">${fmtNum(it.value)}</span><div class="bar" style="height:${Math.max(4,Math.round(it.value/max*168))}px;background:${palette[i]}"></div><span class="bar-name" title="${esc(it.label)}">${esc(it.label)}</span></div>`).join('')}</div>`;
+  // title no bar-col inteiro (não só no nome truncado): passar o mouse por cima da barra também mostra
+  // "nome: quantidade" — pedido do usuário depois de ver um gráfico com muitos procedimentos difícil de ler.
+  return `<div class="bars-chart">${items.map((it,i)=>`<div class="bar-col" title="${esc(it.label)}: ${fmtNum(it.value)}"><span class="bar-val">${fmtNum(it.value)}</span><div class="bar" style="height:${Math.max(4,Math.round(it.value/max*168))}px;background:${palette[i]}"></div><span class="bar-name">${esc(it.label)}</span></div>`).join('')}</div>`;
 }
 function procLineChartHTML(items,color){
   if(items.length<2)return '<div class="notice">É preciso de pelo menos 2 pontos para o gráfico de linhas — tente agrupar por Histórico mensal ou Ano.</div>';
@@ -1832,7 +1928,7 @@ function proceduresHTML(){
   const p=state.preferences,unit=p.unit;
   const source=p.procSource==='group'?'group':'individual';
   const profile=source==='group'?'celk_atividades_grupo':'celk_procedimentos_detalhado';
-  const years=procYearsAvailable(profile,unit);
+  const years=source==='group'?groupSourceYearsAvailable(unit):procYearsAvailable(profile,unit);
   const sourceToggleHTML=`<div class="proc-row"><span class="proc-label">Fonte</span><div class="scope-toggle"><button class="scope-btn${source==='individual'?' active':''}" data-proc-source="individual">Procedimentos individuais</button><button class="scope-btn${source==='group'?' active':''}" data-proc-source="group">Atividades coletivas</button></div></div>`;
   if(!years.length){
     return `<div class="card proc-panel" style="margin-bottom:16px">${sourceToggleHTML}</div>`+emptyState('Nenhum relatório importado para esta fonte',source==='group'?'Importe um relatório "Relação das Atividades em Grupo" do CELK (PDF ou CSV) em Configurações › Importações para ver os dados aqui.':'Importe um relatório "Procedimentos Detalhado" do CELK (PDF ou CSV) em Configurações › Importações para ver os dados aqui.');
