@@ -21,8 +21,8 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.5';
-const SELF_TEST_COUNT = 205;
+const APP_VERSION = '2.7';
+const SELF_TEST_COUNT = 209;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -470,12 +470,12 @@ async function parseGroupPdf(file,hash,pages){
 // (6 a 11 anos, até o dia anterior de completar 12), em vez de aceitar cegamente o "Presentes" agregado do PDF.
 async function parseGroupCsv(file,hash,text){
   const rows=parseCSVText(text),headers=rows.shift()||[],map=headersMap(headers);
-  const required=['Unidade','Data','Código da Atividade','Assunto','Nome dos Participantes','Data Nascimento'];
-  const missing=required.filter(h=>map[norm(h)]==null);if(missing.length)throw new Error(`CSV de Atividades em Grupo sem cabeçalhos obrigatórios: ${missing.join(', ')}`);
+  const requiredGroups=[['Unidade'],['Data'],['Código da Atividade'],['Assunto'],['Nome dos Participantes'],BIRTH_DATE_HEADER_ALIASES];
+  const missing=requiredGroups.filter(g=>!g.some(h=>map[norm(h)]!=null)).map(g=>g[0]);if(missing.length)throw new Error(`CSV de Atividades em Grupo sem cabeçalhos obrigatórios: ${missing.join(', ')}`);
   const data=rows.filter(r=>r.some(v=>String(v).trim()));
   const parsedRows=data.map((r,i)=>{
     const d=parseDate(valueBy(r,map,'Data'));
-    return {line:i+2,unitOrigin:stripIdPrefix(valueBy(r,map,'Unidade')),date:d?fmtDate(d):'',dateObj:d,activityCode:String(valueBy(r,map,'Código da Atividade')).trim(),subject:String(valueBy(r,map,'Assunto')).trim(),participant:String(valueBy(r,map,'Nome dos Participantes')).trim(),birthDate:String(valueBy(r,map,'Data Nascimento')).trim(),targetAudience:valueBy(r,map,'Público Alvo')};
+    return {line:i+2,unitOrigin:stripIdPrefix(valueBy(r,map,'Unidade')),date:d?fmtDate(d):'',dateObj:d,activityCode:String(valueBy(r,map,'Código da Atividade')).trim(),subject:String(valueBy(r,map,'Assunto')).trim(),participant:String(valueBy(r,map,'Nome dos Participantes')).trim(),birthDate:String(valueBy(r,map,...BIRTH_DATE_HEADER_ALIASES)).trim(),targetAudience:valueBy(r,map,'Público Alvo')};
   }).filter(r=>r.date&&r.subject&&r.participant&&r.activityCode);
   if(!parsedRows.length)throw new Error('O CSV foi reconhecido como "Relação das Atividades em Grupo", mas nenhuma linha produtiva pôde ser extraída.');
   const {keepUnit,otherUnitCounts}=pickDominantUnit(parsedRows);
@@ -522,7 +522,12 @@ async function parseMetabaseConsolidated(file,hash,text){
   sessionRaw.set(snap.id,{type:'csv',headers,rows:data.slice(0,300)});return snap;
 }
 
-function detectCSVProfile(headers){const n=headers.map(norm);if(['DS UNIDADE','MES REFERENCIA','INDICADOR','NUMERADOR','DENOMINADOR','RESULTADO'].every(h=>n.includes(h)))return 'metabase_esb';if(['CD USU CADSUS','NOME','EQUIPE','CONSULTA SAUDE BUCAL'].every(h=>n.includes(h)))return 'metabase_2i';if(['PACIENTE','IDADE','SEXO','DATA','PROFISSIONAL','PROCEDIMENTO','UNIDADE','QUANTIDADE'].every(h=>n.includes(h)))return 'celk_procedimentos_csv';if(['UNIDADE','CODIGO DA ATIVIDADE','ASSUNTO','NOME DOS PARTICIPANTES','DATA NASCIMENTO'].every(h=>n.includes(h)))return 'celk_atividades_grupo_csv';if(['FAIXA ETARIA','TODOS OS SERVICOS'].every(h=>n.includes(h)))return 'metabase_populacao_ativa';return 'unknown'}
+// "Data Nascimento" (sem "de") era o único cabeçalho de data de nascimento reconhecido até esta versão — puramente
+// hipotético, nunca conferido contra um CSV real do CELK. O primeiro CSV real de "Relação das Atividades em Grupo"
+// que o usuário anexou traz o cabeçalho como "Data de Nascimento" (com "de") — detectCSVProfile e parseGroupCsv
+// passaram a aceitar as duas grafias (BIRTH_DATE_HEADER_ALIASES), em vez de travar num nome nunca verificado.
+const BIRTH_DATE_HEADER_ALIASES=['Data Nascimento','Data de Nascimento'];
+function detectCSVProfile(headers){const n=headers.map(norm);const hasAny=alts=>alts.some(a=>n.includes(norm(a)));if(['DS UNIDADE','MES REFERENCIA','INDICADOR','NUMERADOR','DENOMINADOR','RESULTADO'].every(h=>n.includes(h)))return 'metabase_esb';if(['CD USU CADSUS','NOME','EQUIPE','CONSULTA SAUDE BUCAL'].every(h=>n.includes(h)))return 'metabase_2i';if(['PACIENTE','IDADE','SEXO','DATA','PROFISSIONAL','PROCEDIMENTO','UNIDADE','QUANTIDADE'].every(h=>n.includes(h)))return 'celk_procedimentos_csv';if(['UNIDADE','CODIGO DA ATIVIDADE','ASSUNTO','NOME DOS PARTICIPANTES'].every(h=>n.includes(h))&&hasAny(BIRTH_DATE_HEADER_ALIASES))return 'celk_atividades_grupo_csv';if(['FAIXA ETARIA','TODOS OS SERVICOS'].every(h=>n.includes(h)))return 'metabase_populacao_ativa';return 'unknown'}
 
 /* ---------- População ativa (Data Studio) — só alimenta a SUGESTÃO de denominador de M1/B1, nunca M3/B4 (pedido explícito do usuário) ---------- */
 const POPULATION_CSV_SOURCE_URL='https://datastudio.google.com/u/0/reporting/a9c928b0-9050-4fc3-b0b4-b72681077387/page/p_khcnk9b1oc';
@@ -790,22 +795,29 @@ function groupGroupItems(yearAgg,groupBy,unit=state.preferences.unit){
 // reconcileNominalRole, a mesma usada em M1/M2) mês a mês dentro do ano, e soma "visitas" (par paciente+data
 // distinto, qualquer procedimento) pra estimar retornos e a distribuição de consultas por paciente — o nome
 // bruto do paciente só é usado como chave interna de agrupamento aqui dentro, nunca exibido na tela.
+// Pedido explícito do usuário: "retorno" não é mais "visitas do período menos 1ª consulta menos tratamento
+// concluído" (uma subtração agregada) — passou a ser, por paciente, TODAS as vezes que ele voltou ao posto no
+// ano, incluindo a própria visita já contada como 1ª consulta ou tratamento concluído em outra tabela. Ex.: se
+// Maria teve 6 consultas em 2026, ela conta 1 vez em "1ª consulta" (tabela própria, indicador M1, sem mudança)
+// E as mesmas 6 consultas contam como "6 vezes retornando ao posto" aqui — não 5. Na prática, "retornosTotal"
+// vira o mesmo número que "totalVisits" (soma de todas as visitas distintas paciente+data do ano); a "Taxa de
+// retorno" (retornos ÷ total de visitas) deixou de fazer sentido nessa definição (sempre daria 100%) e foi
+// removida da tela. "Média de consultas/paciente" (totalVisits ÷ pacientes distintos) já media exatamente o
+// que o usuário descreveu e não mudou.
 function patientEvaluationStats(year,unit=state.preferences.unit){
   const months=procMonthsOfYear(year);const monthly=[];let firstTotal=0,concludedTotal=0;const visitsByPatient=new Map();let totalVisits=0;
   for(const mk of months){const agg=aggregateProcedureMonth(mk,unit);if(!agg){monthly.push({mk,first:0,retorno:0,concluded:0});continue}
     firstTotal+=agg.firstConsultations;concludedTotal+=agg.treatmentsConcluded;
     const visits=agg.visitsList||[];totalVisits+=visits.length;
     for(const v of visits)visitsByPatient.set(v.patient,(visitsByPatient.get(v.patient)||0)+1);
-    const retorno=Math.max(0,visits.length-agg.firstConsultations-agg.treatmentsConcluded);
-    monthly.push({mk,first:agg.firstConsultations,retorno,concluded:agg.treatmentsConcluded});
+    monthly.push({mk,first:agg.firstConsultations,retorno:visits.length,concluded:agg.treatmentsConcluded});
   }
-  const retornosTotal=Math.max(0,totalVisits-firstTotal-concludedTotal);
+  const retornosTotal=totalVisits;
   const distinctPatients=visitsByPatient.size;
   const avgVisits=distinctPatients?totalVisits/distinctPatients:null;
-  const returnRate=totalVisits?100*retornosTotal/totalVisits:null;
   const buckets=[{key:'1',label:'1 consulta sem retorno',min:1,max:1,count:0},{key:'2-3',label:'2 a 3 consultas',min:2,max:3,count:0},{key:'4-6',label:'4 a 6 consultas',min:4,max:6,count:0},{key:'7+',label:'7 ou mais consultas',min:7,max:Infinity,count:0}];
   for(const c of visitsByPatient.values())for(const b of buckets)if(c>=b.min&&c<=b.max){b.count++;break}
-  return {firstTotal,concludedTotal,retornosTotal,totalVisits,distinctPatients,avgVisits,returnRate,monthly,buckets};
+  return {firstTotal,concludedTotal,retornosTotal,totalVisits,distinctPatients,avgVisits,monthly,buckets};
 }
 function aggregateConsolidatedMonth(mk,unit=state.preferences.unit){
   const snaps=latestSnapshots('metabase_saude_bucal',mk,unit);if(!snaps.length)return null;const indicators={};
@@ -1714,7 +1726,7 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
     const dentistOk=byDentist.find(x=>x.key==='Dr. X')?.value===11&&byDentist.find(x=>x.key==='Dr. Y')?.value===4;
     return sexOk&&ageOk&&dentistOk;
   });
-  await add('198. patientEvaluationStats (Avaliação do paciente) calcula retornos como as visitas do ano que não são 1ª consulta nem tratamento concluído, a média de consultas por paciente e a distribuição por faixa, a partir de visitas distintas (paciente+data)',()=>{
+  await add('198. patientEvaluationStats (Avaliação do paciente) calcula retornos como o total de visitas do ano (cada visita do paciente conta, inclusive a que já é 1ª consulta/tratamento concluído em outra tabela), além da média de consultas por paciente e da distribuição por faixa, a partir de visitas distintas (paciente+data)',()=>{
     const beforeSnaps=state.snapshots.length,u=state.preferences.unit;
     try{
       const visitsList=[
@@ -1725,7 +1737,7 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
       const base={firstConsultations:2,firstConsultationQuantity:2,treatmentsConcluded:1,treatmentConcludedQuantity:1,preventive:0,individualProcedures:0,art:0,restorative:0,b5Denominator:0,b3Numerator:0,b3Denominator:0,procedureCounts:[],firstPatients:[{name:'Paciente A',date:'01/03/2020'},{name:'Paciente B',date:'02/03/2020'}],concludedPatients:[{name:'Paciente C',date:'03/03/2020'}],crossRows:[],visitsList};
       state.snapshots.push({id:'tm198',profile:'celk_procedimentos_detalhado',unit:u,fileName:'m198.csv',createdAt:nowISO(),dataByMonth:{'2020-03':{...base,kind:'procedure'}}});
       const stats=patientEvaluationStats(2020,u);
-      const retOk=stats.retornosTotal===2;
+      const retOk=stats.retornosTotal===5&&stats.retornosTotal===stats.totalVisits;
       const avgOk=Math.abs(stats.avgVisits-5/3)<1e-9;
       const bucketOk=stats.buckets.find(b=>b.key==='1').count===2&&stats.buckets.find(b=>b.key==='2-3').count===1;
       return retOk&&avgOk&&bucketOk;
@@ -1803,6 +1815,51 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('205. procBarsChartHTML inclui um atributo title com "nome: quantidade" em cada barra, para o hover mostrar o item mesmo com muitos procedimentos diferentes no gráfico (pedido do usuário após avaliação real com dados importados)',()=>{
     const html=procBarsChartHTML([{key:'a',label:'Aplicação tópica de flúor',value:42},{key:'b',label:'Profilaxia',value:17}],procPalette(2));
     return html.includes('title="Aplicação tópica de flúor: 42"')&&html.includes('title="Profilaxia: 17"');
+  });
+  await add('206. patientEvaluationStats conta "retorno" como o total de vezes que o MESMO paciente veio no ano, incluindo a visita que já é sua 1ª consulta — pedido explícito do usuário ("se Maria veio em 2026 6 vezes... ela conta como 6 vezes retornando ao posto")',()=>{
+    const snap={dataByMonth:{},procedureCounts:[],validations:[]};
+    const rows=[
+      {patient:'Maria',date:'10/01/2021',professional:'Caio',procedure:'PRIMEIRA CONSULTA ODONTOLOGICA PROGRAMÁTICA',quantity:1},
+      {patient:'Maria',date:'15/02/2021',professional:'Caio',procedure:'APLICAÇÃO TÓPICA DE FLÚOR',quantity:1},
+      {patient:'Maria',date:'20/03/2021',professional:'Caio',procedure:'PROFILAXIA / REMOÇÃO DA PLACA',quantity:1},
+      {patient:'Maria',date:'25/04/2021',professional:'Caio',procedure:'EVIDENCIAÇÃO DE PLACA BACTERIANA',quantity:1},
+      {patient:'Maria',date:'30/05/2021',professional:'Caio',procedure:'APLICAÇÃO DE SELANTE',quantity:1},
+      {patient:'Maria',date:'05/06/2021',professional:'Caio',procedure:'ORIENTAÇÃO EM HIGIENE BUCAL',quantity:1},
+    ];
+    buildProcedureSnapshotFromRows(snap,rows);
+    const beforeSnaps=state.snapshots.length,u=state.preferences.unit;
+    try{
+      state.snapshots.push({id:'tm206',profile:'celk_procedimentos_detalhado',unit:u,fileName:'m206.csv',createdAt:nowISO(),dataByMonth:snap.dataByMonth});
+      const stats=patientEvaluationStats(2021,u);
+      return stats.distinctPatients===1&&stats.totalVisits===6&&stats.retornosTotal===6&&stats.firstTotal===1&&stats.avgVisits===6;
+    }finally{state.snapshots.length=beforeSnaps}
+  });
+  await add('207. A aba "Avaliação do paciente" não mostra mais o card "Taxa de retorno" (deixou de fazer sentido — sempre daria 100% com a nova definição de retorno) e o texto explicativo do gráfico mensal reflete que Retorno agora é o total de visitas do mês, não a subtração de 1ª consulta/conclusão',()=>{
+    const prevPrefs={...state.preferences},beforeSnaps=state.snapshots.length,u=state.preferences.unit;
+    try{
+      const base={firstConsultations:1,firstConsultationQuantity:1,treatmentsConcluded:0,treatmentConcludedQuantity:0,preventive:0,individualProcedures:0,art:0,restorative:0,b5Denominator:0,b3Numerator:0,b3Denominator:0,procedureCounts:[],firstPatients:[{name:'Paciente 207',date:'01/06/2020'}],concludedPatients:[],crossRows:[],visitsList:[{patient:'PACIENTE 207',date:'01/06/2020'}]};
+      state.snapshots.push({id:'tm207',profile:'celk_procedimentos_detalhado',unit:u,fileName:'m207.csv',createdAt:nowISO(),dataByMonth:{'2020-06':{...base,kind:'procedure'}}});
+      Object.assign(state.preferences,{year:2020,procSource:'individual',procTab:'patients'});
+      const html=proceduresHTML();
+      return !html.includes('Taxa de retorno')&&html.includes('Retorno = total de visitas do mês')&&html.includes('total de vezes que os pacientes voltaram ao posto no ano');
+    }finally{state.snapshots.length=beforeSnaps;Object.assign(state.preferences,prevPrefs)}
+  });
+  await add('208. detectCSVProfile reconhece o cabeçalho real do CELK "Data de Nascimento" (com "de") para o CSV de Atividades em Grupo — o primeiro CSV real anexado pelo usuário usa essa grafia, diferente da "Data Nascimento" (sem "de") assumida sem verificação até a v2.6',()=>{
+    const headersReal=['Unidade','Cnes','INE','Nome da Equipe','Data','Turno','Código da Atividade','Situação','Público Alvo','Temas','Práticas','Profissionais','Tipo de Atividade','Nr. INEP','Assunto','Local Atividade','Nome dos Participantes','CNS','CPF','Data de Nascimento','Sexo','I.M.C','Peso','Altura','PAS','PAD','Avaliação Alterada',''];
+    return detectCSVProfile(headersReal)==='celk_atividades_grupo_csv'&&detectCSVProfile(['Unidade','Código da Atividade','Assunto','Nome dos Participantes','Data Nascimento'])==='celk_atividades_grupo_csv';
+  });
+  await add('209. parseGroupCsv processa de ponta a ponta um CSV estruturalmente igual ao arquivo real do CELK (cabeçalho "Data de Nascimento", colunas extras de sinais vitais vazias, coluna final sem nome, "Assunto" com sufixo "- Turma N" e variação de maiúsculas/minúsculas em "Saúde bucal") — calcula idade real, filtra elegibilidade de M3/B4 e não deixa as colunas extras quebrarem o parser',async()=>{
+    const header='Unidade,Cnes,INE,Nome da Equipe,Data,Turno,Código da Atividade,Situação,Público Alvo,Temas,Práticas,Profissionais,Tipo de Atividade,Nr. INEP,Assunto,Local Atividade,Nome dos Participantes,CNS,CPF,Data de Nascimento,Sexo,I.M.C,Peso,Altura,PAS,PAD,Avaliação Alterada,';
+    const rows=[
+      'CS MONTE SERRAT,0020036,0002022168,MONTE SERRAT - 1120,2026-09-15 13:00:00.0,Tarde,ACT1,Concluída,Criança de 6 a 11 anos,Saúde bucal,Escovação,Caio,Avaliação,4.2E7,Escovação Supervisionada - Turma 48,Instituto Estadual,Participante A,111,222,2018-09-01,F,,,,,,Não,',
+      'CS MONTE SERRAT,0020036,0002022168,MONTE SERRAT - 1120,2026-09-15 13:00:00.0,Tarde,ACT1,Concluída,Criança de 6 a 11 anos,Saúde bucal,Escovação,Caio,Avaliação,4.2E7,escovação supervisionada - turma 48,Instituto Estadual,Participante B,111,222,2010-01-01,M,,,,,,Não,',
+      'CS MONTE SERRAT,0020036,0002022168,MONTE SERRAT - 1120,2026-09-16 10:00:00.0,Manhã,ACT2,Concluída,Comunidade em geral,Saúde bucal,Palestra,Caio,Avaliação,4.2E7,SAÚDE BUCAL,Instituto Estadual,Participante C,111,222,1980-01-01,F,,,,,,Não,'
+    ];
+    const csv=[header,...rows].join('\n');
+    const fakeFile={name:'grupo_real.csv'};
+    const snap=await parseGroupCsv(fakeFile,'hash_selftest_209',csv);
+    const m=snap.dataByMonth['2026-09'];
+    return snap.profile==='celk_atividades_grupo'&&m.activities===2&&m.eligibleActivities===1&&m.supervisedBrushingPresent===1&&m.subjectCounts.some(s=>norm(s.subject)==='SAUDE BUCAL');
   });
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
@@ -1998,16 +2055,15 @@ function proceduresHTML(){
   let bodyHTML='';
   if(tab==='patients'){
     const stats=patientEvaluationStats(year,unit);
-    bodyHTML=`<div class="grid-kpis" style="grid-template-columns:repeat(5,1fr)">
+    bodyHTML=`<div class="grid-kpis" style="grid-template-columns:repeat(4,1fr)">
       ${kpi('1ª consulta',fmtNum(stats.firstTotal),'pacientes distintos no ano','#17b9ec','users')}
-      ${kpi('Retornos',fmtNum(stats.retornosTotal),'visitas que não são 1ª nem conclusão','#7551e9','trend')}
+      ${kpi('Retornos',fmtNum(stats.retornosTotal),'total de vezes que os pacientes voltaram ao posto no ano','#7551e9','trend')}
       ${kpi('Tratamentos concluídos',fmtNum(stats.concludedTotal),'pacientes distintos no ano','#2cc08b','check')}
-      ${kpi('Taxa de retorno',stats.returnRate!=null?fmtPct(stats.returnRate,1):'—','retornos ÷ total de visitas','#f7821f','trend')}
       ${kpi('Média de consultas/paciente',stats.avgVisits!=null?fmtNum(stats.avgVisits,1):'—','visitas ÷ pacientes distintos','#a855f7','users')}
     </div>
     <article class="card panel">
       <p class="section-title">Consultas por mês — 1ª vez, retorno e conclusão</p>
-      <p class="section-sub" style="margin-bottom:6px">Retorno = visitas do mês que não são 1ª consulta nem tratamento concluído.</p>
+      <p class="section-sub" style="margin-bottom:6px">Retorno = total de visitas do mês (conta todas as vezes que cada paciente veio, inclusive a própria 1ª consulta/conclusão).</p>
       ${procPatientMonthlyChartHTML(stats.monthly)}
     </article>
     <article class="card panel">
