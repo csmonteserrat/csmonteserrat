@@ -21,8 +21,8 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.8';
-const SELF_TEST_COUNT = 217;
+const APP_VERSION = '2.9';
+const SELF_TEST_COUNT = 224;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -215,7 +215,7 @@ function defaultState(){
   const d=new Date();return {
     schemaVersion:SCHEMA_VERSION,appVersion:APP_VERSION,createdAt:nowISO(),updatedAt:nowISO(),snapshots:[],denominators:[],populationInputs:[],
     columnMappings:{consulta2i:{}},parserProfiles:{procedimentos:'CELK-PROC-1.0',atividades:'CELK-GRUPO-1.0',metabase:'METABASE-ESB-1.0',gestantes:'METABASE-2I-1.1'},
-    gestantes:{manual:[],followups:{},merges:{},excluded:{},overrides:{}},manualOverrides:[],audit:[],lastBackupAt:null,dirty:false,
+    gestantes:{manual:[],followups:{},merges:{},excluded:{},overrides:{},puerperioIgnored:{}},manualOverrides:[],audit:[],lastBackupAt:null,dirty:false,
     preferences:{year:d.getFullYear(),quarter:quarterOfMonth(d.getMonth()+1),month:monthKey(d.getFullYear(),d.getMonth()+1),unit:'',view:'overview',settingsTab:'geral',sourceMode:'auto',targetScore:100,overviewScope:'month',pregTeam:'',pregTab:'a_contatar',pregPrioOnly:false,pregMoreFilters:false,pregOrigin:'',pregPhone:'',pregExcluded:'',pregSearch:'',calcPeso:'',
       procSource:'individual',procTab:'charts',procGroupBy:'procedure',procChartType:'bars',procRefineOpen:false,procCompareOpen:false,procSex:'',procAge:'',procDentist:'',procMonth:'',procSingleProcedure:'',procSingleAllMonths:false,procCompareSelection:[]},
     selfTests:null
@@ -527,7 +527,7 @@ async function parseMetabaseConsolidated(file,hash,text){
 // que o usuário anexou traz o cabeçalho como "Data de Nascimento" (com "de") — detectCSVProfile e parseGroupCsv
 // passaram a aceitar as duas grafias (BIRTH_DATE_HEADER_ALIASES), em vez de travar num nome nunca verificado.
 const BIRTH_DATE_HEADER_ALIASES=['Data Nascimento','Data de Nascimento'];
-function detectCSVProfile(headers){const n=headers.map(norm);const hasAny=alts=>alts.some(a=>n.includes(norm(a)));if(['DS UNIDADE','MES REFERENCIA','INDICADOR','NUMERADOR','DENOMINADOR','RESULTADO'].every(h=>n.includes(h)))return 'metabase_esb';if(['CD USU CADSUS','NOME','EQUIPE','CONSULTA SAUDE BUCAL'].every(h=>n.includes(h)))return 'metabase_2i';if(['PACIENTE','IDADE','SEXO','DATA','PROFISSIONAL','PROCEDIMENTO','UNIDADE','QUANTIDADE'].every(h=>n.includes(h)))return 'celk_procedimentos_csv';if(['UNIDADE','CODIGO DA ATIVIDADE','ASSUNTO','NOME DOS PARTICIPANTES'].every(h=>n.includes(h))&&hasAny(BIRTH_DATE_HEADER_ALIASES))return 'celk_atividades_grupo_csv';if(['FAIXA ETARIA','TODOS OS SERVICOS'].every(h=>n.includes(h)))return 'metabase_populacao_ativa';return 'unknown'}
+function detectCSVProfile(headers){const n=headers.map(norm);const hasAny=alts=>alts.some(a=>n.includes(norm(a)));if(['DS UNIDADE','MES REFERENCIA','INDICADOR','NUMERADOR','DENOMINADOR','RESULTADO'].every(h=>n.includes(h)))return 'metabase_esb';if(['CD USU CADSUS','NOME','EQUIPE','CONSULTA SAUDE BUCAL'].every(h=>n.includes(h)))return 'metabase_2i';if(['PACIENTE','IDADE','SEXO','DATA','PROFISSIONAL','PROCEDIMENTO','UNIDADE','QUANTIDADE'].every(h=>n.includes(h)))return 'celk_procedimentos_csv';if(['UNIDADE','CODIGO DA ATIVIDADE','ASSUNTO','NOME DOS PARTICIPANTES'].every(h=>n.includes(h))&&hasAny(BIRTH_DATE_HEADER_ALIASES))return 'celk_atividades_grupo_csv';if(['FAIXA ETARIA','TODOS OS SERVICOS'].every(h=>n.includes(h)))return 'metabase_populacao_ativa';if(['EQUIPE','USUARIA','PERIODO','CONS ODONTO'].every(h=>n.includes(h)))return 'monitora_aps_2i';return 'unknown'}
 
 /* ---------- População ativa (Data Studio) — só alimenta a SUGESTÃO de denominador de M1/B1, nunca M3/B4 (pedido explícito do usuário) ---------- */
 const POPULATION_CSV_SOURCE_URL='https://datastudio.google.com/u/0/reporting/a9c928b0-9050-4fc3-b0b4-b72681077387/page/p_khcnk9b1oc';
@@ -578,6 +578,47 @@ function openPopulationInputsModal(snap){
 }
 
 async function episodeIdFor(record){const anchor=record.ultimaMenstruacao||record.dataProvParto||record.dataParto||'';return sha256(`2i|${record.prontuario}|${anchor}`)}
+// ---- Monitora APS: lista anonimizada de gestantes e puérperas ----
+// Usa só Equipe, Usuária e Cons.Odonto. "Usuária" é o mesmo número do prontuário do CELK: quando bate com
+// uma gestante já guardada (CSV do Metabase ou cadastro manual), vira vínculo em vez de uma linha nova.
+// Período = "Puerpério" não entra na lista e remove (de forma reversível) quem já estava nela.
+const MONITORA_PROFILE='monitora_aps_gestantes';
+function pid(v){return String(v??'').replace(/\D/g,'').replace(/^0+/,'')}
+async function parseMonitoraCSV(file,hash,text){
+  const rows=parseCSVText(text),headers=rows.shift()||[],map=headersMap(headers),required=['Equipe','Usuária','Período','Cons.Odonto'];const missing=required.filter(h=>map[norm(h)]==null);if(missing.length)throw new Error(`CSV do Monitora APS sem cabeçalhos obrigatórios: ${missing.join(', ')}`);
+  const data=rows.filter(r=>r.some(v=>String(v).trim()));
+  const snap=makeSnapshotBase(file,hash,MONITORA_PROFILE,{unit:valueBy(data[0]||[],map,'Unidade')});snap.status='lista anonimizada do Monitora APS';snap.monitoraRows=[];snap.puerperio=[];
+  const byUser=new Map();
+  data.forEach((r,i)=>{const usuaria=pid(valueBy(r,map,'Usuária')),periodo=String(valueBy(r,map,'Período')).trim(),odonto=String(valueBy(r,map,'Cons.Odonto')).trim();
+    if(!usuaria){snap.validations.push({level:'warning',code:'MONITORA_SEM_USUARIA',message:`Linha ${i+2} sem número de Usuária; ignorada.`});return}
+    if(byUser.has(usuaria))snap.validations.push({level:'info',code:'MONITORA_DUPLICADA',message:`Usuária ${usuaria} aparece mais de uma vez; vale a última linha (${i+2}).`});
+    byUser.set(usuaria,{usuaria,equipe:String(valueBy(r,map,'Equipe')).trim(),periodo,consOdonto:odonto,monitoraOdonto:norm(odonto)==='SIM'?'atende':'pendente',line:i+2})});
+  for(const row of byUser.values()){if(norm(row.periodo)==='PUERPERIO')snap.puerperio.push(row.usuaria);else snap.monitoraRows.push(row)}
+  snap.validations.push({level:'info',code:'MONITORA_RESUMO',message:`${snap.monitoraRows.length} gestante(s) e ${snap.puerperio.length} puérpera(s). Puérperas não entram na lista de trabalho.`});
+  snap.validations.push({level:'warning',code:'MONITORA_ANONIMIZADO',message:'Lista anonimizada: nome, telefone e DUM/DPP precisam ser completados na gaveta de cada gestante que não tiver vínculo com um cadastro já guardado.'});
+  sessionRaw.set(snap.id,{type:'monitora',headers,rows:data.map((r,i)=>({line:i+2,values:r}))});return snap;
+}
+function getActiveMonitoraSnapshot(){const all=state.snapshots.filter(s=>s.profile===MONITORA_PROFILE).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));return all.find(s=>!s.supersededBy)||all[0]||null}
+function pregDisplayName(e){return e?.nome||(e?.origin==='monitora'?`Usuária ${e.prontuario}`:'Sem nome')}
+function needsData(e){return e.origin==='monitora'&&(!e.nome||!(e.ultimaMenstruacao||e.dataProvParto||e.dataParto))}
+// Move acompanhamento e dados completados de uma gestante que veio só do Monitora ("mon-<usuária>") para o
+// cadastro com o mesmo prontuário que apareceu depois (CSV do Metabase ou cadastro manual).
+function migrateMonitoraLinks(){
+  const g=state.gestantes,snap=getActive2ISnapshot();let moved=0;
+  for(const e of mergedEpisodes()){
+    if(!e.monitoraUsuaria||e.origin==='monitora')continue;const from=`mon-${e.monitoraUsuaria}`,to=e.id;
+    if(g.followups[from]){const a=g.followups[from],b=g.followups[to];const newer=!b||new Date(a.updatedAt||0)>new Date(b.updatedAt||0)?a:b;g.followups[to]={...newer,history:[...(b?.history||[]),...(a.history||[])].sort((x,y)=>String(x.at).localeCompare(String(y.at)))};delete g.followups[from];moved++}
+    if(g.overrides[from]){const ov=g.overrides[from],manual=g.manual.find(m=>m.id===to),raw=manual||snap?.episodes?.find(x=>x.id===to)||{};const keep=Object.fromEntries(Object.entries(ov).filter(([k,v])=>v&&!(k==='enderecoOverride'?(raw.logradouro||raw.endereco):raw[k])));if(manual){const {enderecoOverride,notaLocal,...rest}=keep;Object.assign(manual,rest,enderecoOverride?{endereco:enderecoOverride}:{},{updatedAt:nowISO()})}else if(Object.keys(keep).length)g.overrides[to]={...keep,...(g.overrides[to]||{})};delete g.overrides[from];moved++}
+    if(g.excluded[from]){if(!g.excluded[to])g.excluded[to]=g.excluded[from];delete g.excluded[from];moved++}
+  }
+  if(moved)audit('2i_monitora_linked',{moved});return moved;
+}
+function applyMonitoraPuerperio(){
+  const set=new Set(getActiveMonitoraSnapshot()?.puerperio||[]);if(!set.size)return 0;const g=state.gestantes;g.puerperioIgnored=g.puerperioIgnored||{};let n=0;
+  for(const e of mergedEpisodes()){const k=pid(e.prontuario);if(!k||!set.has(k)||g.excluded[e.id]||g.puerperioIgnored[e.id])continue;g.excluded[e.id]={at:nowISO(),reason:'Puerpério no Monitora APS',source:'monitora_puerperio'};n++}
+  if(n)audit('2i_monitora_puerperio_removed',{count:n});return n;
+}
+function monitoraImportSummary(snap){const eps=mergedEpisodes(),linked=eps.filter(e=>e.monitoraUsuaria&&e.origin!=='monitora').length,fresh=eps.filter(e=>e.origin==='monitora').length;return {linked,fresh,puerperio:snap.puerperio.length}}
 async function parseGestantesCSV(file,hash,text){
   const rows=parseCSVText(text),headers=rows.shift()||[],map=headersMap(headers),required=['CD USU CADSUS','NOME','EQUIPE','CONSULTA SAUDE BUCAL'];const missing=required.filter(h=>map[h]==null);if(missing.length)throw new Error(`CSV 2I sem cabeçalhos obrigatórios: ${missing.join(', ')}`);
   const data=rows.filter(r=>r.some(v=>String(v).trim()));const distinct=[...new Set(data.map(r=>valueBy(r,map,'Consulta Saude Bucal')))];
@@ -614,13 +655,17 @@ async function importOne(file){
     const {text}=await readTextFile(file),parsed=parseCSVText(text),headers=parsed[0]||[],profile=detectCSVProfile(headers);
     if(profile==='metabase_esb')snap=await parseMetabaseConsolidated(file,hash,text);
     else if(profile==='metabase_2i')snap=await parseGestantesCSV(file,hash,text);
+    else if(profile==='monitora_aps_2i')snap=await parseMonitoraCSV(file,hash,text);
     else if(profile==='celk_procedimentos_csv')snap=await parseProcedureCsv(file,hash,text);
     else if(profile==='celk_atividades_grupo_csv')snap=await parseGroupCsv(file,hash,text);
     else if(profile==='metabase_populacao_ativa')snap=await parsePopulacaoAtivaCSV(file,hash,text);
     else snap=await parseUnknownCSV(file,hash,text,headers,parsed.slice(1));
   }
-  commitSnapshot(snap);return snap;
+  commitSnapshot(snap);
+  if(snap.profile===MONITORA_PROFILE||snap.profile==='metabase_gestantes_2i'){migrateMonitoraLinks();const removed=applyMonitoraPuerperio();if(snap.profile===MONITORA_PROFILE){const r=monitoraImportSummary(snap);lastImportNotice=`Monitora APS: ${r.linked} gestante(s) vinculada(s) a cadastros já guardados, ${r.fresh} com dados a completar. ${r.puerperio} em puerpério não entraram${removed?` (${removed} removida(s) da lista)`:''}.`}queueSave();refreshAll()}
+  return snap;
 }
+let lastImportNotice='';
 function commitSnapshot(snap){
   for(const old of state.snapshots){if(old.profile===snap.profile&&old.unit===snap.unit&&old.periodStart===snap.periodStart&&old.periodEnd===snap.periodEnd&&!old.supersededBy)old.supersededBy=snap.id}
   state.snapshots.push(snap);state.dirty=true;audit('snapshot_imported',{snapshotId:snap.id,profile:snap.profile,fileName:snap.fileName,hash:snap.hash,periodStart:snap.periodStart,periodEnd:snap.periodEnd});
@@ -629,7 +674,7 @@ function commitSnapshot(snap){
 }
 async function importFiles(files){
   const list=[...files];if(!list.length)return;showLoading('Preparando importação',`${list.length} arquivo(s)`);let ok=0;const failures=[],populationSnaps=[];
-  try{for(let i=0;i<list.length;i++){setLoading(`Importando ${i+1} de ${list.length}`,list[i].name);try{const result=await importOne(list[i]);if(result){ok++;if(result.profile==='metabase_populacao_ativa')populationSnaps.push(result)}}catch(e){console.error(e);failures.push({name:list[i].name,message:e?.message||String(e)||'Erro desconhecido.',stack:e?.stack||''})}}}finally{hideLoading();document.getElementById('fileInput').value='';if(failures.length){audit('import_failed',{ok,failures:failures.map(f=>({name:f.name,message:f.message}))});showImportFailures(ok,failures)}else{toast(`${ok} importação(ões) concluída(s)`)}}
+  try{for(let i=0;i<list.length;i++){setLoading(`Importando ${i+1} de ${list.length}`,list[i].name);try{const result=await importOne(list[i]);if(result){ok++;if(result.profile==='metabase_populacao_ativa')populationSnaps.push(result)}}catch(e){console.error(e);failures.push({name:list[i].name,message:e?.message||String(e)||'Erro desconhecido.',stack:e?.stack||''})}}}finally{hideLoading();document.getElementById('fileInput').value='';if(failures.length){audit('import_failed',{ok,failures:failures.map(f=>({name:f.name,message:f.message}))});showImportFailures(ok,failures)}else{toast(lastImportNotice||`${ok} importação(ões) concluída(s)`)}lastImportNotice=''}
   if(populationSnaps.length)openPopulationInputsModal(populationSnaps.at(-1));
 }
 
@@ -1066,7 +1111,7 @@ function followupShortLabel(v){return v==='whatsapp_enviado'?'Tentativa de conta
 const FOLLOWUP_COLORS={nao_contatada:{text:'#697386',bg:'#f0f2f6'},whatsapp_enviado:{text:'#3a52c4',bg:'#eef0ff'},busca_ativa_solicitada:{text:'#b0356b',bg:'#fdecf3'},ok_manual:{text:'#247a4b',bg:'#edf9f3'},atende_confirmado:{text:'#1f7a80',bg:'#e7f7f8'},agendada:{text:'#248997',bg:'#eaf8fa'}};
 function followupColor(v){return FOLLOWUP_COLORS[v]||FOLLOWUP_COLORS.nao_contatada}
 function followupCounts(history){const h=history||[];return {whatsapp:h.filter(x=>x.to==='whatsapp_enviado').length,buscaAtiva:h.filter(x=>x.to==='busca_ativa_solicitada').length,agendada:h.filter(x=>x.to==='agendada').length,notes:h.filter(x=>x.type==='note').length}}
-function isAttended(e){return e.status2i==='atende'||['ok_manual','atende_confirmado'].includes(followupFor(e.id).state)}
+function isAttended(e){return e.status2i==='atende'||e.monitoraOdonto==='atende'||['ok_manual','atende_confirmado'].includes(followupFor(e.id).state)}
 function status2ILabel(v){return v==='atende'?'Atende':v==='pendente'?'Pendente':v==='indeterminado'?'Indeterminado':'Sem registro no Metabase'}
 function episodeOverride(id){return state.gestantes.overrides[id]||{}}
 function mergedEpisodes(){
@@ -1074,14 +1119,19 @@ function mergedEpisodes(){
   for(const e of metabase){const entry=[...manual].find(m=>state.gestantes.merges[m.id]===e.id);const ov=episodeOverride(e.id);
     if(entry){out.push({...entry,...e,...ov,origin:'metabase_manual',manualId:entry.id,metabaseId:e.id,observacao:entry.observacao||'',dataAtividadeManual:entry.dataAtividadeManual||'',phoneNormalized:normalizePhone(ov.telefone??e.telefone)})}
     else out.push({...e,...ov,phoneNormalized:normalizePhone(ov.telefone??e.telefone)})}
-  for(const m of manual)if(!state.gestantes.merges[m.id])out.push({...m,origin:'manual',status2i:'sem_metabase',phoneNormalized:normalizePhone(m.telefone)});return out;
+  for(const m of manual)if(!state.gestantes.merges[m.id])out.push({...m,origin:'manual',status2i:'sem_metabase',phoneNormalized:normalizePhone(m.telefone)});
+  const mon=getActiveMonitoraSnapshot();
+  if(mon){const byUser=new Map((mon.monitoraRows||[]).map(r=>[r.usuaria,r])),used=new Set(),attach=(e,r)=>Object.assign(e,{monitoraUsuaria:r.usuaria,monitoraOdonto:r.monitoraOdonto,monitoraPeriodo:r.periodo,monitoraEquipe:r.equipe,consOdontoMonitora:r.consOdonto});
+    for(const e of out){const k=pid(e.prontuario),r=k&&byUser.get(k);if(r&&!used.has(k)){used.add(k);attach(e,r)}}
+    for(const r of mon.monitoraRows||[]){if(used.has(r.usuaria))continue;const id=`mon-${r.usuaria}`,ov=episodeOverride(id);out.push(attach({id,origin:'monitora',prontuario:r.usuaria,equipe:r.equipe,nome:'',status2i:r.monitoraOdonto,unit:mon.unit,...ov,phoneNormalized:normalizePhone(ov.telefone)},r))}}
+  return out;
 }
 function pregnancyStage(e){return e.dataParto?'finalizada':'ativa'}
 function isExcluded(id){return !!state.gestantes.excluded[id]}
 function visibleByExclusion(episodes){const only=state.preferences.pregExcluded==='only';return episodes.filter(e=>only?isExcluded(e.id):!isExcluded(e.id))}
 function applyPregFilters(episodes){const p=state.preferences;const search=norm(p.pregSearch);return episodes.filter(e=>(!p.pregTeam||e.equipe===p.pregTeam)&&(!p.pregOrigin||e.origin===p.pregOrigin)&&(!p.pregPhone||(p.pregPhone==='valid'?!!e.phoneNormalized:!e.phoneNormalized))&&(!search||norm(`${e.nome} ${e.prontuario}`).includes(search)))}
 function excludeEpisode(id,reason){state.gestantes.excluded[id]={at:nowISO(),reason:reason||''};audit('2i_episode_excluded',{episodeId:id,reason:reason||''});queueSave();closeDrawer();refreshAll();toast('Gestante excluída da lista operacional (dado preservado, pode ser restaurado).')}
-function restoreEpisode(id){delete state.gestantes.excluded[id];audit('2i_episode_restored',{episodeId:id});queueSave();closeDrawer();refreshAll();toast('Gestante restaurada na lista operacional.')}
+function restoreEpisode(id){if(state.gestantes.excluded[id]?.source==='monitora_puerperio'){state.gestantes.puerperioIgnored=state.gestantes.puerperioIgnored||{};state.gestantes.puerperioIgnored[id]=true}delete state.gestantes.excluded[id];audit('2i_episode_restored',{episodeId:id});queueSave();closeDrawer();refreshAll();toast('Gestante restaurada na lista operacional.')}
 function openExcludeEpisode(id){openModal(`<div class="modal-head"><div><h2 id="modalTitle">Excluir gestante da lista operacional</h2><p>Não apaga o cadastro nem altera o panorama do CSV — só some da lista operacional até ser restaurada.</p></div></div><form id="excludeForm"><div class="modal-body"><label class="field full"><span>Motivo (opcional)</span><textarea id="excludeReason" placeholder="Ex.: gestação encerrada, registro duplicado, mudou de unidade"></textarea></div><div class="modal-foot"><button type="button" class="btn" data-close-modal>Cancelar</button><button type="submit" class="btn danger">Confirmar exclusão</button></div></form>`,{wide:false});document.getElementById('excludeForm').onsubmit=e=>{e.preventDefault();excludeEpisode(id,document.getElementById('excludeReason').value.trim())}}
 function ageAt(e,date=new Date()){const b=parseDate(e.dataNascimento);if(!b)return null;let age=date.getFullYear()-b.getFullYear();if(date<new Date(date.getFullYear(),b.getMonth(),b.getDate()))age--;return age}
 function gestationalWeeks(e,at=new Date()){const dum=pregDum(e);if(!dum)return null;const end=parseDate(e.dataParto)||at;const weeks=Math.floor((end-dum)/(7*864e5));return weeks>=0&&weeks<=45?weeks:null}
@@ -1099,12 +1149,12 @@ function mergeManual(manualId,episodeId){
   const m=state.gestantes.manual.find(x=>x.id===manualId),e=getActive2ISnapshot()?.episodes?.find(x=>x.id===episodeId);if(!m||!e)return;const mf=followupFor(manualId),ef=followupFor(episodeId);state.gestantes.merges[manualId]=episodeId;if((mf.history||[]).length){state.gestantes.followups[episodeId]={state:mf.state,updatedAt:mf.updatedAt,history:[...(ef.history||[]),...(mf.history||[]).map(h=>({...h,note:`${h.note||''} (origem: cadastro manual)`.trim()}))]};delete state.gestantes.followups[manualId]}
   audit('2i_manual_merged',{manualId,episodeId});queueSave();closeDrawer();refreshAll();toast('Cadastro manual mesclado com o episódio do Metabase.');
 }
-function gestantesDataCounts(){return {snapshots:state.snapshots.filter(s=>s.profile==='metabase_gestantes_2i').length,manual:state.gestantes.manual.length,followups:Object.keys(state.gestantes.followups).length,overrides:Object.keys(state.gestantes.overrides).length,excluded:Object.keys(state.gestantes.excluded).length}}
+function gestantesDataCounts(){return {snapshots:state.snapshots.filter(s=>s.profile==='metabase_gestantes_2i'||s.profile===MONITORA_PROFILE).length,manual:state.gestantes.manual.length,followups:Object.keys(state.gestantes.followups).length,overrides:Object.keys(state.gestantes.overrides).length,excluded:Object.keys(state.gestantes.excluded).length}}
 function clearAllGestantesData(){
   const before=gestantesDataCounts();
-  for(const s of state.snapshots)if(s.profile==='metabase_gestantes_2i')sessionRaw.delete(s.id);
-  state.snapshots=state.snapshots.filter(s=>s.profile!=='metabase_gestantes_2i');
-  state.gestantes={manual:[],followups:{},merges:{},excluded:{},overrides:{}};
+  for(const s of state.snapshots)if(s.profile==='metabase_gestantes_2i'||s.profile===MONITORA_PROFILE)sessionRaw.delete(s.id);
+  state.snapshots=state.snapshots.filter(s=>s.profile!=='metabase_gestantes_2i'&&s.profile!==MONITORA_PROFILE);
+  state.gestantes={manual:[],followups:{},merges:{},excluded:{},overrides:{},puerperioIgnored:{}};
   state.dirty=true;
   return before;
 }
@@ -1296,11 +1346,12 @@ function agoLabel(v){const n=daysAgo(v);return n==null?'':n<=0?'hoje':n===1?'ont
 function pregBucket(e){if(pregnancyStage(e)==='finalizada')return 'encerrada';if(isAttended(e))return 'atendida';const s=followupFor(e.id).state;return s==='agendada'?'agendada':['whatsapp_enviado','busca_ativa_solicitada'].includes(s)?'em_contato':'a_contatar'}
 function pregTone(e){return isPriority2I(e)?'red':PREG_STAGE[pregBucket(e)][1]}
 function lastContactEntry(e){return (followupFor(e.id).history||[]).filter(h=>h.type!=='note').at(-1)||null}
-function lastContactText(e){const h=lastContactEntry(e);if(h)return `${followupLabel(h.to)} · ${agoLabel(h.at)}`;return e.status2i==='atende'?'Atendimento registrado no Metabase':'Nenhum contato registrado'}
+function lastContactText(e){const h=lastContactEntry(e);if(h)return `${followupLabel(h.to)} · ${agoLabel(h.at)}`;return e.status2i==='atende'&&e.origin!=='monitora'?'Atendimento registrado no Metabase':e.monitoraOdonto==='atende'?'Consulta odontológica registrada no Monitora APS':'Nenhum contato registrado'}
 function pregNextAction(e){
   const b=pregBucket(e),f=followupFor(e.id);
   if(b==='encerrada')return {kind:'open',label:'Ver perfil',cls:'soft',why:isAttended(e)?'Atendida antes do parto':'Parto sem atendimento odontológico'};
-  if(b==='atendida')return {kind:'open',label:'Ver perfil',cls:'soft',why:e.status2i==='atende'?'Registrada no Metabase · conta para a meta':'Confirmação manual · conta para a meta'};
+  if(b==='atendida')return {kind:'open',label:'Ver perfil',cls:'soft',why:e.status2i==='atende'&&e.origin!=='monitora'?'Registrada no Metabase · conta para a meta':e.monitoraOdonto==='atende'?'Consulta odontológica no Monitora APS · conta para a meta':'Confirmação manual · conta para a meta'};
+  if(needsData(e)&&!e.phoneNormalized)return {kind:'dados',label:'Completar dados',cls:'soft',icon:'file',why:'Lista anonimizada do Monitora APS'};
   if(b==='a_contatar')return e.phoneNormalized?{kind:'whatsapp',label:'Enviar WhatsApp',cls:'wa',icon:'message',why:isPriority2I(e)?'Prioridade: 3º trimestre':'Primeiro contato'}:{kind:'busca',label:'Pedir busca ativa',cls:'warn',icon:'search',why:'Sem telefone válido'};
   if(b==='em_contato'){const d=daysAgo(f.updatedAt);if(f.state==='whatsapp_enviado'&&d!=null&&d>=WHATSAPP_NO_REPLY_DAYS)return {kind:'busca',label:'Pedir busca ativa',cls:'warn',icon:'search',why:`Sem resposta há ${d} dias`,alert:true};return {kind:'agendar',label:'Agendar consulta',icon:'clock',why:f.state==='busca_ativa_solicitada'?`Busca ativa pedida ${agoLabel(f.updatedAt)}`:`WhatsApp enviado ${agoLabel(f.updatedAt)}`}}
   const ag=parseDate(f.agendaAt);if(!ag)return {kind:'atendida',label:'Confirmar atendimento',icon:'check',why:`Agendada ${agoLabel(f.updatedAt)}`};
@@ -1310,7 +1361,8 @@ function pregNextAction(e){
 function pregNextBtn(e,n,extra=''){return n.kind==='open'?`<button class="pq-next soft ${extra}" data-open-episode="${esc(e.id)}">${n.label}</button>`:`<button class="pq-next ${n.cls||''} ${extra}" data-preg-act="${n.kind}|${esc(e.id)}">${n.icon?icon(n.icon):''}${n.label}</button>`}
 function pregStagePill(e){const [label,tone]=PREG_STAGE[pregBucket(e)];return `<span class="pq-pill ink-${tone}">${label}</span>`}
 function pregTags(e){const t=[],left=weeksToDpp(e),age=ageAt(e),b=pregBucket(e);
-  if(isPriority2I(e))t.push(`<span class="pq-tag red">3º tri · parto em ${left>0?`${left} sem.`:'dias'}</span>`);
+  if(isPriority2I(e))t.push(`<span class="pq-tag red">3º tri · ${left==null?'Monitora APS':left>0?`parto em ${left} sem.`:'parto em dias'}</span>`);
+  if(needsData(e))t.push('<span class="pq-tag gray">Dados a completar</span>');
   if(!e.phoneNormalized&&b!=='atendida'&&b!=='encerrada')t.push('<span class="pq-tag amber">Sem telefone</span>');
   if(age!=null&&age<20)t.push(`<span class="pq-tag blue">${age} anos</span>`);
   if(isExcluded(e.id))t.push('<span class="pq-tag red">Removida da lista</span>');
@@ -1318,10 +1370,10 @@ function pregTags(e){const t=[],left=weeksToDpp(e),age=ageAt(e),b=pregBucket(e);
 function pregRuler(e){const w=gestationalWeeks(e),t3=isPriority2I(e);return `<div class="pq-ruler${t3?' t3':''}" title="${w==null?'IG não calculável':`IG ${w} de 40 semanas`}"><i style="width:${w==null?0:Math.min(100,100*w/40)}%"></i></div>`}
 function pregRow(e){
   const w=gestationalWeeks(e),n=pregNextAction(e),age=ageAt(e),dpp=pregDpp(e),left=weeksToDpp(e),finalized=pregnancyStage(e)==='finalizada';
-  const igLine=w==null?'<b>IG não calculável</b><span>sem DUM/DPP</span>':`<b>${w} sem · ${trimesterOf(w)} tri</b><span>${finalized?`parto ${fmtDate(e.dataParto)}`:dpp?`DPP ${fmtDate(dpp).slice(0,5)} · ${left>0?`faltam ${left} sem.`:'vencida'}`:''}</span>`;
+  const igLine=w==null?(e.monitoraPeriodo?`<b>${esc(e.monitoraPeriodo.replace(/^T(\d)$/,'$1º tri'))} · Monitora</b><span>DUM/DPP a completar</span>`:'<b>IG não calculável</b><span>sem DUM/DPP</span>'):`<b>${w} sem · ${trimesterOf(w)} tri</b><span>${finalized?`parto ${fmtDate(e.dataParto)}`:dpp?`DPP ${fmtDate(dpp).slice(0,5)} · ${left>0?`faltam ${left} sem.`:'vencida'}`:''}</span>`;
   const secondary=['atendida','encerrada'].includes(pregBucket(e))?'':`<button class="pq-icon" data-preg-act="wa-reg|${esc(e.id)}" ${e.phoneNormalized?'':'disabled'} title="Registrar WhatsApp enviado" aria-label="Registrar WhatsApp enviado">${icon('message')}</button><button class="pq-icon" data-open-episode="${esc(e.id)}" title="Abrir perfil" aria-label="Abrir perfil">${icon('chevron')}</button>`;
   return `<div class="pq-card tone-${pregTone(e)}" data-open-episode="${esc(e.id)}">
-    <div class="pq-who"><button class="pq-name" data-open-episode="${esc(e.id)}">${esc(e.nome||'Sem nome')}</button><small>Equipe ${esc(e.equipe||'—')}${age!=null?` · ${age} anos`:''} · <span class="mono">${esc(e.prontuario||'ID local')}</span>${e.origin==='manual'?' · manual':''}</small><div class="pq-tags">${pregStagePill(e)}${pregTags(e)}</div></div>
+    <div class="pq-who"><button class="pq-name" data-open-episode="${esc(e.id)}">${esc(pregDisplayName(e))}</button><small>Equipe ${esc(e.equipe||'—')}${age!=null?` · ${age} anos`:''} · <span class="mono">${esc(e.prontuario||'ID local')}</span>${e.origin==='manual'?' · manual':e.origin==='monitora'?' · Monitora APS':''}</small><div class="pq-tags">${pregStagePill(e)}${pregTags(e)}</div></div>
     <div class="pq-ig"><div class="pq-ig-top">${igLine}</div>${pregRuler(e)}</div>
     <div class="pq-contact"><b>${e.telefone?esc(e.telefone):'Sem telefone válido'}</b><span>${esc(lastContactText(e))}</span></div>
     <div class="pq-go"><div>${secondary}${pregNextBtn(e,n)}</div><span class="pq-why${n.alert?' alert':''}">${esc(n.why)}</span></div>
@@ -1330,21 +1382,23 @@ function pregSort(a,b){const pa=isPriority2I(a)?0:1,pb=isPriority2I(b)?0:1;if(pa
 function pregQueue(){const p=state.preferences,tab=p.pregTab||'a_contatar';let rows=applyPregFilters(visibleByExclusion(mergedEpisodes()));if(tab!=='todas')rows=rows.filter(e=>pregBucket(e)===tab);if(p.pregPrioOnly)rows=rows.filter(isPriority2I);return rows.sort(pregSort)}
 function toastAction(message,label,fn){const t=document.getElementById('toast');t.innerHTML=`<span>${esc(message)}</span><button type="button" class="toast-action">${esc(label)}</button>`;t.classList.add('show','has-action');t.querySelector('.toast-action').onclick=()=>{t.classList.remove('show','has-action');fn()};clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show','has-action'),6000)}
 function setFollowupWithUndo(id,next,message,extra={}){const prev=state.gestantes.followups[id]?JSON.parse(JSON.stringify(state.gestantes.followups[id])):null;setFollowup(id,next,extra.note||'',extra);toastAction(message,'Desfazer',()=>{if(prev)state.gestantes.followups[id]=prev;else delete state.gestantes.followups[id];audit('2i_followup_undo',{episodeId:id,to:prev?.state||'nao_contatada'});queueSave();refreshAll();reopenDrawerIfOpen(id)})}
-function firstName(e){return String(e?.nome||'Gestante').split(' ')[0]}
+function firstName(e){return String(e?.nome||pregDisplayName(e)).split(' ')[0]}
 function pregAct(kind,id){
   const e=mergedEpisodes().find(x=>x.id===id);if(!e)return;
   if(kind==='whatsapp'){if(e.phoneNormalized)window.open(`https://wa.me/${e.phoneNormalized}`,'_blank','noopener,noreferrer');return setFollowupWithUndo(id,'whatsapp_enviado',`WhatsApp aberto e registrado para ${firstName(e)}. Ela foi para "Em contato".`)}
   if(kind==='wa-reg')return setFollowupWithUndo(id,'whatsapp_enviado',`WhatsApp enviado registrado para ${firstName(e)}.`);
   if(kind==='busca')return setFollowupWithUndo(id,'busca_ativa_solicitada',`Busca ativa registrada para ${firstName(e)}.`);
   if(kind==='agendar')return openEpisode(id,'acomp',{sched:true});
+  if(kind==='dados'){pregDrawer={id:e.id,tab:'dados',edit:true,sched:false};return openEpisode(id)}
   if(kind==='atendida')return setFollowupWithUndo(id,'ok_manual',`${firstName(e)} marcada como atendida. Já conta para a meta.`);
 }
 function pregSaveSchedule(id){const date=document.getElementById('pqSchedDate')?.value,time=document.getElementById('pqSchedTime')?.value||'';if(!date){toast('Escolha a data da consulta.');return}const at=time?`${date}T${time}`:date;pregDrawer.sched=false;const e=mergedEpisodes().find(x=>x.id===id);setFollowupWithUndo(id,'agendada',`Consulta de ${firstName(e)} agendada para ${fmtDate(date)}${time?` às ${time}`:''}.`,{agendaAt:at,note:`Consulta em ${fmtDate(date)}${time?` às ${time}`:''}`})}
 function openPregHowTo(){openModal(`<div class="modal-head"><div><h2 id="modalTitle">Como o 2I é calculado aqui</h2><p>Leitura do CSV do Metabase somada ao acompanhamento feito nesta ferramenta.</p></div></div><div class="modal-body"><div class="notice"><strong>Atendida.</strong> Conta como atendida quem tem “Sim” em Consulta Saude Bucal no CSV do Metabase, ou quem foi confirmada manualmente no acompanhamento. Cada gestante conta uma única vez para a meta.</div><div class="notice" style="margin-top:9px"><strong>Prioridade.</strong> Gestantes no 3º trimestre (28 semanas ou mais) sem atendimento vão para o topo da fila e ganham destaque em vermelho.</div><div class="notice" style="margin-top:9px"><strong>Etapas.</strong> A contatar → Em contato (WhatsApp ou busca ativa) → Agendada → Atendida. Com parto registrado, a gestante sai da fila e fica em “Encerradas”.</div><div class="notice warn" style="margin-top:9px"><strong>Cadastros manuais</strong> entram na lista de trabalho sem alterar o CSV importado. Correções de dados também ficam só nesta ferramenta.</div></div><div class="modal-foot"><button class="btn primary" data-close-modal>Entendi</button></div>`)}
-function isPriority2I(e){return !isAttended(e)&&pregnancyStage(e)==='ativa'&&gestationalWeeks(e)!=null&&gestationalWeeks(e)>=28}
+function isPriority2I(e){if(isAttended(e)||pregnancyStage(e)!=='ativa')return false;const w=gestationalWeeks(e);return w!=null?w>=28:e.monitoraPeriodo==='T3'}
 function pregnancyHTML(){
   const snap=getActive2ISnapshot();
-  if(!snap&&!state.gestantes.manual.length)return `${emptyState('Importe o CSV de gestantes','O arquivo do Metabase forma a lista do 2I. Gestantes que ainda não aparecem no CSV podem ser cadastradas à mão.')}<div style="margin-top:12px"><button class="btn" data-add-pregnant>${icon('plus')}Adicionar gestante manualmente</button></div>`;
+  const monSnap=getActiveMonitoraSnapshot();
+  if(!snap&&!monSnap&&!state.gestantes.manual.length)return `${emptyState('Importe o CSV de gestantes','O CSV do Metabase ou a lista do Monitora APS formam a lista do 2I. Gestantes que ainda não aparecem no CSV podem ser cadastradas à mão.')}<div style="margin-top:12px"><button class="btn" data-add-pregnant>${icon('plus')}Adicionar gestante manualmente</button></div>`;
   const p=state.preferences,tab=p.pregTab||'a_contatar';
   const expanded=visibleByExclusion(mergedEpisodes());
   const base=expanded.filter(e=>!p.pregTeam||e.equipe===p.pregTeam);
@@ -1363,16 +1417,16 @@ function pregnancyHTML(){
   const teamChips=`<button class="pq-chip${!p.pregTeam?' on':''}" data-team-filter="">Todas as equipes</button>`+teams.map(team=>{const rows=expanded.filter(e=>e.equipe===team),ok=rows.filter(isAttended).length;return `<button class="pq-chip${p.pregTeam===team?' on':''}" data-team-filter="${esc(team)}">${esc(team)}<span class="pq-mini"><i style="width:${rows.length?100*ok/rows.length:0}%"></i></span><span class="f">${ok}/${rows.length}</span></button>`}).join('');
   const moreActive=!!(p.pregOrigin||p.pregPhone||p.pregExcluded),moreOpen=p.pregMoreFilters||moreActive;
   const sel=(k,opts)=>`<select class="filter preg-filter" data-preg-filter="${k}">${opts.map(([v,l])=>`<option value="${v}" ${p[k]===v?'selected':''}>${l}</option>`).join('')}</select>`;
-  const more=moreOpen?`<div class="pq-more"><label><span>Origem</span>${sel('pregOrigin',[['','Todas'],['metabase','Metabase'],['manual','Cadastro manual'],['metabase_manual','Manual + Metabase']])}</label><label><span>Telefone</span>${sel('pregPhone',[['','Todos'],['valid','Com WhatsApp válido'],['invalid','Sem número válido']])}</label><label><span>Lista</span>${sel('pregExcluded',[['','Ocultar removidas'],['only','Só removidas']])}</label>${moreActive||p.pregTeam||p.pregSearch?'<button class="btn small ghost" data-clear-preg-filters>Limpar filtros</button>':''}</div>`:'';
-  const unit=snap?.unit||snap?.meta?.unit||'';
-  const src=[snap?`CSV do Metabase importado em ${fmtDate(snap.createdAt)}`:'Sem CSV importado · só cadastros manuais',`${fmtNum(expanded.length)} gestante(s) na lista`,unit].filter(Boolean).map(s=>`<span>${esc(s)}</span>`).join('');
+  const more=moreOpen?`<div class="pq-more"><label><span>Origem</span>${sel('pregOrigin',[['','Todas'],['metabase','Metabase'],['manual','Cadastro manual'],['metabase_manual','Manual + Metabase'],['monitora','Só Monitora APS']])}</label><label><span>Telefone</span>${sel('pregPhone',[['','Todos'],['valid','Com WhatsApp válido'],['invalid','Sem número válido']])}</label><label><span>Lista</span>${sel('pregExcluded',[['','Ocultar removidas'],['only','Só removidas']])}</label>${moreActive||p.pregTeam||p.pregSearch?'<button class="btn small ghost" data-clear-preg-filters>Limpar filtros</button>':''}</div>`:'';
+  const unit=snap?.unit||monSnap?.unit||'';
+  const src=[snap?`CSV do Metabase importado em ${fmtDate(snap.createdAt)}`:monSnap?'':'Sem CSV importado · só cadastros manuais',monSnap?`Monitora APS importado em ${fmtDate(monSnap.createdAt)}`:'',`${fmtNum(expanded.length)} gestante(s) na lista`,unit].filter(Boolean).map(s=>`<span>${esc(s)}</span>`).join('');
   const rowsHTML=sorted.map(pregRow).join('');
   const empty=`<p class="pq-empty">${tab==='a_contatar'&&!p.pregTeam&&!p.pregSearch&&!p.pregPrioOnly?'Ninguém para contatar. Todas as gestantes ativas já têm algum contato registrado.':'Nenhuma gestante corresponde a esta aba e aos filtros.'}</p>`;
   return `<div class="pq-head"><div class="pq-src">${src}</div><div class="pq-actions"><button class="btn primary" data-add-pregnant>${icon('plus')}Adicionar gestante</button><div class="pq-menu-wrap"><button class="btn" data-preg-menu aria-haspopup="true">Mais${icon('chevron')}</button><div class="pq-menu" hidden><button data-action="import">${icon('upload')}Importar novo CSV</button><button data-export-2i>${icon('download')}Exportar lista</button><button data-preg-howto>${icon('info')}Como o 2I é calculado</button><button class="danger" data-clear-all-gestantes>${icon('trash')}Limpar todas as gestantes</button></div></div></div></div>
   <section class="card pq-goal" aria-label="Panorama atual"><div class="pq-goal-num" title="Panorama atual">${base.length?fmtPct(pct,1):'—'}<small>${fmtNum(attendedCount)} de ${fmtNum(base.length)} gestante(s) atendida(s)${p.pregTeam?` · ${esc(p.pregTeam)}`:''}</small></div><div><div class="pq-bar">${bar}</div><div class="pq-legend">${legend}</div></div>${priority?`<div class="pq-prio">${icon('alert')}<span><strong>${fmtNum(priority)} gestante(s) no 3º trimestre</strong> ainda sem atendimento odontológico. O parto está próximo.</span><button data-preg-prio>${p.pregPrioOnly?'Mostrar todas':'Ver só essas'}</button></div>`:''}</section>
   <article class="card pq-queue"><div class="pq-tabs" role="tablist">${tabs}</div><div class="pq-tools"><label class="search-box">${icon('search')}<input id="pregSearch" type="search" value="${esc(p.pregSearch)}" placeholder="Buscar nome ou prontuário..."></label><div class="pq-chips">${teamChips}</div><button class="pq-chip${moreOpen?' on':''}" data-preg-more>Mais filtros${moreActive?' ·':''}</button></div>${more}<div class="pq-hint">${p.pregPrioOnly?'Mostrando só o 3º trimestre sem atendimento. ':''}${PREG_TAB_HINTS[tab]}</div><div class="pq-legend pq-legend-tones"><span><i class="pq-sw tone-red"></i>3º tri sem atendimento</span><span><i class="pq-sw tone-amber"></i>A contatar</span><span><i class="pq-sw tone-blue"></i>Em contato</span><span><i class="pq-sw tone-teal"></i>Agendada</span><span><i class="pq-sw tone-green"></i>Atendida</span><span><i class="pq-sw tone-violet"></i>Encerrada</span></div><div class="pq-list">${rowsHTML||empty}</div></article>`;
 }
-function profileLabel(profile){return ({celk_procedimentos_detalhado:'CELK · procedimentos detalhados',celk_atividades_grupo:'CELK · atividades em grupo',metabase_saude_bucal:'Metabase · consolidado Saúde Bucal',metabase_gestantes_2i:'Metabase · gestantes 2I',csv_manual_configuravel:'CSV · layout não reconhecido',pdf_nao_reconhecido:'PDF · layout não reconhecido'})[profile]||profile}
+function profileLabel(profile){return ({celk_procedimentos_detalhado:'CELK · procedimentos detalhados',celk_atividades_grupo:'CELK · atividades em grupo',metabase_saude_bucal:'Metabase · consolidado Saúde Bucal',metabase_gestantes_2i:'Metabase · gestantes 2I',monitora_aps_gestantes:'Monitora APS · gestantes (anonimizado)',csv_manual_configuravel:'CSV · layout não reconhecido',pdf_nao_reconhecido:'PDF · layout não reconhecido'})[profile]||profile}
 function snapshotPeriod(s){const months=Object.keys(s.dataByMonth||{}).sort();return months.length?`${fmtMonth(months[0])}${months.length>1?`–${fmtMonth(months.at(-1))}`:''}`:s.periodStart||s.periodEnd?`${fmtDate(s.periodStart)}–${fmtDate(s.periodEnd)}`:'sem competência detectada'}
 function importsHTML(){
   const mk=state.preferences.month,proc=aggregateProcedureMonth(mk),items=[...state.snapshots].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
@@ -1544,7 +1598,7 @@ function saveManualPregnant(again=false){
   // "Sim, já foi atendida" confirma o atendimento no acompanhamento (é o que faz contar para a meta)
   if(mpForm.bucal==='sim'&&!['ok_manual','atende_confirmado'].includes(followupFor(rec.id).state)){const f=followupFor(rec.id),entry={at:nowISO(),from:f.state,to:'ok_manual',note:`Atendimento em ${fmtDate(d.dataAtividadeManual)} informado no cadastro manual`};state.gestantes.followups[rec.id]={state:'ok_manual',updatedAt:entry.at,history:[...(f.history||[]),entry]}}
   const note=mpValue('mpFollowNote');if(note){const f=followupFor(rec.id);state.gestantes.followups[rec.id]={state:f.state,updatedAt:f.updatedAt,history:[...(f.history||[]),{at:nowISO(),type:'note',text:note}]}}
-  queueSave();closeModal();refreshAll();
+  migrateMonitoraLinks();queueSave();closeModal();refreshAll();
   const where=mpForm.bucal==='sim'?'Atendidas':pregnancyStage(rec)==='finalizada'?'Encerradas':'A contatar';
   if(again){openManualPregnant();toast(`${firstName(rec)} cadastrada em "${where}". Pode adicionar a próxima.`)}
   else{toast(old?'Cadastro manual atualizado. O CSV importado não muda.':`${firstName(rec)} cadastrada em "${where}". O CSV importado não muda.`);openEpisode(rec.id)}
@@ -1566,7 +1620,7 @@ function openEpisode(id,tab,opts={}){
   const nowX=dum?pos(finalized?e.dataParto:new Date()):null;
   const chips=[counts.whatsapp?`<span class="count-chip wa">${icon('message')}WhatsApp · ${counts.whatsapp}x</span>`:'',counts.buscaAtiva?`<span class="count-chip ba">${icon('search')}Busca ativa · ${counts.buscaAtiva}x</span>`:'',counts.agendada?`<span class="count-chip ag">${icon('clock')}Agendada · ${counts.agendada}x</span>`:'',counts.notes?`<span class="count-chip note">${icon('file')}Notas · ${counts.notes}</span>`:''].filter(Boolean).join('');
   const timelineHTML=(f.history||[]).slice().reverse().map(h=>h.type==='note'?`<li><i style="background:#e7a23b"></i><div><b class="is-note">${esc(h.text)}</b><small>Nota · ${fmtDateTime(h.at)} · ${agoLabel(h.at)}</small></div></li>`:`<li><i style="background:${followupColor(h.to).text}"></i><div><b style="color:${followupColor(h.to).text}">${esc(followupLabel(h.to))}</b><small>${fmtDateTime(h.at)} · ${agoLabel(h.at)}${h.note?` · ${esc(h.note)}`:''}</small></div></li>`).join('');
-  const alerts=`${excl?`<div class="pq-alert red"><strong>Removida da lista de trabalho</strong> em ${fmtDateTime(excl.at)}${excl.reason?` · ${esc(excl.reason)}`:''}. Os dados continuam guardados. <button data-restore-episode="${esc(e.id)}">Restaurar na lista</button></div>`:''}${match?`<div class="pq-alert amber"><strong>Pode ser a mesma gestante do CSV.</strong> Prontuário ${esc(match.prontuario)} e data ${fmtDate(episodeAnchor(match))} iguais a um registro do Metabase. O nome sozinho nunca é usado para mesclar. <button data-merge-manual="${esc(e.id)}|${esc(match.id)}">Confirmar mesclagem</button></div>`:''}`;
+  const alerts=`${needsData(e)?`<div class="pq-alert blue"><strong>Veio do Monitora APS, que é anonimizado.</strong> Complete nome, telefone e DUM ou DPP para poder contatar. Os dados ficam guardados pelo número da Usuária e são reaproveitados nas próximas importações. ${pregDrawer.tab==='dados'&&pregDrawer.edit?'':`<button data-preg-act="dados|${esc(e.id)}">Completar dados</button>`}</div>`:''}${excl?`<div class="pq-alert red"><strong>Removida da lista de trabalho</strong> em ${fmtDateTime(excl.at)}${excl.reason?` · ${esc(excl.reason)}`:''}. Os dados continuam guardados. <button data-restore-episode="${esc(e.id)}">Restaurar na lista</button></div>`:''}${match?`<div class="pq-alert amber"><strong>Pode ser a mesma gestante do CSV.</strong> Prontuário ${esc(match.prontuario)} e data ${fmtDate(episodeAnchor(match))} iguais a um registro do Metabase. O nome sozinho nunca é usado para mesclar. <button data-merge-manual="${esc(e.id)}|${esc(match.id)}">Confirmar mesclagem</button></div>`:''}`;
   const today=isoDate(new Date()),inAWeek=isoDate(new Date(Date.now()+7*DAY_MS));
   const acomp=`<section class="pq-d-next">
       <div class="pq-d-next-top"><div><div class="pq-sec-t">Próxima ação</div><p class="pq-d-why${n.alert?' alert':''}">${esc(n.why)}</p></div>${n.kind!=='open'?(n.kind==='agendar'?`<button class="pq-next" data-preg-sched="${esc(e.id)}">${icon('clock')}Agendar consulta</button>`:pregNextBtn(e,n)):''}</div>
@@ -1578,7 +1632,7 @@ function openEpisode(id,tab,opts={}){
       <div class="pq-d-phone drawer-contact-line"><div><b>${esc(e.telefone||'Telefone não informado')}</b><small>${esc(address||'Endereço não informado')}</small></div><div class="pq-d-phone-a">${e.phoneNormalized?`<button class="pq-next wa" data-open-whatsapp="${esc(e.id)}">${icon('message')}Abrir WhatsApp</button><button class="pq-icon" data-copy-text="${esc(e.telefone||'')}" title="Copiar número" aria-label="Copiar número">${icon('copy')}</button>`:`<button class="pq-qa" data-preg-dtab="dados">Corrigir telefone</button>`}</div></div>
     </section>
     <section class="pq-d-card"><div class="pq-d-card-h"><div class="pq-sec-t">Gestação</div><button class="pq-link" data-preg-parto="${esc(e.id)}">${finalized?'Reabrir gestação':'Registrar parto hoje'}</button></div>
-      <div class="pq-d-facts"><div><span>IG</span><b>${weeks==null?'—':`${weeks} sem · ${trimesterOf(weeks)} tri`}</b></div><div><span>DUM</span><b>${fmtDate(e.ultimaMenstruacao)}</b></div><div><span>DPP</span><b>${dpp?fmtDate(dpp):'—'}</b></div><div><span>${finalized?'Parto':'Faltam'}</span><b${t3?' class="alert"':''}>${finalized?fmtDate(e.dataParto):left==null?'—':left>0?`${left} sem.`:'DPP vencida'}</b></div></div>
+      <div class="pq-d-facts"><div><span>IG</span><b>${weeks==null?(e.monitoraPeriodo?`${esc(e.monitoraPeriodo)} (Monitora)`:'—'):`${weeks} sem · ${trimesterOf(weeks)} tri`}</b></div><div><span>DUM</span><b>${fmtDate(e.ultimaMenstruacao)}</b></div><div><span>DPP</span><b>${dpp?fmtDate(dpp):'—'}</b></div><div><span>${finalized?'Parto':'Faltam'}</span><b${t3?' class="alert"':''}>${finalized?fmtDate(e.dataParto):left==null?'—':left>0?`${left} sem.`:'DPP vencida'}</b></div></div>
       ${dum?`<div class="pq-track" aria-label="Gestação: ${weeks??'—'} de 40 semanas"><div class="pq-bands"><i><span>1º tri</span></i><i><span>2º tri</span></i><i><span>3º tri</span></i></div><div class="pq-fill${t3?' t3':''}" style="width:${nowX??0}%"></div>${evs.map(v=>`<span class="pq-ev${v.future?' future':''}" title="${esc(v.t)}" style="left:${v.x}%;--c:${v.c}"></span>`).join('')}<span class="pq-now" style="left:${nowX??0}%"><span>${finalized?'parto':'hoje'}</span></span></div>`:''}
     </section>
     <section class="pq-d-card"><div class="pq-d-card-h"><div class="pq-sec-t">Histórico e notas</div><span class="pq-d-count">${(f.history||[]).length} registro(s)</span></div>
@@ -1589,19 +1643,19 @@ function openEpisode(id,tab,opts={}){
   const edit=pregDrawer.edit&&e.origin!=='manual';
   const field=(id,label,value,type='text',full=false,display)=>`<label class="pq-f${full?' full':''}"><span>${label}</span>${edit?(type==='textarea'?`<textarea id="${id}">${esc(value||'')}</textarea>`:`<input id="${id}" type="${type}" value="${esc(value||'')}">`):`<b>${esc(display??(value||'—'))}</b>`}</label>`;
   const dados=`<section class="pq-d-card"><div class="pq-d-card-h"><div class="pq-sec-t">Cadastro</div>${e.origin==='manual'?`<button class="pq-link" data-edit-manual="${esc(e.id)}">Editar cadastro</button>`:edit?'':'<button class="pq-link" data-preg-edit>Editar</button>'}</div>
-      ${edit?'<p class="pq-d-hint">As correções ficam salvas só nesta ferramenta. O CSV original do Metabase não é alterado.</p>':e.origin==='manual'?'<p class="pq-d-hint">Cadastro manual: as alterações mudam o próprio cadastro.</p>':''}
+      ${edit?`<p class="pq-d-hint">${e.origin==='monitora'?'Os dados ficam salvos só nesta ferramenta, guardados pelo número da Usuária do Monitora APS.':'As correções ficam salvas só nesta ferramenta. O CSV original do Metabase não é alterado.'}</p>`:e.origin==='manual'?'<p class="pq-d-hint">Cadastro manual: as alterações mudam o próprio cadastro.</p>':''}
       <div class="pq-form">${field('efNome','Nome',e.nome,'text',true)}${field('efProntuario','Prontuário (CELK)',e.prontuario)}${field('efEquipe','Equipe',e.equipe)}${field('efNascimento','Nascimento',isoDate(e.dataNascimento),'date',false,fmtDate(e.dataNascimento))}${field('efTelefone','Telefone',e.telefone)}${field('efEndereco','Endereço',address,'text',true)}${field('efDum','DUM',isoDate(e.ultimaMenstruacao),'date',false,fmtDate(e.ultimaMenstruacao))}${field('efDpp','DPP',isoDate(e.dataProvParto),'date',false,fmtDate(e.dataProvParto))}${field('efParto','Data do parto',isoDate(e.dataParto),'date',false,fmtDate(e.dataParto))}${field('efNota','Nota local',e.notaLocal,'textarea',true)}</div>
       ${edit?`<div class="pq-d-edit-a"><button type="button" class="btn" data-preg-edit>Cancelar</button><button type="button" class="btn primary" data-save-all-fields="${esc(e.id)}">Salvar correções</button></div>`:''}
     </section>
-    <details class="pq-d-card pq-tech"><summary>Detalhes técnicos</summary><div class="facts"><div class="fact"><span>Origem</span><strong>${esc(e.origin==='manual'?'Cadastro manual':e.origin==='metabase_manual'?'Manual + Metabase':`CSV do Metabase${e.line?`, linha ${e.line}`:''}`)}</strong></div><div class="fact"><span>Telefone normalizado</span><strong>${esc(e.phoneNormalized||'Inválido ou sem DDD')}</strong></div><div class="fact"><span>Valor original do CSV</span><strong>${esc(e.consultaSaudeBucal||'Não veio do Metabase')}</strong></div><div class="fact"><span>Interpretação 2I</span><strong>${esc(status2ILabel(e.status2i))}</strong></div><div class="fact"><span>Atividade manual</span><strong>${fmtDate(e.dataAtividadeManual)}</strong></div><div class="fact"><span>Observação manual</span><strong>${esc(e.observacao||'—')}</strong></div><div class="fact"><span>Situação na lista</span><strong>${excl?'Removida (pode ser restaurada)':'Na lista de trabalho'}</strong></div></div></details>`;
+    <details class="pq-d-card pq-tech"><summary>Detalhes técnicos</summary><div class="facts"><div class="fact"><span>Origem</span><strong>${esc(e.origin==='manual'?'Cadastro manual':e.origin==='metabase_manual'?'Manual + Metabase':e.origin==='monitora'?'Monitora APS (lista anonimizada)':`CSV do Metabase${e.line?`, linha ${e.line}`:''}`)}</strong></div><div class="fact"><span>Telefone normalizado</span><strong>${esc(e.phoneNormalized||'Inválido ou sem DDD')}</strong></div><div class="fact"><span>Valor original do CSV</span><strong>${esc(e.consultaSaudeBucal||'Não veio do Metabase')}</strong></div><div class="fact"><span>Interpretação 2I</span><strong>${esc(status2ILabel(e.status2i))}</strong></div><div class="fact"><span>Atividade manual</span><strong>${fmtDate(e.dataAtividadeManual)}</strong></div><div class="fact"><span>Observação manual</span><strong>${esc(e.observacao||'—')}</strong></div>${e.monitoraUsuaria?`<div class="fact"><span>Monitora APS</span><strong>Usuária ${esc(e.monitoraUsuaria)} · ${esc(e.monitoraPeriodo||'—')} · Cons.Odonto ${esc(e.consOdontoMonitora||'—')} · Equipe ${esc(e.monitoraEquipe||'—')}</strong></div>`:''}<div class="fact"><span>Situação na lista</span><strong>${excl?'Removida (pode ser restaurada)':'Na lista de trabalho'}</strong></div></div></details>`;
   const menu=`<button data-copy-name="${esc(e.id)}">${icon('copy')}Copiar nome</button>${e.prontuario?`<button data-copy-text="${esc(e.prontuario)}">${icon('copy')}Copiar prontuário</button>`:''}<button data-followup="${esc(e.id)}|atende_confirmado">${icon('check')}Marcar como confirmado no Metabase</button><button data-followup="${esc(e.id)}|nao_contatada">${icon('clock')}Reiniciar acompanhamento</button>${e.origin==='manual'?`<button data-archive-manual="${esc(e.id)}">${icon('file')}Arquivar cadastro manual</button>`:''}${excl?`<button data-restore-episode="${esc(e.id)}">${icon('check')}Restaurar na lista</button>`:`<button class="danger" data-exclude-episode="${esc(e.id)}">${icon('trash')}Remover da lista</button>`}`;
   openDrawer(`<div class="pq-drawer tone-${pregTone(e)}">
     <header class="pq-d-h">
       <div class="pq-d-h-top"><div class="pq-d-nav"><button class="pq-icon" data-preg-nav="-1" ${idx<=0?'disabled':''} aria-label="Gestante anterior"><span class="flip">${icon('chevron')}</span></button><span>${idx>=0?`${idx+1} de ${q.length}`:'fora da aba atual'}</span><button class="pq-icon" data-preg-nav="1" ${idx<0||idx>=q.length-1?'disabled':''} aria-label="Próxima gestante">${icon('chevron')}</button></div>
         <div class="pq-menu-wrap"><button class="pq-icon" data-preg-menu aria-label="Mais opções">•••</button><div class="pq-menu" hidden>${menu}</div></div>
         <button class="pq-icon" data-close-drawer aria-label="Fechar">${icon('close')}</button></div>
-      <h2>${esc(e.nome||'Gestante')}</h2>
-      <p class="pq-d-sub">Equipe ${esc(e.equipe||'—')}${ageAt(e)==null?'':` · ${ageAt(e)} anos`} · <span class="mono">${esc(e.prontuario||'ID local temporário')}</span> · ${esc(e.origin==='manual'?'cadastro manual':e.origin==='metabase_manual'?'manual + Metabase':'Metabase')}</p>
+      <h2>${esc(pregDisplayName(e))}</h2>
+      <p class="pq-d-sub">Equipe ${esc(e.equipe||'—')}${ageAt(e)==null?'':` · ${ageAt(e)} anos`} · <span class="mono">${esc(e.prontuario||'ID local temporário')}</span> · ${esc(e.origin==='manual'?'cadastro manual':e.origin==='metabase_manual'?'manual + Metabase':e.origin==='monitora'?'Monitora APS':'Metabase')}${e.monitoraUsuaria&&e.origin!=='monitora'?' + Monitora APS':''}</p>
       <div class="pq-tags">${pregStagePill(e)}${pregTags(e)}</div>
       <div class="pq-d-tabs"><button class="pq-d-tab${pregDrawer.tab==='acomp'?' on':''}" data-preg-dtab="acomp">Acompanhamento</button><button class="pq-d-tab${pregDrawer.tab==='dados'?' on':''}" data-preg-dtab="dados">Dados cadastrais</button></div>
     </header>
@@ -1620,7 +1674,7 @@ function export2I(mode){const rows=applyPregFilters(mergedEpisodes()),nominal=mo
 function backupState(type='full'){
   const copy=structuredClone(state);copy.dirty=false;
   for(const snap of copy.snapshots||[]){for(const p of snap.procedureCounts||[])delete p.professionals;for(const month of Object.values(snap.dataByMonth||{}))for(const p of month.procedureCounts||[])delete p.professionals}
-  if(type==='analytic'){copy.snapshots=copy.snapshots.filter(s=>s.profile!=='metabase_gestantes_2i');copy.gestantes={manual:[],followups:{},merges:{},excluded:{},overrides:{}};copy.audit=(copy.audit||[]).filter(a=>!String(a.action).startsWith('2i_'));copy.columnMappings={...copy.columnMappings,consulta2i:{}};for(const snap of copy.snapshots||[])for(const month of Object.values(snap.dataByMonth||{})){delete month.firstPatients;delete month.concludedPatients}}
+  if(type==='analytic'){copy.snapshots=copy.snapshots.filter(s=>s.profile!=='metabase_gestantes_2i'&&s.profile!==MONITORA_PROFILE);copy.gestantes={manual:[],followups:{},merges:{},excluded:{},overrides:{},puerperioIgnored:{}};copy.audit=(copy.audit||[]).filter(a=>!String(a.action).startsWith('2i_'));copy.columnMappings={...copy.columnMappings,consulta2i:{}};for(const snap of copy.snapshots||[])for(const month of Object.values(snap.dataByMonth||{})){delete month.firstPatients;delete month.concludedPatients}}
   return copy;
 }
 async function createBackupEnvelope(type='full'){
@@ -2105,6 +2159,13 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('215. Cadastro manual guarda só a data informada (DUM ou DPP), para a mesclagem com o CSV continuar comparando exatamente a mesma data',()=>{const save=saveManualPregnant.toString();return save.includes("ultimaMenstruacao:mpForm.ref==='dum'?d.ref:''")&&save.includes("dataProvParto:mpForm.ref==='dpp'?d.ref:''")});
   await add('216. "Desfazer" depois de registrar um contato restaura o acompanhamento anterior (ou remove, se não havia)',()=>{const src=setFollowupWithUndo.toString();return src.includes('JSON.parse(JSON.stringify(state.gestantes.followups[id]))')&&src.includes('state.gestantes.followups[id]=prev')&&src.includes('delete state.gestantes.followups[id]')&&src.includes("'Desfazer'")});
   await add('217. Filtros de ano, quadrimestre e mês ficam ocultos na view de gestantes (não afetam o 2I) e voltam nas outras views',()=>{switchView('pregnant',{save:false});const hidden=document.getElementById('appShell').classList.contains('is-pregnant-view');switchView('overview',{save:false});const back=!document.getElementById('appShell').classList.contains('is-pregnant-view');return hidden&&back});
+  await add('218. detectCSVProfile reconhece a lista de gestantes do Monitora APS pelos cabeçalhos Equipe/Usuária/Período/Cons.Odonto (cabeçalho real do arquivo exportado)',()=>detectCSVProfile('Unidade,Equipe,Usuária,Período,1ªCons.12s.,7 consultas,7 PA,7 PesoAlt,DTPA,Exames T1,Exames T3,Cons.Puérp.,Cons.Odonto'.split(','))==='monitora_aps_2i');
+  await add('219. parseMonitoraCSV lê só Equipe, Usuária e Cons.Odonto e separa quem está em Puerpério (não entra na lista)',async()=>{const csv=['Unidade,Equipe,Usuária,Período,1ªCons.12s.,7 consultas,7 PA,7 PesoAlt,DTPA,Exames T1,Exames T3,Cons.Puérp.,Cons.Odonto','CS MONTE SERRAT,120,78503,Puerpério,Sim,Não,Não,Não,Não,Não,Não,Não,Não','CS MONTE SERRAT,120,721139,T3,Sim,Sim,Não,Sim,Sim,Sim,Sim,Não,Sim','CS MONTE SERRAT,121,71735,T3,Sim,Sim,Não,Não,Sim,Sim,Não,Não,Não'].join('\n');const snap=await parseMonitoraCSV({name:'monitora.csv'},'hash_selftest_219',csv);sessionRaw.delete(snap.id);const r=Object.fromEntries(snap.monitoraRows.map(x=>[x.usuaria,x]));return snap.profile===MONITORA_PROFILE&&snap.puerperio.join()==='78503'&&snap.monitoraRows.length===2&&r['721139'].monitoraOdonto==='atende'&&r['71735'].monitoraOdonto==='pendente'&&r['71735'].equipe==='121'&&snap.unit==='CS MONTE SERRAT'});
+  await add('220. Usuária do Monitora com o mesmo número de um prontuário já guardado vira vínculo (sem linha nova) e Cons.Odonto = Sim conta como atendida sem mudar o status bruto do CSV',()=>{const mb={id:'sMb220',profile:'metabase_gestantes_2i',createdAt:new Date(Date.now()+9e10).toISOString(),episodes:[{id:'e220',nome:'Ana',prontuario:'000721139',equipe:'ESF 120',status2i:'pendente'}]},mon={id:'sMon220',profile:MONITORA_PROFILE,createdAt:new Date(Date.now()+9e10).toISOString(),monitoraRows:[{usuaria:'721139',equipe:'120',periodo:'T3',consOdonto:'Sim',monitoraOdonto:'atende'}],puerperio:[]};state.snapshots.push(mb,mon);const eps=mergedEpisodes(),e=eps.find(x=>x.id==='e220');const ok=eps.length===1&&!!e&&e.monitoraUsuaria==='721139'&&e.status2i==='pendente'&&isAttended(e);state.snapshots=state.snapshots.filter(x=>x!==mb&&x!==mon);return ok});
+  await add('221. Usuária do Monitora sem vínculo entra como gestante nova "mon-<usuária>" com Dados a completar; T3 já conta como prioridade e a próxima ação é Completar dados',()=>{const mon={id:'sMon221',profile:MONITORA_PROFILE,createdAt:new Date(Date.now()+9e10).toISOString(),monitoraRows:[{usuaria:'999221',equipe:'122',periodo:'T3',consOdonto:'Não',monitoraOdonto:'pendente'}],puerperio:[]};const saved=state.snapshots;state.snapshots=[mon];const e=mergedEpisodes().find(x=>x.id==='mon-999221');const n=e&&pregNextAction(e);const ok=!!e&&e.origin==='monitora'&&needsData(e)&&isPriority2I(e)&&n.kind==='dados'&&pregDisplayName(e)==='Usuária 999221'&&pregTags(e).includes('Dados a completar');state.snapshots=saved;return ok});
+  await add('222. Puerpério no Monitora remove da lista quem já estava nela (de forma reversível) e, se restaurada, não é removida de novo na próxima importação',()=>{const mb={id:'sMb222',profile:'metabase_gestantes_2i',createdAt:new Date(Date.now()+9e10).toISOString(),episodes:[{id:'e222',nome:'Bia',prontuario:'274599',equipe:'ESF 120',status2i:'pendente'}]},mon={id:'sMon222',profile:MONITORA_PROFILE,createdAt:new Date(Date.now()+9e10).toISOString(),monitoraRows:[],puerperio:['274599']};const saved=state.snapshots;state.snapshots=[mb,mon];const removed=applyMonitoraPuerperio(),wasExcluded=state.gestantes.excluded['e222']?.source==='monitora_puerperio';restoreEpisode('e222');const again=applyMonitoraPuerperio();const ok=removed===1&&wasExcluded&&again===0&&!isExcluded('e222');delete state.gestantes.puerperioIgnored['e222'];state.snapshots=saved;return ok});
+  await add('223. Dados completados e acompanhamento de uma gestante do Monitora migram para o registro com o mesmo prontuário quando ela aparece no CSV do Metabase, sem sobrescrever o que o Metabase já traz',()=>{const mon={id:'sMon223',profile:MONITORA_PROFILE,createdAt:new Date(Date.now()+9e10).toISOString(),monitoraRows:[{usuaria:'71735',equipe:'120',periodo:'T3',consOdonto:'Não',monitoraOdonto:'pendente'}],puerperio:[]},mb={id:'sMb223',profile:'metabase_gestantes_2i',createdAt:new Date(Date.now()+9e10).toISOString(),episodes:[{id:'e223',nome:'Nome Oficial',prontuario:'71735',equipe:'ESF 120',telefone:'',status2i:'pendente'}]};const saved=state.snapshots;state.snapshots=[mon];state.gestantes.overrides['mon-71735']={nome:'Nome Digitado',telefone:'48988887777'};state.gestantes.followups['mon-71735']={state:'whatsapp_enviado',updatedAt:nowISO(),history:[{at:nowISO(),from:'nao_contatada',to:'whatsapp_enviado'}]};state.snapshots=[mb,mon];migrateMonitoraLinks();const e=mergedEpisodes().find(x=>x.id==='e223');const ok=!!e&&e.nome==='Nome Oficial'&&e.telefone==='48988887777'&&followupFor('e223').state==='whatsapp_enviado'&&!state.gestantes.overrides['mon-71735']&&!state.gestantes.followups['mon-71735'];delete state.gestantes.overrides['e223'];delete state.gestantes.followups['e223'];state.snapshots=saved;return ok});
+  await add('224. "Limpar tudo" do 2I e o backup analítico também removem a lista do Monitora APS',()=>{const b=backupState('analytic');return clearAllGestantesData.toString().includes('MONITORA_PROFILE')&&!b.snapshots.some(s=>s.profile===MONITORA_PROFILE)&&profileLabel(MONITORA_PROFILE).includes('Monitora APS')});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 

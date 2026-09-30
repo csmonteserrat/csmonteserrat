@@ -1,5 +1,30 @@
 # Histórico de versões
 
+## Versão 2.9 (importação da lista de gestantes do Monitora APS, anonimizada, com vínculo pelo número da Usuária e remoção de puérperas)
+
+- **Pedido do usuário**, com o CSV real "Monitora APS - Listas de Pacientes Gestante e Puérpera": "quero que a página seja capaz de ler esse CSV do Monitora APS […], que é lista de gestante anonimizada, daí falta os dados que precisam ser completados. […] o que é importante é pegar Equipe, Usuária e Cons.Odonto. Usuária se já tiver a mesma já com dados guardados já fazer o link. Em 'Período' se tiver o valor 'Puerpério' é pra deletar a gestante, não precisa adicionar."
+- **Novo perfil de importação `monitora_aps_gestantes`**:
+  - É reconhecido pelos cabeçalhos Equipe, Usuária, Período e Cons.Odonto. As outras colunas (7 consultas, exames, DTPA etc.) são ignoradas.
+  - Uma nova importação substitui a anterior, como já acontece com o CSV do Metabase.
+- **Vínculo pela Usuária**:
+  - A Usuária é comparada com o prontuário (CELK) das gestantes já guardadas, vindas do CSV do Metabase ou de cadastro manual, só por dígitos e ignorando zeros à esquerda.
+  - Quando bate, não entra linha nova. A gestante existente ganha os dados do Monitora (período, Cons.Odonto e equipe) e "Cons.Odonto = Sim" passa a contar como atendida em `isAttended`, sem alterar o status bruto do CSV do Metabase.
+- **Sem vínculo**:
+  - A gestante entra como "Usuária <número>", com o selo "Dados a completar" e a próxima ação "Completar dados", que abre a gaveta já no formulário.
+  - O "T3" do Monitora já conta como prioridade de 3º trimestre, mesmo sem DUM.
+  - O que se completa fica guardado pelo número da Usuária (`mon-<usuária>`) e é reaproveitado nas próximas importações.
+  - Se ela aparecer depois no CSV do Metabase ou num cadastro manual com o mesmo prontuário, acompanhamento, dados completados e remoção migram para esse registro. Só preenchem o que o Metabase não traz: nome oficial, DUM etc. não são sobrescritos.
+- **Puerpério**:
+  - Não entra na lista.
+  - Quem já estava nela é removida da lista de trabalho, com o motivo "Puerpério no Monitora APS" e de forma reversível: fica em "Mais filtros → Só removidas".
+  - Se for restaurada à mão, não é removida de novo nas próximas importações.
+  - A regra também vale quando o CSV do Metabase é importado depois do Monitora.
+- **Aviso ao importar**: resume quantas foram vinculadas, quantas estão com dados a completar e quantas puérperas não entraram ou foram removidas.
+- **Limpar tudo e backup**: "Limpar tudo" do 2I e o backup analítico também removem a lista do Monitora.
+- **Verificado com Playwright**: 224/224 autotestes passam, com 7 novos (218–224), incluindo o cabeçalho real do arquivo. Testado de ponta a ponta com o **arquivo real** (18 linhas) junto de um CSV do Metabase de teste:
+  - 1 gestante vinculada, 14 com dados a completar e 3 em puerpério fora da lista, das quais 1 que já estava nela foi removida.
+  - Uma Usuária completada à mão (nome, telefone e DUM) e com WhatsApp registrado teve acompanhamento e telefone migrados quando passou a aparecer no Metabase, mantendo o nome oficial.
+
 ## Versão 2.8 (página de Gestantes redesenhada como fila de trabalho: abas por etapa, cards em cores, próxima ação, nova gaveta e nova janela de cadastro)
 
 - **Pedido do usuário**: "eu quero repensar o design da página de gestantes". O que mais incomodava era a dificuldade de saber quem contatar e o excesso de filtros e informação antes da lista. O desenho foi aprovado por etapas num protótipo navegável com dados fictícios. Primeiro a página, depois os cards ("em lista como na versão atual, porém com uma corzinha pastel leve de acordo com os tipos e condições"), depois a gaveta da gestante e por fim a janela de cadastro. Só uma correção foi pedida no fim: o campo é "Prontuário (CELK)", não CNS.
