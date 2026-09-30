@@ -1,5 +1,18 @@
 # Histórico de versões
 
+## Versão 2.23 (excluir um arquivo importado)
+
+- **Pedido do usuário**: poder excluir um arquivo específico em Configurações › Arquivos importados, removendo os dados dele do histórico.
+- Cada arquivo tem um botão de lixeira na lista, e a gaveta "Conferir" tem "Excluir este arquivo…". Antes de excluir, um aviso diz o que acontece com aquele tipo de arquivo:
+  - **Produção**: os indicadores do período deixam de usar a produção dele (M1, M2, M4, M5 e B1 a B6), assim como a página Procedimentos e o cruzamento com as gestantes.
+  - **Atividades em grupo**: M3 e B4 do período deixam de usar as atividades dele.
+  - **Gestantes (Metabase ou Monitora)**: quem veio só dele sai da lista; quem também está em outro arquivo continua. O acompanhamento registrado fica guardado e volta se o arquivo for importado de novo.
+  - **População ativa**: o denominador de M1/B1 já confirmado continua valendo.
+  - Se o arquivo tinha substituído outro do mesmo período, o anterior volta a valer (e o aviso diz qual).
+  - O cadastro de nomes de pacientes não é apagado.
+- A exclusão fica registrada na auditoria. Para desfazer, basta importar o arquivo de novo (a checagem de arquivo repetido libera o mesmo arquivo depois de excluído).
+- **Verificado com Playwright**: 258/258 autotestes (1 novo, 258). De ponta a ponta com o CSV real de produção e 180 gestantes: excluir o CSV de gestantes tira da lista só quem veio dele; excluir a produção zera M4; tudo continua assim depois de recarregar.
+
 ## Versão 2.22 (gestantes mais rápidas e colar data nos campos de data)
 
 - **Relato do usuário**: "o site está lento, principalmente no carregamento das gestantes e nas edições nas gestantes" e "nas datas o site não aceita eu copiar a data e colar".

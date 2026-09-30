@@ -656,3 +656,9 @@ table.st-table{min-width:560px;width:100%}
   .st-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.st-box{padding:16px}
 }
 @media print{.st-tabs,.st-acts,.st-foot .btn,.st-golink .link-btn{display:none!important}}
+/* ---- Excluir arquivo (v2.23) ---- */
+.st-file-acts{display:flex;gap:6px;justify-content:flex-end}
+.btn.st-del{padding:0 9px;color:var(--muted)}.btn.st-del:hover{color:var(--red);border-color:var(--red)}
+.btn.st-del svg{width:15px;height:15px}
+.st-del-row{display:flex;justify-content:flex-end}
+@media(max-width:640px){.st-file .st-file-acts{grid-column:2;grid-row:2}}

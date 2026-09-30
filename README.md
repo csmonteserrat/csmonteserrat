@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.22
+# Acompanhamento Odontológico · versão 2.23
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -31,7 +31,7 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 ## Configurações
 
 - **Geral**: salvamento no navegador e backup em arquivo (com a situação de cada um), denominadores de M1/B1 e M3/B4 com botão para editar, e "Sobre" (versões, regras e passo a passo).
-- **Arquivos**: importação e a lista de arquivos agrupada por tipo, com o estado de cada um (em uso, somado ou substituído). "Conferir" abre a gaveta do arquivo: o que ele trouxe, onde entra no cálculo, avisos, linhas lidas e detalhes técnicos.
+- **Arquivos**: importação e a lista de arquivos agrupada por tipo, com o estado de cada um (em uso, somado ou substituído). "Conferir" abre a gaveta do arquivo: o que ele trouxe, onde entra no cálculo, avisos, linhas lidas e detalhes técnicos. O botão da lixeira exclui o arquivo: os dados dele saem de todos os cálculos e, se ele tinha substituído um arquivo do mesmo período, o anterior volta a valer.
 - **Verificação**: primeiro o que precisa de ação, depois as informações dos arquivos, os limites das fontes e os testes internos.
 - **Conferência por procedimento**: quanto de cada procedimento foi lido, excluído e validado no mês, e em que indicador entra, com exportação em CSV.
 
