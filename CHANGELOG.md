@@ -1,5 +1,26 @@
 # Histórico de versões
 
+## Versão 2.11 (cadastro de pacientes código → nome, montado a partir dos relatórios de produção, para completar listas anonimizadas)
+
+- **Pedido do usuário**: "quero que ao importar a produção CSV ou PDF o app guarde o nome também, para que, por exemplo, quando eu colocar uma nova gestante, ou outros relatórios anonimizados no futuro, já pegue automaticamente o nome do paciente".
+- **Cadastro de pacientes**:
+  - Novo `state.patientDirectory`, com o código do CELK (só dígitos, sem zeros à esquerda) apontando para `{nome, fonte, atualizadoEm}`.
+  - É alimentado a cada importação do relatório "Procedimentos Detalhado", em CSV ou PDF, a partir do "( código ) NOME" de cada linha.
+  - A última importação vence, o que corrige grafias.
+  - O aviso da importação informa quantos pacientes foram guardados, novos ou atualizados.
+- **Onde o nome entra sozinho**:
+  - **Monitora APS**: uma gestante sem vínculo ganha o nome do cadastro no lugar de "Usuária <número>". O que for digitado à mão continua valendo, e "Detalhes técnicos" indica quando o nome veio da produção.
+  - **Cadastro manual de gestante**: ao digitar o prontuário, o nome é preenchido se o campo estiver vazio, com a mensagem "✓ Nome encontrado na produção do CELK". Se a pessoa digitar outro nome, ele não é trocado.
+  - **Relatórios anonimizados futuros**: `patientNameFor(código)` é o ponto único de consulta.
+- **Backup**:
+  - O cadastro vai no backup completo e é somado na mesclagem de backups. A mesclagem agora também preserva `puerperioIgnored` (v2.9), que tinha ficado de fora.
+  - O backup analítico não leva o cadastro.
+- **Reimportação**: relatórios de produção importados antes desta versão precisam ser reimportados para alimentar o cadastro.
+- **Verificado com Playwright**: 232/232 autotestes passam, com 4 novos (229–232). Testado de ponta a ponta:
+  - A importação da produção guardou os pacientes.
+  - A lista do Monitora mostrou o nome da Usuária que estava na produção.
+  - No cadastro manual, o nome se preencheu ao digitar o prontuário, mesmo com zero à esquerda.
+
 ## Versão 2.10 (cruzamento do prontuário da gestante com os atendimentos dos relatórios de produção do CELK)
 
 - **Pedido do usuário**: "veja se é possível bater o dado do prontuário com o dado do atendimento odontológico dos relatórios de produção".
