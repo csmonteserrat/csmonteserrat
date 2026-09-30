@@ -357,3 +357,5 @@ sup a{color:var(--primary);text-decoration:none;font-weight:700}
   .mp-modal .modal-foot{padding:10px 16px}.mp-modal .modal-foot .btn{flex:1 1 40%;justify-content:center}.mp-modal .modal-foot .btn.primary{flex-basis:100%;order:-1}.mp-spacer{display:none}
 }
 @media print{.pq-head .pq-actions,.pq-go,.pq-tools,.pq-legend-tones{display:none!important}.pq-card{grid-template-columns:1.4fr 1.2fr 1fr;break-inside:avoid}}
+.pq-tag.gray{color:#5c6080;background:#eef0f7}
+.pq-alert.blue{background:#eff1ff;color:#3a52c4}

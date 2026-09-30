@@ -1,4 +1,4 @@
-# Indicadores Saúde Bucal · versão 2.8
+# Indicadores Saúde Bucal · versão 2.11
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -17,6 +17,17 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - O consolidado do Metabase permanece como referência de conferência.
 - Divergências entre CELK e Metabase são apresentadas nos cards, na reconciliação e no diagnóstico.
 - O Metabase só fornece o resultado ativo quando não há relatório CELK aplicável para aquela competência.
+
+## Gestantes (2I)
+
+- A lista vem do CSV de gestantes do Metabase e, opcionalmente, da lista "Gestante e Puérpera" do **Monitora APS**.
+- Do Monitora APS só se usam **Equipe**, **Usuária** e **Cons.Odonto**. A Usuária é o número do prontuário do CELK:
+  - Quando bate com uma gestante já guardada, ela é vinculada, e "Cons.Odonto = Sim" conta como atendida.
+  - Sem correspondência, ela entra como "Dados a completar".
+  - Quem está em **Puerpério** não entra, e quem já estava na lista sai dela (de forma reversível).
+- O relatório de produção **Procedimentos Detalhado** do CELK traz o paciente como "( código ) NOME". Esse código é o mesmo número do prontuário. Um atendimento da equipe de saúde bucal **dentro da gestação** (da DUM até o parto ou hoje; sem DUM, nos últimos 300 dias) conta a gestante como atendida. A atividade educativa em grupo não conta.
+- Ao importar a produção (CSV ou PDF), o app guarda um **cadastro de pacientes** (código do CELK → nome). Com ele, o nome é preenchido automaticamente nas listas anonimizadas, como a do Monitora APS, e no cadastro manual de gestante ao digitar o prontuário. Esse cadastro vai no backup completo, mas não no analítico.
+- Os dados completados à mão ficam guardados pelo número da Usuária. Se ela aparecer depois no CSV do Metabase, migram para esse registro sem sobrescrever o que o Metabase traz.
 
 ## Publicar no Render
 
