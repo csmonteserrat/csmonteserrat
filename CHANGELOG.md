@@ -1,5 +1,18 @@
 # Histórico de versões
 
+## Versão 2.18 (M4 com a mesma conta da B5)
+
+- **Pedido do usuário**: "deixe a regra de cálculo municipal igual à regra federal, considerando a mesma conta", depois de conferir a lista de denominadores da Nota B5.
+- **M4 agora usa a conta da B5**:
+  - Numerador: os 7 procedimentos preventivos (sem mudança).
+  - Denominador: a lista fechada de 28 códigos SIGTAP da Nota B5, no lugar de "todo procedimento individual do mês".
+  - Saem do denominador de M4: atendimentos genéricos e de urgência, consulta de nível superior, visita domiciliar, aferição de pressão, atividade em grupo, retirada de pontos, curetagem periapical, odontossecção, excisão/sutura, correção de irregularidades, ajuste oclusal, exodontia de decíduo e exodontia múltipla.
+  - Corte (20%) e meta (40%) municipais não mudam. O resultado de M4 tende a subir, porque o denominador fica menor.
+- **B5 passa a espelhar M4** (como B1/M1, B2/M2, B4/M3 e B6/M5): mesmo numerador e denominador, muda só a faixa. Na página Federal, B5 ganha o selo "= M4" e só B3 fica com "regra própria". A gaveta da B5 leva para a do M4, que mostra o que entrou no numerador e no denominador.
+- **Texto corrigido**: a explicação falava em "~27 códigos" da Nota B5; agora diz 28.
+- A conferência completa, a Conferência por procedimento e a gaveta do M4 mostram "M4 den" nos 28 procedimentos da lista, e não mais nos que saíram.
+- **Verificado com Playwright**: 253/253 autotestes passam (testes 55, 58, 97 e 186 ajustados e o novo 253, que confere M4 = B5 e que atendimento genérico, aferição de pressão e exodontia de decíduo ficam fora).
+
 ## Versão 2.17 (Configurações redesenhadas: quatro abas com a situação no botão, sem blocos repetidos, e o "Conferir" de cada arquivo numa gaveta)
 
 - **Pedido do usuário**: "repense o design da página de configurações de forma que fique mais limpa, mais fácil de ler e menos redundante", mostrando antes de aplicar. Decisões no protótipo: a "Conferência por procedimento" vira uma subaba própria de Configurações, e o "Conferir" de cada arquivo também foi redesenhado.
