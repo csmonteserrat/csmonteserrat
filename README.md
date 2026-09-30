@@ -1,4 +1,4 @@
-# Indicadores Saúde Bucal · versão 2.14
+# Indicadores Saúde Bucal · versão 2.15
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -21,7 +21,10 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 
 ## Gestantes (2I)
 
-- A lista vem do CSV de gestantes do Metabase e, opcionalmente, da lista "Gestante e Puérpera" do **Monitora APS**.
+- A lista vem do CSV de gestantes do Metabase e, opcionalmente, da lista "Gestante e Puérpera" do **Monitora APS**. **Cada novo arquivo é somado aos anteriores**:
+  - A mesma gestante não duplica, e o dado mais recente atualiza o que mudou.
+  - "Sim" em consulta odontológica não volta para "Não".
+  - Quem não veio no arquivo novo é mantida.
 - Do Monitora APS só se usam **Equipe**, **Usuária** e **Cons.Odonto**. A Usuária é o número do prontuário do CELK:
   - Quando bate com uma gestante já guardada, ela é vinculada, e "Cons.Odonto = Sim" conta como atendida.
   - Sem correspondência, ela entra como "Dados a completar".

@@ -1,5 +1,27 @@
 # Histórico de versões
 
+## Versão 2.15 (listas de gestantes somadas: um CSV do Monitora APS ou do Metabase não apaga mais o outro)
+
+- **Relato do usuário**: "quando eu coloco um relatório do Monitora das gestantes e depois coloco outro, um apaga o outro. Não quero que nenhum relatório apague o outro, eu quero que a ferramenta veja o que repetiu, o que está igual e faça as equivalências para adicionar o que falta e manter o que já tem sem duplicar dado".
+- **Causa**:
+  - `commitSnapshot` marcava o arquivo anterior do mesmo tipo como substituído (`supersededBy`).
+  - `getActive2ISnapshot`/`getActiveMonitoraSnapshot` liam só o arquivo mais recente.
+  - Com isso, quem não estava no último arquivo sumia da lista. O mesmo acontecia com o CSV de gestantes do Metabase.
+- **Agora os arquivos se somam**. As novas `merged2IEpisodes` e `mergedMonitora` juntam todos os arquivos importados, do mais antigo para o mais recente:
+  - **Sem duplicar**: no Metabase, a mesma gestação (mesmo episódio: prontuário + DUM/DPP); no Monitora, o mesmo número de Usuária.
+  - **O mais recente atualiza** o que mudou, como período T2 → T3, telefone, DPP ou equipe. Um campo vazio no arquivo novo não apaga o que já havia.
+  - **"Sim" em consulta odontológica não volta para "Não"**: uma vez atendida num arquivo, continua atendida. A origem fica registrada nos detalhes técnicos ("Sim em arquivo anterior").
+  - **Quem não veio no arquivo novo é mantida.**
+  - **Puerpério**: se a informação mais recente sobre a Usuária é "Puerpério", ela sai da lista, de forma reversível, como antes. Se ela volta num arquivo posterior como gestante, volta para a lista.
+- **Resumo da importação**: diz quantas eram novas, quantas foram atualizadas, quantas estavam iguais ao que já havia e quantas não vieram no arquivo e foram mantidas. A página de gestantes mostra quantos arquivos foram somados.
+- **Arquivos já importados**: os de gestantes que tinham sido marcados como substituídos em versões anteriores voltam a valer ao abrir o app, e `recomputeSupersession` (mesclagem de backup) não marca mais esses perfis.
+- **Relatórios de produção e de atividades em grupo não mudaram.** Um novo arquivo do mesmo mês e unidade continua substituindo o anterior, para não contar a mesma produção duas vezes.
+- **Verificado com Playwright**: 244/244 autotestes passam, com 3 novos (242–244), e o teste 220 ficou independente de outros dados na lista. Testado de ponta a ponta com o CSV real do Monitora e um segundo arquivo modificado:
+  - 1 nova, 1 atualizada, 8 iguais (incluindo uma que veio "Não" depois de "Sim" e continuou atendida) e 5 mantidas.
+  - Uma puérpera nova saiu da lista.
+  - Com dois CSVs do Metabase, 3 + 1 gestantes, sem duplicar.
+  - Tudo permanece depois de recarregar a página.
+
 ## Versão 2.14 (Visão Geral redesenhada: resumo, "o que falta para bater as metas", situação dos dados, cartões com os meses do quadrimestre e gaveta do indicador com denominador editável)
 
 - **Pedido do usuário**: "repense o design da aba visão geral", mostrando antes de aplicar. O desenho foi aprovado num protótipo navegável, com estas decisões:
