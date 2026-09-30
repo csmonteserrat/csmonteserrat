@@ -1,4 +1,4 @@
-# Indicadores Saúde Bucal · versão 2.15
+# Indicadores Saúde Bucal · versão 2.16
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -16,8 +16,17 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 
 - Quando houver dados do CELK para o mês, eles são usados no cálculo.
 - O consolidado do Metabase permanece como referência de conferência.
-- Divergências entre CELK e Metabase são apresentadas nos cards, na reconciliação e no diagnóstico.
+- Divergências entre CELK e Metabase aparecem no Diagnóstico.
 - O Metabase só fornece o resultado ativo quando não há relatório CELK aplicável para aquela competência.
+
+## Indicadores municipais e federais
+
+- As páginas **Municipal** (M1–M5) e **Federal** (B1–B6) mostram o quadrimestre numa matriz: uma linha por indicador, os 4 meses, o resultado do quadrimestre e o que falta. Clicar numa linha abre a gaveta com a conta, o mês a mês e o que entrou no numerador e no denominador.
+- **Resultado do quadrimestre**:
+  - M1, M3, B1 e B4: média dos 4 meses (mês sem dado conta como 0%). O denominador é de população, então não se soma mês a mês.
+  - Os demais: soma dos numeradores e dos denominadores dos meses com dado. Na leitura federal é um cálculo de conveniência, porque as Notas não definem como consolidar o quadrimestre.
+- B1, B2, B4 e B6 usam os mesmos números de M1, M2, M3 e M5; muda só a faixa. B3 e B5 usam as listas de códigos das Notas.
+- Na página Federal, "Para subir de faixa" mostra quantos procedimentos faltam para a próxima faixa. Na B3 (exodontia), a ferramenta nunca recomenda produzir exodontias: mostra quanto o restante da produção precisaria crescer.
 
 ## Gestantes (2I)
 

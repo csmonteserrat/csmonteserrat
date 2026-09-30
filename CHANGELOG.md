@@ -1,5 +1,34 @@
 # Histórico de versões
 
+## Versão 2.16 (páginas Municipal e Federal redesenhadas: matriz do quadrimestre, "para subir de faixa" e gaveta federal; B1/B4 pela média dos 4 meses)
+
+- **Pedido do usuário**: "repensar o design da página municipal e federal sem modificar ainda o site, mantendo consistência com o design das gavetas". O desenho foi aprovado num protótipo, com estas decisões:
+  - B1 e B4 no quadrimestre passam a usar a **média dos 4 meses**, como M1 e M3.
+  - A seção "Reconciliação com o Metabase" sai da página Municipal.
+  - A página Federal segue a **ordem numérica B1–B6**.
+- **Página Municipal**:
+  - Resumo do quadrimestre com quantas metas estão garantidas (cumpridas, depois que o quadrimestre fecha) e a situação do prazo, no mesmo estilo da Visão Geral.
+  - **Matriz "Apuração do quadrimestre"**: uma linha por indicador (M1–M5), os 4 meses coloridos pela zona da meta (ou pelas faixas oficiais, em M1), o mês em foco destacado, meses a chegar hachurados, o resultado do quadrimestre e o que falta. Clicar na linha abre a gaveta do indicador já no quadrimestre.
+  - **Denominadores**: a conta de M1/B1 pela população ativa e os valores de M3/B4 em cada mês, com botão para confirmar ou editar (abre a gaveta no mês em foco). O link para o CSV da população no Data Studio ficou aqui.
+  - "Como é calculado" reúne as regras (média em M1/M3, soma em M2/M4/M5, corte e meta, fonte).
+  - Saem os cartões antigos, o aviso do topo e a Reconciliação com o Metabase. As divergências continuam no Diagnóstico.
+- **Página Federal**:
+  - Resumo com quantos indicadores estão em cada faixa (Ótimo, Bom, Suficiente, Regular), com a paleta federal própria.
+  - Matriz B1–B6 em ordem numérica. Os espelhos levam o selo "= M1", "= M2", "= M3" e "= M5"; B3 e B5 levam "regra própria".
+  - **"Para subir de faixa"**: quantos procedimentos faltam para a próxima faixa no quadrimestre (nova `fedNextBand`):
+    - B1, B2 e B4 somam só no numerador.
+    - B5 (abaixo de 85%) e B6 somam nos dois lados.
+    - B3 e B5 acima de 85% somam só no denominador (procedimentos que não são exodontia ou preventivo).
+    - Na B3 abaixo de 3%, a ferramenta avisa para conferir o registro e não recomenda produzir exodontias.
+  - **Gaveta federal** (nova `openFederalDetail`), no mesmo padrão das gavetas da Visão Geral: o que falta com a régua das faixas da Nota, o mês a mês com a faixa de cada mês, e o "Como é calculado" com a conferência completa. Nos espelhos, um botão abre a gaveta do M correspondente; em B3 e B5, a lista do que entrou no numerador e no denominador (marcando o que conta nos dois).
+- **Cálculo — B1/B4 no quadrimestre**: antes, somava os numeradores dos 4 meses e dividia pelo denominador de um único mês. Isso inflava o resultado (meses de ~0,7% davam 2,93%, "Ótimo"). Agora `cumulativeFederal` usa a média dos 4 meses, com mês sem dado contando como 0%, igual a M1/M3.
+- **Gaveta do indicador municipal**: `openIndicatorDetail` aceita o escopo (mês ou quadrimestre) vindo do botão, sem mudar a escolha da Visão Geral, e reabre no mesmo escopo depois de salvar um denominador.
+- **Código removido**: `indicatorCard`, `apuracaoMonthBoxes`, `federalMonthBoxes`, `denomInline`, `sharedDenomNote`, `divergenceNotice` e `monthProjection`, que só serviam às páginas antigas.
+- **Verificado com Playwright**: 247/247 autotestes passam. Os testes 91, 94, 97, 167, 168, 170, 175, 177 e 190 foram reescritos para as novas páginas, e há 3 novos (245–247). Testado de ponta a ponta com dados sintéticos, no computador e no celular (390 px, sem rolagem horizontal):
+  - Páginas, gavetas municipal e federal.
+  - Confirmação do denominador de M3 pela página Municipal.
+  - Passagem da gaveta B1 para a M1.
+
 ## Versão 2.15 (listas de gestantes somadas: um CSV do Monitora APS ou do Metabase não apaga mais o outro)
 
 - **Relato do usuário**: "quando eu coloco um relatório do Monitora das gestantes e depois coloco outro, um apaga o outro. Não quero que nenhum relatório apague o outro, eu quero que a ferramenta veja o que repetiu, o que está igual e faça as equivalências para adicionar o que falta e manter o que já tem sem duplicar dado".
