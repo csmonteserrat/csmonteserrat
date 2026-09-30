@@ -1,5 +1,19 @@
 # Histórico de versões
 
+## Versão 2.19 (restaurações reconhecidas pelo tipo, com SIGTAP)
+
+- **Achado ao conferir um CSV real do quadrimestre (mai a ago/2026)**: o CSV do CELK traz a descrição completa das restaurações, mas o app juntava tudo em "Restauração de dente permanente/decíduo (subtipo não exibido)", sem código, e mostrava o aviso "O CELK abrevia descrições de restaurações", que não valia para esse arquivo.
+- **Agora os 5 tipos da Nota B5 têm regra própria, com o SIGTAP**:
+  - 03.07.01.003-1 · permanente anterior com resina composta;
+  - 03.07.01.012-0 · permanente posterior com resina composta;
+  - 03.07.01.008-2 · decíduo posterior com resina composta;
+  - 03.07.01.010-4 · decíduo posterior com ionômero de vidro;
+  - 03.07.01.011-2 · decíduo anterior com resina composta.
+- Entram nas mesmas contas de antes (M4/B5, M5/B6 e B3), então **nenhum resultado muda**. Conferido com o CSV real: M4/B5 de 35,67%, 39,27%, 36,02% e 35,10% (mai a ago), iguais antes e depois, e iguais à conta refeita por fora a partir da lista de 28 códigos da Nota.
+- A descrição cortada (PDF) continua caindo na regra genérica, com o aviso. Com a descrição completa, o aviso não aparece.
+- Na página Procedimentos e na Conferência por procedimento, as restaurações aparecem separadas por tipo.
+- **Verificado com Playwright**: 254/254 autotestes (62 e 148 ajustados, 254 novo).
+
 ## Versão 2.18 (M4 com a mesma conta da B5)
 
 - **Pedido do usuário**: "deixe a regra de cálculo municipal igual à regra federal, considerando a mesma conta", depois de conferir a lista de denominadores da Nota B5.
