@@ -1,5 +1,29 @@
 # Histórico de versões
 
+## Versão 2.10 (cruzamento do prontuário da gestante com os atendimentos dos relatórios de produção do CELK)
+
+- **Pedido do usuário**: "veja se é possível bater o dado do prontuário com o dado do atendimento odontológico dos relatórios de produção".
+- **É possível.** O relatório "Procedimentos Detalhado" do CELK traz o paciente como "( código ) NOME", como em "( 2149034 ) ABIGAIL…", já coberto pelo autoteste 145. Até aqui o código era descartado por `stripIdPrefix`. Ele tem o mesmo formato do número de "Usuária" do Monitora APS, que o usuário confirmou ser o prontuário do CELK.
+- **Leitura**:
+  - A nova função `idPrefix` lê esse código no CSV e no PDF, sem mudar o nome usado nos outros cálculos.
+  - `buildProcedureSnapshotFromRows` passa a guardar, por mês, `patientVisits`: código do paciente, data e até 4 procedimentos, **sem o nome**.
+  - A atividade educativa em grupo não entra.
+- **Regra do 2I**:
+  - `isAttended` passa a considerar também um atendimento da produção com o mesmo prontuário **dentro da gestação**: da DUM (ou DUM estimada pela DPP) até o parto ou hoje.
+  - Sem DUM nem DPP, como nas gestantes que vieram só do Monitora, vale a janela dos últimos 300 dias.
+  - A comparação é só por dígitos, sem zeros à esquerda.
+  - Atendimentos antes da gestação não contam.
+- **Tela**:
+  - O card mostra "Atendimento odontológico no CELK · dd/mm" e o motivo "Atendida na produção do CELK em dd/mm · conta para a meta".
+  - Na gaveta, os atendimentos entram no histórico, com os procedimentos, e na régua de 40 semanas. "Detalhes técnicos" lista os atendimentos encontrados ou diz por que não há cruzamento.
+- **Privacidade**: o backup analítico remove `patientVisits`, como já fazia com `firstPatients` e `concludedPatients`.
+- **Reimportação**: relatórios de produção importados antes desta versão não guardaram os códigos e precisam ser reimportados para o cruzamento funcionar.
+- **Nenhuma fórmula municipal ou federal mudou.** O código do paciente é guardado à parte e não altera M1–M5, B1–B6 nem a página Procedimentos.
+- **Verificado com Playwright**: 228/228 autotestes passam, com 4 novos (225–228). Testado de ponta a ponta com um CSV de produção no formato real do CELK:
+  - Uma gestante com atendimento durante a gestação passou para "Atendidas".
+  - Outra, com atendimento só antes da DUM, continuou "A contatar".
+  - Um paciente que não é gestante foi ignorado.
+
 ## Versão 2.9 (importação da lista de gestantes do Monitora APS, anonimizada, com vínculo pelo número da Usuária e remoção de puérperas)
 
 - **Pedido do usuário**, com o CSV real "Monitora APS - Listas de Pacientes Gestante e Puérpera": "quero que a página seja capaz de ler esse CSV do Monitora APS […], que é lista de gestante anonimizada, daí falta os dados que precisam ser completados. […] o que é importante é pegar Equipe, Usuária e Cons.Odonto. Usuária se já tiver a mesma já com dados guardados já fazer o link. Em 'Período' se tiver o valor 'Puerpério' é pra deletar a gestante, não precisa adicionar."

@@ -1,4 +1,4 @@
-# Indicadores Saúde Bucal · versão 2.9
+# Indicadores Saúde Bucal · versão 2.10
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -25,6 +25,7 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
   - Quando bate com uma gestante já guardada, ela é vinculada, e "Cons.Odonto = Sim" conta como atendida.
   - Sem correspondência, ela entra como "Dados a completar".
   - Quem está em **Puerpério** não entra, e quem já estava na lista sai dela (de forma reversível).
+- O relatório de produção **Procedimentos Detalhado** do CELK traz o paciente como "( código ) NOME". Esse código é o mesmo número do prontuário. Um atendimento da equipe de saúde bucal **dentro da gestação** (da DUM até o parto ou hoje; sem DUM, nos últimos 300 dias) conta a gestante como atendida. A atividade educativa em grupo não conta.
 - Os dados completados à mão ficam guardados pelo número da Usuária. Se ela aparecer depois no CSV do Metabase, migram para esse registro sem sobrescrever o que o Metabase traz.
 
 ## Publicar no Render
