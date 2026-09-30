@@ -1,5 +1,23 @@
 # Histórico de versões
 
+## Versão 2.27 (página Procedimentos redesenhada)
+
+- **Pedido do usuário**: repensar o design da página de procedimentos, aprovado num protótipo com os dados reais do CSV de mai a ago/2026 e do CSV de atividades em grupo de set/2026.
+- **Procedimentos individuais**:
+  - Filtros numa faixa só: fonte, período (Mês, Quadrimestre ou Ano, a partir do filtro do topo), dentista, idade e sexo. Antes a página somava o ano inteiro e ignorava o quadrimestre.
+  - Quatro números: procedimentos, pacientes atendidos, dias de atendimento e procedimentos por atendimento. Saem "Média por categoria", "Maior" e "Menor".
+  - "O que foi feito" por categoria clínica (Preventivos, Periodontia, Restauradores, Endodontia, Cirurgia e Outros), com barra de composição. Cada categoria abre seus procedimentos com nome legível, SIGTAP e em que indicador entram (M4 num, B5 den…). Saem o gráfico de barras com nomes cortados e a pizza de 32 fatias.
+  - "Mês a mês" empilhado por categoria e "Por dentista"; clicar num mês ou num dentista filtra a página.
+  - "Pacientes" (antiga aba "Avaliação do paciente"): primeiras consultas, dias de atendimento e tratamentos concluídos por mês, quantas vezes cada paciente veio, idade e sexo.
+  - Gaveta do procedimento com mês a mês, por dentista, idade e sexo (substitui "Comparar" e "Refinar").
+- **Atividades coletivas**:
+  - O CSV passa a guardar o detalhe de cada atividade: todos os participantes, quem entra em M3/B4 (6 a 11 anos), quantos ficaram fora da faixa, idade, sexo e avaliação alterada (com os nomes, que o backup analítico não leva). O numerador de M3/B4 não muda.
+  - Números: atividades, participantes, crianças que entram em M3/B4 e crianças com avaliação alterada. Lista agrupada em "Escovação supervisionada" e "Educação em saúde e outras atividades"; a gaveta de cada atividade mostra idade, sexo e a lista de quem teve avaliação alterada.
+  - Corrige as atividades "Saúde bucal" com adultos, que apareciam com 0 presentes (o app contava só crianças de 6 a 11 anos em todas as atividades).
+  - Arquivos importados antes desta versão (e PDFs) mostram só o total; importe o CSV de novo para ver os detalhes.
+- **Código removido**: os gráficos de barras, linhas e pizza, a tabela, a comparação e o gráfico de pacientes da página antiga.
+- **Verificado com Playwright**: 260/260 autotestes (200, 205 e 207 reescritos para a página nova). Com os CSVs reais: Q2 com 2.438 procedimentos, 539 pacientes e 864 dias de atendimento; agosto com 671; atividades de setembro com 117 participantes, 110 em M3/B4 e 39 com avaliação alterada; sem rolagem horizontal no celular.
+
 ## Versão 2.26 (histórico da gestante com todos os atendimentos do CELK)
 
 - **Pedido do usuário**: em "Histórico e notas", mostrar todos os atendimentos da gestante que estão nos relatórios do CELK, de qualquer data, mesmo os que não contam para a gestação.

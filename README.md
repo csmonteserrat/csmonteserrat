@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.26
+# Acompanhamento Odontológico · versão 2.27
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -27,6 +27,12 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
   - Os demais: soma dos numeradores e dos denominadores dos meses com dado. Na leitura federal é um cálculo de conveniência, porque as Notas não definem como consolidar o quadrimestre.
 - B1, B2, B4, B5 e B6 usam os mesmos números de M1, M2, M3, M4 e M5; muda só a faixa. M4 e B5 usam no denominador a lista de 28 códigos SIGTAP da Nota B5. B3 usa a lista de códigos da Nota B3.
 - Na página Federal, "Para subir de faixa" mostra quantos procedimentos faltam para a próxima faixa. Na B3 (exodontia), a ferramenta nunca recomenda produzir exodontias: mostra quanto o restante da produção precisaria crescer.
+
+## Procedimentos
+
+- **Individuais**: número de procedimentos, pacientes atendidos, dias de atendimento e procedimentos por atendimento; "O que foi feito" por categoria clínica (Preventivos, Periodontia, Restauradores, Endodontia, Cirurgia e Outros), com nome, SIGTAP e em que indicador cada procedimento entra; mês a mês e por dentista (clicar filtra); pacientes por mês, quantas vezes cada um veio, idade e sexo. Clicar num procedimento abre a gaveta com mês a mês, dentista, idade e sexo.
+- **Atividades coletivas**: atividades, participantes, crianças que entram em M3/B4 e crianças com avaliação alterada; cada atividade mostra quantos ficaram fora da faixa de 6 a 11 anos e, na gaveta, a lista de quem teve avaliação alterada (o backup analítico não leva os nomes).
+- Período: mês, quadrimestre ou ano, a partir do filtro do topo. Filtros de dentista, idade e sexo.
 
 ## Configurações
 

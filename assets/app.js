@@ -21,7 +21,7 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.26';
+const APP_VERSION = '2.27';
 const SELF_TEST_COUNT = 260;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
@@ -245,7 +245,7 @@ function defaultState(){
     columnMappings:{consulta2i:{}},parserProfiles:{procedimentos:'CELK-PROC-1.0',atividades:'CELK-GRUPO-1.0',metabase:'METABASE-ESB-1.0',gestantes:'METABASE-2I-1.1'},
     gestantes:{manual:[],followups:{},merges:{},excluded:{},overrides:{},puerperioIgnored:{}},patientDirectory:{},manualOverrides:[],audit:[],lastBackupAt:null,dirty:false,
     preferences:{year:d.getFullYear(),quarter:quarterOfMonth(d.getMonth()+1),month:monthKey(d.getFullYear(),d.getMonth()+1),unit:'',view:'overview',settingsTab:'geral',sourceMode:'auto',targetScore:100,overviewScope:'month',pregTeam:'',pregTab:'a_contatar',pregPrioOnly:false,pregIncomplete:false,pregMoreFilters:false,pregOrigin:'',pregPhone:'',pregExcluded:'',pregSearch:'',calcPeso:'',
-      procSource:'individual',procTab:'charts',procGroupBy:'procedure',procChartType:'bars',procRefineOpen:false,procCompareOpen:false,procSex:'',procAge:'',procDentist:'',procMonth:'',procSingleProcedure:'',procSingleAllMonths:false,procCompareSelection:[]},
+      procSource:'individual',procPeriod:'Q',procOpenCats:['Periodontia','Preventivos'],procTab:'charts',procGroupBy:'procedure',procChartType:'bars',procRefineOpen:false,procCompareOpen:false,procSex:'',procAge:'',procDentist:'',procMonth:'',procSingleProcedure:'',procSingleAllMonths:false,procCompareSelection:[]},
     selfTests:null
   };
 }
@@ -519,7 +519,7 @@ async function parseGroupCsv(file,hash,text){
   const data=rows.filter(r=>r.some(v=>String(v).trim()));
   const parsedRows=data.map((r,i)=>{
     const d=parseDate(valueBy(r,map,'Data'));
-    return {line:i+2,unitOrigin:stripIdPrefix(valueBy(r,map,'Unidade')),date:d?fmtDate(d):'',dateObj:d,activityCode:String(valueBy(r,map,'Código da Atividade')).trim(),subject:String(valueBy(r,map,'Assunto')).trim(),participant:String(valueBy(r,map,'Nome dos Participantes')).trim(),birthDate:String(valueBy(r,map,...BIRTH_DATE_HEADER_ALIASES)).trim(),targetAudience:valueBy(r,map,'Público Alvo')};
+    return {line:i+2,unitOrigin:stripIdPrefix(valueBy(r,map,'Unidade')),date:d?fmtDate(d):'',dateObj:d,activityCode:String(valueBy(r,map,'Código da Atividade')).trim(),subject:String(valueBy(r,map,'Assunto')).trim(),participant:String(valueBy(r,map,'Nome dos Participantes')).trim(),birthDate:String(valueBy(r,map,...BIRTH_DATE_HEADER_ALIASES)).trim(),targetAudience:valueBy(r,map,'Público Alvo'),turno:String(valueBy(r,map,'Turno')).trim(),local:String(valueBy(r,map,'Local Atividade')).trim(),temas:String(valueBy(r,map,'Temas')).trim(),tipo:String(valueBy(r,map,'Tipo de Atividade')).trim(),sex:sexLabel(valueBy(r,map,'Sexo')),altered:/^S/i.test(String(valueBy(r,map,'Avaliação Alterada')).trim())};
   }).filter(r=>r.date&&r.subject&&r.participant&&r.activityCode);
   if(!parsedRows.length)throw new Error('O CSV foi reconhecido como "Relação das Atividades em Grupo", mas nenhuma linha produtiva pôde ser extraída.');
   const {keepUnit,otherUnitCounts}=pickDominantUnit(parsedRows);
@@ -541,6 +541,13 @@ async function parseGroupCsv(file,hash,text){
   }
   const events=[...perActivity.values()].map(ev=>({date:ev.date,subject:ev.subject,present:ev.presentEligible,status:'Concluída'}));
   buildGroupSnapshotFromEvents(snap,events);
+  // Detalhe por atividade para a página Procedimentos (v2.27): todos os participantes, quem entra em M3/B4, idade,
+  // sexo e avaliação alterada. Não muda o cálculo de M3/B4 acima.
+  const details=new Map();
+  for(const r of parsedRows){const brush=/ESCOVACAO SUPERVISIONADA/.test(norm(r.subject));const a=details.get(r.activityCode)||{code:r.activityCode,date:r.date,mk:r.dateObj?monthKey(r.dateObj.getFullYear(),r.dateObj.getMonth()+1):'',subject:r.subject,turno:r.turno,local:r.local,publico:String(r.targetAudience||'').trim(),temas:r.temas,tipo:r.tipo,brush,total:0,eligible:0,outOfRange:0,noBirth:0,altered:0,ages:{},sex:{F:0,M:0},alteredNames:[]};details.set(r.activityCode,a);
+    a.total++;const age=r.birthDate?ageAt({dataNascimento:r.birthDate},r.dateObj):null;if(age==null)a.noBirth++;else{const b=ageBandLabel(age);if(b)a.ages[b]=(a.ages[b]||0)+1;if(brush){if(age>=6&&age<=11)a.eligible++;else a.outOfRange++}}
+    if(r.sex==='Feminino')a.sex.F++;else if(r.sex==='Masculino')a.sex.M++;if(r.altered){a.altered++;a.alteredNames.push(r.participant)}}
+  for(const a of details.values()){const d=snap.dataByMonth[a.mk];if(!d)continue;(d.activityDetails??=[]).push(a)}
   if(ineligibleCount||missingBirthCount){
     const parts=[];
     if(ineligibleCount)parts.push(`${ineligibleCount} participante(s) fora da faixa etária de 6 a 11 anos na data da atividade`);
@@ -866,13 +873,6 @@ function procYearsAvailable(profile,unit=state.preferences.unit){const years=new
 // (celk_atividades_grupo) com os anos em que o relatório "Procedimentos Detalhado" trouxe a linha "Atividade
 // educativa / orientação em grupo" (groupSubjectFromProcedures) — assim a aba mostra dados mesmo quando só
 // existe o relatório de procedimentos importado, sem nenhum "Relação das Atividades em Grupo".
-function groupSourceYearsAvailable(unit=state.preferences.unit){
-  const years=new Set(procYearsAvailable('celk_atividades_grupo',unit));
-  for(const s of state.snapshots){if(s.profile!=='celk_procedimentos_detalhado')continue;if(unit&&s.unit!==unit)continue;
-    for(const [mk,d] of Object.entries(s.dataByMonth||{}))if((d.groupSubjectFromProcedures||[]).length)years.add(parseMonthKey(mk).year);
-  }
-  return [...years].sort((a,b)=>b-a);
-}
 function procMonthsOfYear(year){return Array.from({length:12},(_,i)=>monthKey(year,i+1))}
 function aggregateProcedureYear(year,unit=state.preferences.unit,{onlyMonth=''}={}){
   const months=onlyMonth?[onlyMonth]:procMonthsOfYear(year);
@@ -886,16 +886,6 @@ function aggregateProcedureYear(year,unit=state.preferences.unit,{onlyMonth=''}=
     for(const c of agg.crossRows){const ck=`${c.procKey}${c.professional}${c.sex}${c.age}`;const a=byCross[ck]??={...c,quantity:0};a.quantity+=c.quantity;byCross[ck]=a}
   }
   out.procedureCounts=Object.values(byProc);out.crossRows=Object.values(byCross);
-  return out;
-}
-function aggregateGroupYear(year,unit=state.preferences.unit,{onlyMonth=''}={}){
-  const months=onlyMonth?[onlyMonth]:procMonthsOfYear(year);
-  const out={year,activities:0,eligibleActivities:0,supervisedBrushingPresent:0,subjectCounts:[],monthsWithData:[]};
-  const bySubject={};
-  for(const mk of months){const agg=aggregateGroupMonth(mk,unit);if(!agg)continue;out.monthsWithData.push(mk);out.activities+=agg.activities;out.eligibleActivities+=agg.eligibleActivities;out.supervisedBrushingPresent+=agg.supervisedBrushingPresent;
-    for(const sc of agg.subjectCounts||[]){const key=norm(sc.subject);const a=bySubject[key]??={subject:sc.subject,activities:0,present:0};a.activities+=sc.activities;a.present+=sc.present}
-  }
-  out.subjectCounts=Object.values(bySubject);
   return out;
 }
 function applyCrossFilters(crossRows,{sex='',age='',dentist=''}={}){return crossRows.filter(c=>(!sex||c.sex===sex)&&(!age||c.age===age)&&(!dentist||c.professional===dentist))}
@@ -917,12 +907,6 @@ function groupProcedureItems(yearAgg,groupBy,filters,unit=state.preferences.unit
   if(groupBy==='sex'){const byS={};for(const c of filteredCross){if(!c.sex)continue;byS[c.sex]=(byS[c.sex]||0)+c.quantity}return Object.entries(byS).map(([label,value])=>({key:label,label,value})).sort((a,b)=>b.value-a.value);}
   if(groupBy==='month'){return yearAgg.monthsWithData.map(mk=>{const monthAgg=aggregateProcedureMonth(mk,unit);const rows=applyCrossFilters(monthAgg.crossRows,filters);const value=filterActive?sum(rows.map(r=>r.quantity)):sum(monthAgg.procedureCounts.filter(p=>!p.nonDental).map(p=>p.quantityValid));return {key:mk,label:fmtMonth(mk),value}});}
   if(groupBy==='year'){const years=procYearsAvailable('celk_procedimentos_detalhado',unit);return years.map(y=>{const agg=y===yearAgg.year?yearAgg:aggregateProcedureYear(y,unit);const rows=applyCrossFilters(agg.crossRows,filters);const value=filterActive?sum(rows.map(r=>r.quantity)):sum(agg.procedureCounts.map(p=>p.quantityValid));return {key:String(y),label:String(y),value}}).sort((a,b)=>a.key-b.key);}
-  return [];
-}
-function groupGroupItems(yearAgg,groupBy,unit=state.preferences.unit){
-  if(groupBy==='procedure')return yearAgg.subjectCounts.map(s=>({key:norm(s.subject),label:s.subject,value:s.activities,present:s.present})).sort((a,b)=>b.value-a.value);
-  if(groupBy==='month')return yearAgg.monthsWithData.map(mk=>{const agg=aggregateGroupMonth(mk,unit);return {key:mk,label:fmtMonth(mk),value:agg.activities}});
-  if(groupBy==='year'){const years=groupSourceYearsAvailable(unit);return years.map(y=>{const agg=y===yearAgg.year?yearAgg:aggregateGroupYear(y,unit);return {key:String(y),label:String(y),value:agg.activities}}).sort((a,b)=>a.key-b.key);}
   return [];
 }
 // Avaliação do paciente: reaproveita aggregateProcedureMonth (já com a dedução oficial de 12 meses de
@@ -2184,7 +2168,7 @@ function export2I(mode){const rows=applyPregFilters(mergedEpisodes()),nominal=mo
 function backupState(type='full'){
   const copy=structuredClone(state);copy.dirty=false;
   for(const snap of copy.snapshots||[]){for(const p of snap.procedureCounts||[])delete p.professionals;for(const month of Object.values(snap.dataByMonth||{}))for(const p of month.procedureCounts||[])delete p.professionals}
-  if(type==='analytic'){copy.snapshots=copy.snapshots.filter(s=>s.profile!=='metabase_gestantes_2i'&&s.profile!==MONITORA_PROFILE);copy.gestantes={manual:[],followups:{},merges:{},excluded:{},overrides:{},puerperioIgnored:{}};copy.patientDirectory={};copy.audit=(copy.audit||[]).filter(a=>!String(a.action).startsWith('2i_'));copy.columnMappings={...copy.columnMappings,consulta2i:{}};for(const snap of copy.snapshots||[])for(const month of Object.values(snap.dataByMonth||{})){delete month.firstPatients;delete month.concludedPatients;delete month.patientVisits}}
+  if(type==='analytic'){copy.snapshots=copy.snapshots.filter(s=>s.profile!=='metabase_gestantes_2i'&&s.profile!==MONITORA_PROFILE);copy.gestantes={manual:[],followups:{},merges:{},excluded:{},overrides:{},puerperioIgnored:{}};copy.patientDirectory={};copy.audit=(copy.audit||[]).filter(a=>!String(a.action).startsWith('2i_'));copy.columnMappings={...copy.columnMappings,consulta2i:{}};for(const snap of copy.snapshots||[])for(const month of Object.values(snap.dataByMonth||{})){delete month.firstPatients;delete month.concludedPatients;delete month.patientVisits;for(const a of month.activityDetails||[])delete a.alteredNames}}
   return copy;
 }
 async function createBackupEnvelope(type='full'){
@@ -2554,20 +2538,7 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
       return ('procedures' in VIEW_META)&&title==='Procedimentos realizados'&&sectionVisible&&!!navActive;
     }finally{switchView(prevView,{save:false})}
   });
-  await add('200. proceduresHTML esconde os chips "Idade" e "Sexo" de Agrupar por quando o agrupamento atual é "Procedimento" (já coberto pelo cruzamento avançado do Refinar) e volta a mostrá-los para outros agrupamentos',()=>{
-    const prevPrefs={...state.preferences},beforeSnaps=state.snapshots.length,u=state.preferences.unit;
-    try{
-      const base={firstConsultations:0,firstConsultationQuantity:0,treatmentsConcluded:0,treatmentConcludedQuantity:0,preventive:0,individualProcedures:0,art:0,restorative:0,b5Denominator:0,b3Numerator:0,b3Denominator:0,firstPatients:[],concludedPatients:[],crossRows:[],visitsList:[],procedureCounts:[{descriptionOriginal:'Proc Teste 200',descriptionNormalized:norm('Proc Teste 200'),sigtap:'',quantityRaw:1,quantityValid:1,lineCount:1,roles:[],ambiguous:false,unrecognized:false,outOfScope:false,pages:[],professionals:{'Dr. Teste 200':1}}]};
-      state.snapshots.push({id:'tm200',profile:'celk_procedimentos_detalhado',unit:u,fileName:'m200.csv',createdAt:nowISO(),dataByMonth:{'2020-06':{...base,kind:'procedure'}}});
-      Object.assign(state.preferences,{year:2020,procSource:'individual',procGroupBy:'procedure',procTab:'charts',procMonth:'',procSex:'',procAge:'',procDentist:'',procSingleAllMonths:false,procCompareOpen:false});
-      const htmlProcedure=proceduresHTML();
-      const hiddenOk=!/data-proc-group="age"/.test(htmlProcedure)&&!/data-proc-group="sex"/.test(htmlProcedure);
-      state.preferences.procGroupBy='dentist';
-      const htmlDentist=proceduresHTML();
-      const shownOk=/data-proc-group="age"/.test(htmlDentist)&&/data-proc-group="sex"/.test(htmlDentist);
-      return hiddenOk&&shownOk;
-    }finally{state.snapshots.length=beforeSnaps;Object.assign(state.preferences,prevPrefs)}
-  });
+  await add('200. Página Procedimentos (v2.27): agrupa por categoria clínica com nome legível, SIGTAP e indicador, tem período Mês/Quadrimestre/Ano e filtros de dentista, idade e sexo, sem gráfico de pizza nem "Agrupar por"',()=>{const before=state.snapshots.length,prev={...state.preferences};try{const mk='2031-02',u=state.preferences.unit;Object.assign(state.preferences,{year:2031,quarter:1,month:mk,procSource:'individual',procPeriod:'Q',procDentist:'',procAge:'',procSex:'',procOpenCats:['Preventivos']});state.snapshots.push({id:'tproc200_selftest',profile:'celk_procedimentos_detalhado',unit:u,fileName:'p.csv',createdAt:nowISO(),validations:[],procedureCounts:[],dataByMonth:{[mk]:{kind:'procedure',firstConsultations:1,treatmentsConcluded:0,procedureCounts:[{descriptionOriginal:'APLICAÇÃO TÓPICA DE FLÚOR',descriptionNormalized:'Aplicação tópica de flúor',sigtap:'01.01.02.007-4',quantityRaw:3,quantityValid:3,roles:['preventive','m4den','b5den','b3den']}],crossRows:[{procKey:norm('Aplicação tópica de flúor'),procLabel:'Aplicação tópica de flúor',professional:'Dentista X',sex:'Feminino',age:'6-11',quantity:3}],visitsList:[{patient:'P1',date:'01/02/2031'}]}}});const h=proceduresHTML();return h.includes('Preventivos')&&h.includes('Aplicação tópica de flúor')&&h.includes('01.01.02.007-4')&&h.includes('M4 num')&&h.includes('data-proc-period="M"')&&h.includes('data-proc-dentist-sel')&&h.includes('data-proc-open=')&&!h.includes('Pizza')&&!h.includes('Agrupar por')}finally{state.snapshots.length=before;Object.assign(state.preferences,prev)}});
   await add('201. buildProcedureSnapshotFromRows funde "ORIENTAÇÃO DE HIGIENE BUCAL" e "ORIENTAÇÃO EM HIGIENE BUCAL" (duas grafias do mesmo procedimento no relatório) numa única linha, somando as quantidades e exibindo o nome canônico "Orientação em higiene bucal"',()=>{
     const snap={dataByMonth:{},procedureCounts:[],validations:[]};
     const rows=[{patient:'Fulana',date:'05/06/2026',professional:'Caio',procedure:'ORIENTAÇÃO DE HIGIENE BUCAL',quantity:2},{patient:'Beltrano',date:'06/06/2026',professional:'Caio',procedure:'ORIENTAÇÃO EM HIGIENE BUCAL',quantity:3}];
@@ -2613,10 +2584,7 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
       return hasNoGroupSnap&&!!agg&&agg.activities===2&&!!subj&&subj.present===25;
     } finally { state.snapshots.length=prevSnaps; }
   });
-  await add('205. procBarsChartHTML inclui um atributo title com "nome: quantidade" em cada barra, para o hover mostrar o item mesmo com muitos procedimentos diferentes no gráfico (pedido do usuário após avaliação real com dados importados)',()=>{
-    const html=procBarsChartHTML([{key:'a',label:'Aplicação tópica de flúor',value:42},{key:'b',label:'Profilaxia',value:17}],procPalette(2));
-    return html.includes('title="Aplicação tópica de flúor: 42"')&&html.includes('title="Profilaxia: 17"');
-  });
+  await add('205. procCategory separa os procedimentos em Preventivos, Periodontia, Restauradores, Endodontia, Cirurgia e Outros (selamento provisório em Restauradores, capeamento em Endodontia)',()=>procCategory('Aplicação tópica de flúor')==='Preventivos'&&procCategory('Orientação em higiene bucal')==='Preventivos'&&procCategory('RASPAGEM CORONO-RADICULAR (POR SEXTANTE)')==='Periodontia'&&procCategory('Selamento provisório de cavidade')==='Restauradores'&&procCategory('Restauração de dente permanente anterior com resina composta')==='Restauradores'&&procCategory('Capeamento pulpar')==='Endodontia'&&procCategory('Exodontia de dente permanente')==='Cirurgia'&&procCategory('DRENAGEM DE ABSCESSO DA BOCA E ANEXOS')==='Cirurgia'&&procCategory('Ajuste oclusal')==='Outros');
   await add('206. patientEvaluationStats conta "retorno" como o total de vezes que o MESMO paciente veio no ano, incluindo a visita que já é sua 1ª consulta — pedido explícito do usuário ("se Maria veio em 2026 6 vezes... ela conta como 6 vezes retornando ao posto")',()=>{
     const snap={dataByMonth:{},procedureCounts:[],validations:[]};
     const rows=[
@@ -2635,16 +2603,7 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
       return stats.distinctPatients===1&&stats.totalVisits===6&&stats.retornosTotal===6&&stats.firstTotal===1&&stats.avgVisits===6;
     }finally{state.snapshots.length=beforeSnaps}
   });
-  await add('207. A aba "Avaliação do paciente" não mostra mais o card "Taxa de retorno" (deixou de fazer sentido — sempre daria 100% com a nova definição de retorno) e o texto explicativo do gráfico mensal reflete que Retorno agora é o total de visitas do mês, não a subtração de 1ª consulta/conclusão',()=>{
-    const prevPrefs={...state.preferences},beforeSnaps=state.snapshots.length,u=state.preferences.unit;
-    try{
-      const base={firstConsultations:1,firstConsultationQuantity:1,treatmentsConcluded:0,treatmentConcludedQuantity:0,preventive:0,individualProcedures:0,art:0,restorative:0,b5Denominator:0,b3Numerator:0,b3Denominator:0,procedureCounts:[],firstPatients:[{name:'Paciente 207',date:'01/06/2020'}],concludedPatients:[],crossRows:[],visitsList:[{patient:'PACIENTE 207',date:'01/06/2020'}]};
-      state.snapshots.push({id:'tm207',profile:'celk_procedimentos_detalhado',unit:u,fileName:'m207.csv',createdAt:nowISO(),dataByMonth:{'2020-06':{...base,kind:'procedure'}}});
-      Object.assign(state.preferences,{year:2020,procSource:'individual',procTab:'patients'});
-      const html=proceduresHTML();
-      return !html.includes('Taxa de retorno')&&html.includes('Retorno = total de visitas do mês')&&html.includes('total de vezes que os pacientes voltaram ao posto no ano');
-    }finally{state.snapshots.length=beforeSnaps;Object.assign(state.preferences,prevPrefs)}
-  });
+  await add('207. CSV de atividades em grupo guarda o detalhe de cada atividade (todos os participantes, quem entra em M3/B4, fora da faixa, idade, sexo e avaliação alterada) sem mudar o numerador de M3/B4, e a página mostra "fora da faixa"',async()=>{const csv=['Unidade,Data,Turno,Código da Atividade,Público Alvo,Temas,Tipo de Atividade,Assunto,Local Atividade,Nome dos Participantes,Data de Nascimento,Sexo,Avaliação Alterada','CS X,2031-03-10 13:00:00.0,Tarde,1,Criança de 6 a 11 anos,Saúde bucal,Coletivo,Escovação Supervisionada - Turma 1,Escola,Ana A,2022-01-01,F,Sim','CS X,2031-03-10 13:00:00.0,Tarde,1,Criança de 6 a 11 anos,Saúde bucal,Coletivo,Escovação Supervisionada - Turma 1,Escola,Beto B,2018-05-01,M,Não','CS X,2031-03-11 09:00:00.0,Manhã,2,Comunidade,Saúde bucal,Grupo,SAÚDE BUCAL,CS,Carla C,1980-01-01,F,Não'].join('\n');const snap=await parseGroupCsv({name:'g.csv'},'hash_selftest_207',csv);const d=snap.dataByMonth['2031-03'],a=d.activityDetails.find(x=>x.code==='1'),b=d.activityDetails.find(x=>x.code==='2');const before=state.snapshots.length,prev={...state.preferences};try{state.snapshots.push(snap);Object.assign(state.preferences,{year:2031,quarter:1,month:'2031-03',procSource:'group',procPeriod:'M',unit:snap.unit});const h=proceduresHTML();return d.supervisedBrushingPresent===1&&a.total===2&&a.eligible===1&&a.outOfRange===1&&a.altered===1&&a.alteredNames[0]==='Ana A'&&a.sex.F===1&&b.total===1&&!b.brush&&h.includes('fora da faixa')&&h.includes('Avaliação alterada')}finally{state.snapshots.length=before;Object.assign(state.preferences,prev)}});
   await add('208. detectCSVProfile reconhece o cabeçalho real do CELK "Data de Nascimento" (com "de") para o CSV de Atividades em Grupo — o primeiro CSV real anexado pelo usuário usa essa grafia, diferente da "Data Nascimento" (sem "de") assumida sem verificação até a v2.6',()=>{
     const headersReal=['Unidade','Cnes','INE','Nome da Equipe','Data','Turno','Código da Atividade','Situação','Público Alvo','Temas','Práticas','Profissionais','Tipo de Atividade','Nr. INEP','Assunto','Local Atividade','Nome dos Participantes','CNS','CPF','Data de Nascimento','Sexo','I.M.C','Peso','Altura','PAS','PAD','Avaliação Alterada',''];
     return detectCSVProfile(headersReal)==='celk_atividades_grupo_csv'&&detectCSVProfile(['Unidade','Código da Atividade','Assunto','Nome dos Participantes','Data Nascimento'])==='celk_atividades_grupo_csv';
@@ -2772,201 +2731,168 @@ function calculatorHTML(){
 
 
 /* ---------- Página Procedimentos: gráficos, tabela e avaliação do paciente ---------- */
-function procBarsChartHTML(items,palette){
-  if(!items.length)return '<div class="notice">Sem dados para este recorte.</div>';
-  const max=Math.max(1,...items.map(i=>i.value));
-  // title no bar-col inteiro (não só no nome truncado): passar o mouse por cima da barra também mostra
-  // "nome: quantidade" — pedido do usuário depois de ver um gráfico com muitos procedimentos difícil de ler.
-  return `<div class="bars-chart">${items.map((it,i)=>`<div class="bar-col" title="${esc(it.label)}: ${fmtNum(it.value)}"><span class="bar-val">${fmtNum(it.value)}</span><div class="bar" style="height:${Math.max(4,Math.round(it.value/max*168))}px;background:${palette[i]}"></div><span class="bar-name">${esc(it.label)}</span></div>`).join('')}</div>`;
+/* ---------- Página Procedimentos (v2.27): categorias clínicas, período, mês a mês, dentistas, pacientes e gavetas ---------- */
+const PROC_CATS=[['Preventivos','#0f9d8a'],['Periodontia','#7551e9'],['Restauradores','#2f80ed'],['Endodontia','#d98a1c'],['Cirurgia','#d9486a'],['Outros','#8a8fab']];
+const PROC_CAT_COLOR=Object.fromEntries(PROC_CATS);
+const PROC_AGE_BANDS=['0-5','6-11','12-17','18-59','60+'];
+function procCategory(name){const n=norm(name);
+  if(/^(ORIENTACAO|PROFILAXIA|APLICACAO TOPICA|APLICACAO DE SELANTE|APLICACAO DE CARIOSTATICO|EVIDENCIACAO)/.test(n))return 'Preventivos';
+  if(/^(RASPAGEM|GENGIVECTOMIA|TRATAMENTO DE GENGIVITE|TRATAMENTO DE PERICORONARITE)/.test(n))return 'Periodontia';
+  if(/^(RESTAURACAO|TRATAMENTO RESTAURADOR|SELAMENTO PROVISORIO)/.test(n))return 'Restauradores';
+  if(/^(ACESSO A POLPA|CURATIVO DE DEMORA|PULPOTOMIA|CAPEAMENTO|TRATAMENTO INICIAL DO DENTE)/.test(n))return 'Endodontia';
+  if(/^(EXODONTIA|RETIRADA DE PONTOS|EXCISAO|CURETAGEM|ODONTOSEC|CORRECAO DE IRREG|DRENAGEM)/.test(n))return 'Cirurgia';
+  return 'Outros';
 }
-function procLineChartHTML(items,color){
-  if(items.length<2)return '<div class="notice">É preciso de pelo menos 2 pontos para o gráfico de linhas — tente agrupar por Histórico mensal ou Ano.</div>';
-  const w=760,h=190,pad=18,max=Math.max(1,...items.map(i=>i.value)),stepX=(w-pad*2)/(items.length-1);
-  const pts=items.map((it,i)=>[pad+i*stepX,h-pad-(it.value/max)*(h-pad*2)]);
-  const path=pts.map((pt,i)=>`${i===0?'M':'L'}${pt[0].toFixed(1)},${pt[1].toFixed(1)}`).join(' ');
-  const area=`${path} L${pts.at(-1)[0].toFixed(1)},${h-pad} L${pts[0][0].toFixed(1)},${h-pad} Z`;
-  const last=items.at(-1);
-  return `<div class="proc-line-pill">Último ponto: <strong>${esc(last.label)}</strong> · ${fmtNum(last.value)}</div>
-    <svg viewBox="0 0 ${w} ${h}" style="width:100%;height:200px" preserveAspectRatio="none">
-      <defs><linearGradient id="procLineGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.32"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
-      <path d="${area}" fill="url(#procLineGrad)" stroke="none"/>
-      <path d="${path}" fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-      ${pts.map(pt=>`<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="3.2" fill="${color}"/>`).join('')}
-    </svg>
-    <div class="bars-chart" style="height:auto;padding-top:2px">${items.map(it=>`<div class="bar-col"><span class="bar-name" title="${esc(it.label)}">${esc(it.label)}</span></div>`).join('')}</div>`;
+function procPeriod(){const p=state.preferences,mode=['M','Q','Y'].includes(p.procPeriod)?p.procPeriod:'Q',year=Number(p.year),q=Number(p.quarter);
+  const qm=quarterMonths(year,q),months=mode==='M'?[p.month]:mode==='Q'?qm:procMonthsOfYear(year),chart=mode==='Y'?procMonthsOfYear(year):qm;
+  const a=parseMonthKey(qm[0]),b=parseMonthKey(qm.at(-1));
+  return {mode,months,chart,label:mode==='M'?fmtMonth(p.month,true):mode==='Q'?`Q${q} · ${MONTHS[a.month-1]} a ${MONTHS[b.month-1]}/${b.year}`:String(year)};
 }
-function procPieChartHTML(items,palette){
-  if(!items.length)return '<div class="notice">Sem dados para este recorte.</div>';
-  const total=sum(items.map(i=>i.value))||1;let acc=0;
-  const stops=items.map((it,i)=>{const start=acc/total*360;acc+=it.value;const end=acc/total*360;return `${palette[i]} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`});
-  return `<div style="display:flex;align-items:center;gap:28px;flex-wrap:wrap;padding:6px 0">
-    <div style="width:170px;height:170px;border-radius:50%;background:conic-gradient(${stops.join(',')});flex:0 0 auto"></div>
-    <div class="participation-legend" style="flex:1;min-width:220px">${items.map((it,i)=>`<span><i style="background:${palette[i]}"></i>${esc(it.label)}<b>${fmtPct(it.value/total*100,1)}</b></span>`).join('')}</div>
-  </div>`;
-}
-function procParticipationHTML(items,palette){
-  const total=sum(items.map(i=>i.value))||1;
-  return `<div class="participation"><p class="section-title" style="font-size:12.5px;margin-bottom:8px">Participação por categoria</p><div class="participation-track">${items.map((it,i)=>`<span style="width:${(it.value/total*100).toFixed(2)}%;background:${palette[i]}"></span>`).join('')}</div><div class="participation-legend">${items.map((it,i)=>`<span><i style="background:${palette[i]}"></i>${esc(it.label)}<b>${fmtPct(it.value/total*100,1)}</b></span>`).join('')}</div></div>`;
-}
-function procTableHTML(items,palette,labelHeader){
-  if(!items.length)return '<div class="notice">Sem dados para este recorte.</div>';
-  const total=sum(items.map(i=>i.value))||1;
-  return `<div class="table-scroll"><table><thead><tr><th>${esc(labelHeader)}</th><th>Quantidade</th><th>% do total</th><th>Distribuição</th></tr></thead><tbody>${items.map((it,i)=>`<tr><td><span class="legend-dot" style="background:${palette[i]};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px"></span>${esc(it.label)}</td><td class="num">${fmtNum(it.value)}</td><td class="num">${fmtPct(it.value/total*100,1)}</td><td><div class="progress" style="min-width:140px"><span style="width:${(it.value/total*100).toFixed(2)}%;background:${palette[i]}"></span></div></td></tr>`).join('')}</tbody></table></div>`;
-}
-function procCompareSummaryHTML(items){
-  if(items.length<2)return '';
-  const sorted=[...items].sort((a,b)=>b.value-a.value),max=sorted[0],min=sorted.at(-1);
-  return `<div class="notice" style="margin-top:12px"><strong>${esc(max.label)}</strong> é o maior (${fmtNum(max.value)}), <strong>${esc(min.label)}</strong> é o menor (${fmtNum(min.value)}) — diferença de ${fmtNum(max.value-min.value)}.</div>`;
-}
-function procCompareChipsHTML(items,selection){
-  return `<div class="proc-row" style="margin-top:10px">${items.map(it=>`<button class="proc-chip${selection.includes(it.key)?' active':''}" data-proc-compare-item="${esc(it.key)}">${esc(it.label)}</button>`).join('')}</div>`;
-}
-function procPatientMonthlyChartHTML(monthly){
-  const max=Math.max(1,...monthly.flatMap(m=>[m.first,m.retorno,m.concluded]));
-  return `<div class="legend-row" style="margin-bottom:2px">${legendDot('#17b9ec','1ª consulta')}${legendDot('#7551e9','Retorno')}${legendDot('#2cc08b','Tratamento concluído')}</div>
-  <div class="grouped-bars">${monthly.map(m=>`<div class="grp"><div class="grp-bars">
-    <i style="height:${Math.max(2,Math.round(m.first/max*108))}px;background:#17b9ec" title="1ª consulta: ${fmtNum(m.first)}"></i>
-    <i style="height:${Math.max(2,Math.round(m.retorno/max*108))}px;background:#7551e9" title="Retorno: ${fmtNum(m.retorno)}"></i>
-    <i style="height:${Math.max(2,Math.round(m.concluded/max*108))}px;background:#2cc08b" title="Tratamento concluído: ${fmtNum(m.concluded)}"></i>
-  </div><span class="grp-label">${esc(fmtMonth(m.mk))}</span></div>`).join('')}</div>`;
-}
-function procDistributionHTML(buckets,distinctPatients){
-  if(!distinctPatients)return '<div class="notice">Sem pacientes atendidos neste recorte.</div>';
-  const palette=['#17b9ec','#7551e9','#2cc08b','#f7821f'];
-  return `<div class="participation-track" style="margin-bottom:11px">${buckets.map((b,i)=>`<span style="width:${(b.count/distinctPatients*100).toFixed(2)}%;background:${palette[i]}"></span>`).join('')}</div>
-  <div class="table-scroll"><table><thead><tr><th>Consultas por paciente</th><th>Pacientes</th><th>% do total</th><th>Distribuição</th></tr></thead><tbody>${buckets.map((b,i)=>`<tr><td><span class="legend-dot" style="background:${palette[i]};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px"></span>${esc(b.label)}</td><td class="num">${fmtNum(b.count)}</td><td class="num">${fmtPct(b.count/distinctPatients*100,1)}</td><td><div class="progress" style="min-width:140px"><span style="width:${(b.count/distinctPatients*100).toFixed(2)}%;background:${palette[i]}"></span></div></td></tr>`).join('')}</tbody></table></div>`;
-}
+function procFilters(){const p=state.preferences;return {dentist:p.procDentist||'',age:PROC_AGE_BANDS.includes(p.procAge)?p.procAge:'',sex:['Feminino','Masculino'].includes(p.procSex)?p.procSex:''}}
+// Linhas de cruzamento (procedimento × dentista × sexo × idade) por mês, sem os registros que não são procedimento.
+function procCrossByMonth(months,unit=state.preferences.unit){const out={};for(const mk of months){const agg=aggregateProcedureMonth(mk,unit);out[mk]=agg?{cross:agg.crossRows||[],agg}:null}return out}
+function procInfoMap(byMonth){const info={};for(const v of Object.values(byMonth))if(v)for(const p of v.agg.procedureCounts||[])if(!p.nonDental)info[norm(p.descriptionNormalized)]??={name:p.descriptionNormalized,sigtap:p.sigtap,roles:p.roles||[],unrecognized:!!p.unrecognized};return info}
+function procSumBy(rows,f){const m=new Map();for(const r of rows){const k=f(r);m.set(k,(m.get(k)||0)+r.quantity)}return m}
+function procChipsHTML(roles){const b=procedureRoleBadges(roles).sort((x,y)=>(x.part==='Numerador'?0:1)-(y.part==='Numerador'?0:1));return b.map(x=>`<span class="pr-ic${x.part==='Numerador'?'':' den'}">${esc(x.ind)} ${x.part==='Numerador'?'num':'den'}</span>`).join('')}
 function proceduresHTML(){
-  const p=state.preferences,unit=p.unit;
-  const source=p.procSource==='group'?'group':'individual';
-  const profile=source==='group'?'celk_atividades_grupo':'celk_procedimentos_detalhado';
-  const years=source==='group'?groupSourceYearsAvailable(unit):procYearsAvailable(profile,unit);
-  const sourceToggleHTML=`<div class="proc-row"><span class="proc-label">Fonte</span><div class="scope-toggle"><button class="scope-btn${source==='individual'?' active':''}" data-proc-source="individual">Procedimentos individuais</button><button class="scope-btn${source==='group'?' active':''}" data-proc-source="group">Atividades coletivas</button></div></div>`;
-  if(!years.length){
-    return `<div class="card proc-panel" style="margin-bottom:16px">${sourceToggleHTML}</div>`+emptyState('Nenhum relatório importado para esta fonte',source==='group'?'Importe um relatório "Relação das Atividades em Grupo" do CELK (PDF ou CSV) em Configurações › Importações para ver os dados aqui.':'Importe um relatório "Procedimentos Detalhado" do CELK (PDF ou CSV) em Configurações › Importações para ver os dados aqui.');
-  }
-  const year=years.includes(Number(p.year))?Number(p.year):years[0];
-  const groupOptionsAll=source==='individual'
-    ?[{key:'procedure',label:'Procedimento'},{key:'dentist',label:'Dentista'},{key:'age',label:'Idade'},{key:'sex',label:'Sexo'},{key:'month',label:'Histórico mensal'},{key:'year',label:'Ano'}]
-    :[{key:'procedure',label:'Assunto'},{key:'month',label:'Histórico mensal'},{key:'year',label:'Ano'}];
-  let groupBy=p.procGroupBy;
-  if(!groupOptionsAll.some(o=>o.key===groupBy))groupBy='procedure';
-  const groupOptions=groupOptionsAll.filter(o=>!(groupBy==='procedure'&&(o.key==='age'||o.key==='sex')));
-  const tabsAll=source==='individual'?[{key:'charts',label:'Gráficos'},{key:'table',label:'Tabelas'},{key:'patients',label:'Avaliação do paciente'}]:[{key:'charts',label:'Gráficos'},{key:'table',label:'Tabelas'}];
-  const tab=tabsAll.some(t=>t.key===p.procTab)?p.procTab:'charts';
-  const filters={sex:p.procSex,age:p.procAge,dentist:p.procDentist};
-  const refineActive=!!(filters.sex||filters.age||filters.dentist||p.procMonth);
-  const refineCount=[filters.sex,filters.age,filters.dentist,p.procMonth].filter(Boolean).length;
-  const chartType=['bars','lines','pie'].includes(p.procChartType)?p.procChartType:'bars';
-  const sequential=(groupBy==='month'||groupBy==='year')||(source==='individual'&&p.procSingleAllMonths&&p.procSingleProcedure);
-
-  let items=[],dentistList=[],yearAgg=null,groupAgg=null,pivotActive=false;
-  if(source==='individual'){
-    yearAgg=aggregateProcedureYear(year,unit,{onlyMonth:p.procMonth});
-    const fullYearAgg=p.procMonth?aggregateProcedureYear(year,unit):yearAgg;
-    dentistList=procDentistList(fullYearAgg.crossRows);
-    if(p.procSingleAllMonths&&p.procSingleProcedure&&fullYearAgg.procedureCounts.some(x=>x.descriptionNormalized===p.procSingleProcedure)){
-      pivotActive=true;
-      items=procMonthsOfYear(year).map(mk=>{const agg=aggregateProcedureMonth(mk,unit);const proc=(agg?.procedureCounts||[]).find(x=>x.descriptionNormalized===p.procSingleProcedure);return {key:mk,label:fmtMonth(mk),value:proc?proc.quantityValid:0}});
-    } else {
-      // "Histórico mensal" e "Ano" ignoram o recorte de um único mês (Refinar > seletor de mês): não faria
-      // sentido comparar meses ou anos usando um valor já reduzido a 1 mês só.
-      items=groupProcedureItems((groupBy==='month'||groupBy==='year')?fullYearAgg:yearAgg,groupBy,filters,unit);
-    }
-  } else {
-    groupAgg=aggregateGroupYear(year,unit,{onlyMonth:p.procMonth});
-    items=groupGroupItems(groupAgg,groupBy,unit);
-  }
-  const compareSelection=Array.isArray(p.procCompareSelection)?p.procCompareSelection:[];
-  const chipItems=items;
-  const displayItems=(p.procCompareOpen&&compareSelection.length>=2)?items.filter(it=>compareSelection.includes(it.key)):items;
-  const palette=chartType==='pie'?procPalette(displayItems.length):(sequential?displayItems.map(()=>'#7551e9'):procPalette(displayItems.length));
-  const mainLabel=source==='individual'?(groupOptionsAll.find(o=>o.key===groupBy)?.label||'Procedimento'):(groupOptionsAll.find(o=>o.key===groupBy)?.label||'Assunto');
-
-  const tabsHTML=`<div class="proc-tabs">${tabsAll.map(t=>`<button class="${t.key===tab?'active':''}" data-proc-tab="${t.key}">${esc(t.label)}</button>`).join('')}</div>`;
-  const groupRowHTML=(tab==='patients')?'':`<div class="proc-row"><span class="proc-label">Agrupar por</span>${groupOptions.map(o=>`<button class="proc-chip${o.key===groupBy?' active':''}" data-proc-group="${o.key}">${esc(o.label)}</button>`).join('')}
-    ${source==='individual'?`<button class="btn small${p.procRefineOpen?' primary':''}" data-proc-toggle-refine>Refinar${refineCount?`<span class="proc-badge">${refineCount}</span>`:''}</button>`:''}
-    <button class="btn small${p.procCompareOpen?' primary':''}" data-proc-toggle-compare>Comparar</button>
-  </div>`;
-
-  let refinePanelHTML='';
-  if(source==='individual'&&p.procRefineOpen&&tab!=='patients'){
-    const sexOptions=['Feminino','Masculino'],ageOptions=['0-5','6-11','12-17','18-59','60+'];
-    const monthOptions=procMonthsOfYear(year).filter(mk=>state.snapshots.some(s=>s.profile==='celk_procedimentos_detalhado'&&s.dataByMonth?.[mk]&&(!unit||s.unit===unit)));
-    refinePanelHTML=`<div class="card" style="margin-top:10px;padding:14px 16px">
-      <p class="proc-label" style="margin-bottom:8px">Cruzamento avançado</p>
-      <div class="proc-row"><span class="proc-label" style="width:64px">Sexo</span>${sexOptions.map(s=>`<button class="proc-chip${filters.sex===s?' active':''}" data-proc-filter-sex="${esc(s)}">${esc(s)}</button>`).join('')}</div>
-      <div class="proc-row"><span class="proc-label" style="width:64px">Idade</span>${ageOptions.map(a=>`<button class="proc-chip${filters.age===a?' active':''}" data-proc-filter-age="${esc(a)}">${esc(a)} anos</button>`).join('')}</div>
-      <div class="proc-row"><span class="proc-label" style="width:64px">Dentista</span>${dentistList.map(d=>`<button class="proc-chip${filters.dentist===d?' active':''}" data-proc-filter-dentist="${esc(d)}">${esc(d)}</button>`).join('')}</div>
-      <p class="proc-label" style="margin:14px 0 8px">Período e recorte</p>
-      <div class="proc-row"><label class="switchrow" style="cursor:pointer"><input type="checkbox" data-proc-single-toggle ${p.procSingleAllMonths?'checked':''}><span>Ver um procedimento em todos os meses do ano</span></label>
-        ${p.procSingleAllMonths?`<select class="filter" id="procSingleProcedureSelect">${['',...fullYearProcedureOptions(year,unit)].map(x=>x?`<option value="${esc(x)}" ${p.procSingleProcedure===x?'selected':''}>${esc(procLabelFor(x,year,unit))}</option>`:`<option value="">Escolha um procedimento…</option>`).join('')}</select>`:''}
-      </div>
-      <div class="proc-row"><span class="proc-label" style="width:64px">Mês</span><select class="filter" id="procMonthSelect"><option value="">Ano inteiro</option>${monthOptions.map(mk=>`<option value="${mk}" ${p.procMonth===mk?'selected':''}>${esc(fmtMonth(mk,true))}</option>`).join('')}</select></div>
-      ${refineCount?`<div class="proc-row" style="margin-top:4px"><button class="link-btn" data-proc-clear-refine>Limpar filtros</button></div>`:''}
-    </div>`;
-  }
-
-  let bodyHTML='';
-  if(tab==='patients'){
-    const stats=patientEvaluationStats(year,unit);
-    bodyHTML=`<div class="grid-kpis" style="grid-template-columns:repeat(4,1fr)">
-      ${kpi('1ª consulta',fmtNum(stats.firstTotal),'pacientes distintos no ano','#17b9ec','users')}
-      ${kpi('Retornos',fmtNum(stats.retornosTotal),'total de vezes que os pacientes voltaram ao posto no ano','#7551e9','trend')}
-      ${kpi('Tratamentos concluídos',fmtNum(stats.concludedTotal),'pacientes distintos no ano','#2cc08b','check')}
-      ${kpi('Média de consultas/paciente',stats.avgVisits!=null?fmtNum(stats.avgVisits,1):'—','visitas ÷ pacientes distintos','#a855f7','users')}
+  const p=state.preferences,unit=p.unit,source=p.procSource==='group'?'group':'individual',per=procPeriod(),f=procFilters();
+  const seg=(key,val,label,cur)=>`<button class="pr-sb" data-${key}="${val}" aria-pressed="${cur===val}">${label}</button>`;
+  const hasAny=state.snapshots.some(s=>s.profile===(source==='group'?'celk_atividades_grupo':'celk_procedimentos_detalhado'));
+  const byMonth=source==='individual'?procCrossByMonth([...new Set([...per.chart,...per.months])],unit):null;
+  const dentists=byMonth?[...new Set(Object.values(byMonth).flatMap(v=>v?v.cross.map(c=>c.professional):[]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')):[];
+  const bar=`<section class="card pr-bar" aria-label="Filtros">
+    <div class="pr-fg"><span>Fonte</span><div class="pr-seg">${seg('proc-source','individual','Individuais',source)}${seg('proc-source','group','Atividades coletivas',source)}</div></div>
+    <div class="pr-fg"><span>Período</span><div class="pr-seg">${seg('proc-period','M','Mês',per.mode)}${seg('proc-period','Q','Quadrimestre',per.mode)}${seg('proc-period','Y','Ano',per.mode)}</div><b class="pr-per">${esc(per.label)}</b></div>
+    ${source==='individual'?`<div class="pr-fg"><span>Dentista</span><select class="filter" data-proc-dentist-sel aria-label="Dentista"><option value="">Todos</option>${dentists.map(d=>`<option value="${esc(d)}"${f.dentist===d?' selected':''}>${esc(d)}</option>`).join('')}</select></div>
+    <div class="pr-fg"><span>Idade</span><span class="pr-chips">${PROC_AGE_BANDS.map(a=>`<button class="pr-chip" data-proc-age="${a}" aria-pressed="${f.age===a}">${a.replace('-','–')}</button>`).join('')}</span></div>
+    <div class="pr-fg"><span>Sexo</span><span class="pr-chips">${['Feminino','Masculino'].map(s=>`<button class="pr-chip" data-proc-sex="${s}" aria-pressed="${f.sex===s}">${s}</button>`).join('')}</span></div>
+    ${f.dentist||f.age||f.sex?'<button class="link-btn pr-clear" data-proc-clear>Limpar filtros</button>':''}`:''}
+  </section>`;
+  if(!hasAny)return bar+emptyState('Nenhum relatório importado para esta fonte',source==='group'?'Importe um relatório "Relação das Atividades em Grupo" do CELK (PDF ou CSV) para ver as atividades aqui.':'Importe um relatório "Procedimentos Detalhado" do CELK (PDF ou CSV) para ver os procedimentos aqui.');
+  return bar+(source==='group'?groupActivitiesHTML(per):procIndividualHTML(per,f,byMonth));
+}
+function procIndividualHTML(per,f,byMonth){
+  const p=state.preferences,info=procInfoMap(byMonth),rowsOf=(months,{skipDent=false}={})=>months.flatMap(mk=>byMonth[mk]?byMonth[mk].cross:[]).filter(c=>(skipDent||!f.dentist||c.professional===f.dentist)&&(!f.age||c.age===f.age)&&(!f.sex||c.sex===f.sex));
+  const rows=rowsOf(per.months),total=sum(rows.map(r=>r.quantity)),withData=per.months.filter(mk=>byMonth[mk]);
+  const visits=withData.flatMap(mk=>byMonth[mk].agg.visitsList||[]),patients=new Set(visits.map(v=>v.patient)),filtered=!!(f.dentist||f.age||f.sex);
+  const scope=[per.label,f.dentist,f.age?`${f.age.replace('-','–')} anos`:'',f.sex].filter(Boolean).join(' · ');
+  if(!withData.length)return `<article class="card pr-box"><p class="pr-note">Nenhum relatório "Procedimentos Detalhado" para ${esc(per.label)}. Escolha outro período no topo ou importe o relatório.</p></article>`;
+  const kpis=`<section class="pr-kpis" aria-label="Resumo">
+    <div class="card pr-kpi"><span class="pq-sec-t">Procedimentos</span><b>${fmtNum(total)}</b><small>${per.mode==='M'?esc(per.label):`${fmtNum(total/Math.max(1,withData.length))} por mês com dado, em média`}</small></div>
+    <div class="card pr-kpi"><span class="pq-sec-t">Pacientes atendidos</span><b>${fmtNum(patients.size)}</b><small>pessoas diferentes${filtered?' · sem os filtros':''}</small></div>
+    <div class="card pr-kpi"><span class="pq-sec-t">Dias de atendimento</span><b>${fmtNum(visits.length)}</b><small>paciente × dia com registro${filtered?' · sem os filtros':''}</small></div>
+    <div class="card pr-kpi"><span class="pq-sec-t">Por atendimento</span><b>${visits.length&&!filtered?fmtNum(total/visits.length,1):'—'}</b><small>${filtered?'não se aplica com filtros':'procedimentos em média'}</small></div>
+  </section>`;
+  const byCat=procSumBy(rows,r=>procCategory(r.procLabel)),byProc=procSumBy(rows,r=>r.procKey),maxP=Math.max(1,...byProc.values()),open=new Set(Array.isArray(p.procOpenCats)?p.procOpenCats:['Periodontia','Preventivos']);
+  const cats=PROC_CATS.filter(([c])=>byCat.get(c)).sort((a,b)=>byCat.get(b[0])-byCat.get(a[0])).map(([c,color])=>{const procs=[...byProc.entries()].filter(([k])=>procCategory(info[k]?.name||rows.find(r=>r.procKey===k)?.procLabel||k)===c).sort((a,b)=>b[1]-a[1]),isOpen=open.has(c);
+    return `<div class="pr-cat${isOpen?' open':''}"><button class="pr-cat-h" data-proc-cat="${c}" aria-expanded="${isOpen}"><span class="pr-dot" style="background:${color}"></span><b>${c} <small>· ${procs.length} procedimento${procs.length===1?'':'s'}</small></b><span class="pr-n">${fmtNum(byCat.get(c))}</span><span class="pr-pct">${fmtPct(100*byCat.get(c)/total,1)}</span><span class="pr-chev">›</span></button>${isOpen?`<div class="pr-rows">${procs.map(([k,q])=>{const i=info[k]||{name:rows.find(r=>r.procKey===k)?.procLabel||k,sigtap:'',roles:[]};return `<button class="pr-row" data-proc-open="${esc(k)}"><span class="pr-nm"><b>${esc(i.name)}</b><small>${i.sigtap?`<span class="mono">${esc(i.sigtap)}</span>`:'<span>sem código SIGTAP no relatório</span>'}${procChipsHTML(i.roles)}</small></span><span class="pr-track"><i style="width:${100*q/maxP}%;background:${color}"></i></span><span class="pr-q">${fmtNum(q)}</span><span class="pr-p">${fmtPct(100*q/total,1)}</span></button>`}).join('')}</div>`:''}</div>`}).join('');
+  const mix=PROC_CATS.map(([c,color])=>byCat.get(c)?`<i style="width:${100*byCat.get(c)/total}%;background:${color}" title="${c}: ${fmtNum(byCat.get(c))}"></i>`:'').join('');
+  const legend=PROC_CATS.filter(([c])=>byCat.get(c)).map(([c,color])=>`<span><i style="background:${color}"></i>${c} ${fmtPct(100*byCat.get(c)/total,1)}</span>`).join('');
+  const mRows=per.chart.map(mk=>({mk,cat:procSumBy(rowsOf([mk]),r=>procCategory(r.procLabel))})),mTot=mRows.map(x=>sum([...x.cat.values()])),mMax=Math.max(1,...mTot);
+  const months=`<div class="pr-months" style="grid-template-columns:repeat(${per.chart.length},minmax(0,1fr))">${mRows.map((x,i)=>{const sel=per.mode==='M'&&x.mk===p.month,dim=per.mode==='M'&&!sel;return `<button class="pr-mcol${sel?' sel':''}${dim?' dim':''}" data-proc-month="${x.mk}" aria-label="${esc(fmtMonth(x.mk,true))}: ${fmtNum(mTot[i])} procedimentos"><span class="pr-mtot">${mTot[i]?fmtNum(mTot[i]):'—'}</span><span class="pr-mstack"><span style="height:${100*mTot[i]/mMax}%">${PROC_CATS.map(([c,color])=>x.cat.get(c)?`<i style="height:${100*x.cat.get(c)/mTot[i]}%;background:${color}"></i>`:'').join('')}</span></span><span class="pr-mlab">${MONTHS_SHORT[parseMonthKey(x.mk).month-1]}</span></button>`}).join('')}</div>`;
+  const dRows=rowsOf(per.months,{skipDent:true}),dCat=new Map();for(const r of dRows){const d=r.professional||'(sem profissional)',m=dCat.get(d)||new Map();m.set(procCategory(r.procLabel),(m.get(procCategory(r.procLabel))||0)+r.quantity);dCat.set(d,m)}
+  const dList=[...dCat.entries()].map(([d,m])=>[d,m,sum([...m.values()])]).sort((a,b)=>b[2]-a[2]),dMax=Math.max(1,...dList.map(x=>x[2]));
+  const dents=dList.map(([d,m,t])=>`<button class="pr-drow${f.dentist===d?' sel':''}${f.dentist&&f.dentist!==d?' dim':''}" data-proc-dentist="${esc(d)}"><b title="${esc(d)}">${esc(d)}</b><span class="pr-mix" style="height:10px;width:${Math.max(4,100*t/dMax)}%">${PROC_CATS.map(([c,color])=>m.get(c)?`<i style="width:${100*m.get(c)/t}%;background:${color}"></i>`:'').join('')}</span><span class="pr-q">${fmtNum(t)}</span></button>`).join('')||'<p class="pr-note">Sem dados.</p>';
+  const pRows=per.chart.map(mk=>{const a=byMonth[mk]?.agg;return `<tr class="${per.mode==='M'&&mk===p.month?'sel':''}"><td>${esc(fmtMonth(mk,true))}</td><td class="num">${a?fmtNum(a.firstConsultations):'—'}</td><td class="num">${a?fmtNum((a.visitsList||[]).length):'—'}</td><td class="num">${a?fmtNum(a.treatmentsConcluded):'—'}</td></tr>`}).join('');
+  const perPat=new Map();for(const v of visits)perPat.set(v.patient,(perPat.get(v.patient)||0)+1);const dist=[['1 vez',1,1],['2 a 3 vezes',2,3],['4 a 6 vezes',4,6],['7 ou mais',7,Infinity]].map(([l,a,b])=>[l,[...perPat.values()].filter(n=>n>=a&&n<=b).length]),distMax=Math.max(1,...dist.map(x=>x[1]));
+  const ageRows=rowsOf(per.months).filter(r=>r.age),ages=procSumBy(ageRows,r=>r.age),ageMax=Math.max(1,...ages.values()),sx=procSumBy(rows.filter(r=>r.sex),r=>r.sex),sxT=(sx.get('Feminino')||0)+(sx.get('Masculino')||0);
+  const hb=(l,v,max,color)=>`<div class="pr-hb"><span>${l}</span><span class="pr-track"><i style="width:${100*v/max}%;background:${color}"></i></span><span class="pr-q">${fmtNum(v)}</span></div>`;
+  return `${kpis}
+  <div class="pr-cols">
+    <section class="card pr-box"><div class="pr-box-h"><h2>O que foi feito</h2><small>${esc(scope)}</small></div>
+      ${total?`<div><div class="pr-mix">${mix}</div><div class="pr-legend">${legend}</div></div><div>${cats}</div>`:'<p class="pr-note">Nenhum procedimento com esses filtros.</p>'}
+      <p class="pr-note">Primeira consulta, tratamento concluído e atendimentos gerais não são procedimentos: entram em "Pacientes", abaixo.</p></section>
+    <div class="pr-side">
+      <section class="card pr-box"><div class="pr-box-h"><h2>Mês a mês</h2><small>clique num mês para filtrar</small></div>${months}</section>
+      <section class="card pr-box"><div class="pr-box-h"><h2>Por dentista</h2><small>clique para filtrar</small></div><div>${dents}</div></section>
     </div>
-    <article class="card panel">
-      <p class="section-title">Consultas por mês — 1ª vez, retorno e conclusão</p>
-      <p class="section-sub" style="margin-bottom:6px">Retorno = total de visitas do mês (conta todas as vezes que cada paciente veio, inclusive a própria 1ª consulta/conclusão).</p>
-      ${procPatientMonthlyChartHTML(stats.monthly)}
-    </article>
-    <article class="card panel">
-      <p class="section-title">Consultas por paciente</p>
-      <p class="section-sub" style="margin-bottom:6px">Quantas consultas cada paciente teve no ano, agrupadas em faixas.</p>
-      ${procDistributionHTML(stats.buckets,stats.distinctPatients)}
-    </article>`;
-  } else if(tab==='table'){
-    bodyHTML=`<article class="card table-card">
-      <div class="table-head"><div><p class="section-title">${esc(mainLabel)} — ${esc(String(year))}</p><p class="section-sub">${esc(sourceLabelForProc(source))}${p.procMonth?` · ${esc(fmtMonth(p.procMonth,true))}`:''}</p></div></div>
-      ${procTableHTML(displayItems,palette,mainLabel)}
-      ${p.procCompareOpen?procCompareSummaryHTML(displayItems):''}
-    </article>`;
-  } else {
-    const statItems=[...items].sort((a,b)=>b.value-a.value);
-    const totalValue=sum(items.map(i=>i.value));
-    bodyHTML=`<div class="grid-kpis" style="grid-template-columns:repeat(4,1fr)">
-      ${kpi('Total',fmtNum(totalValue),source==='individual'?'procedimentos no período':'atividades no período','#7551e9','trend')}
-      ${kpi(source==='group'?'Média por assunto':'Média por categoria',statItems.length?fmtNum(Math.round(totalValue/statItems.length)):'—',`média entre ${statItems.length} categoria(s)`,'#17b9ec','trend')}
-      ${kpi('Maior',statItems[0]?esc(statItems[0].label):'—',statItems[0]?`${fmtNum(statItems[0].value)} ${source==='individual'?'procedimentos':'atividades'}`:'sem dados','#2cc08b','trend')}
-      ${kpi('Menor',statItems.length?esc(statItems.at(-1).label):'—',statItems.length?`${fmtNum(statItems.at(-1).value)} ${source==='individual'?'procedimentos':'atividades'}`:'sem dados','#f7821f','trend')}
-    </div>
-    <article class="card panel">
-      <div class="panel-head">
-        <div><p class="section-title">${esc(mainLabel)}${pivotActive?` · ${esc(procLabelFor(p.procSingleProcedure,year,unit))}`:''}</p><p class="section-sub">${esc(sourceLabelForProc(source))}${p.procMonth?` · ${esc(fmtMonth(p.procMonth,true))}`:''}${pivotActive?' · todos os meses do ano (substitui o agrupamento selecionado)':''}</p></div>
-        <div class="scope-toggle">${[['bars','Barras'],['lines','Linhas'],['pie','Pizza']].map(([k,l])=>`<button class="scope-btn${chartType===k?' active':''}" data-proc-chart="${k}">${l}</button>`).join('')}</div>
-      </div>
-      ${chartType==='bars'?procBarsChartHTML(displayItems,palette):chartType==='lines'?procLineChartHTML(displayItems,sequential?'#7551e9':palette[0]||'#7551e9'):procPieChartHTML(displayItems,palette)}
-      ${(chartType==='bars'&&!sequential&&!pivotActive)?procParticipationHTML(displayItems,palette):''}
-      ${p.procCompareOpen?procCompareSummaryHTML(displayItems):''}
-    </article>`;
-  }
-  const compareChipsHTML=(p.procCompareOpen&&tab!=='patients')?procCompareChipsHTML(chipItems,compareSelection):'';
-
-  return `<div class="card proc-panel" style="margin-bottom:16px">
-    ${sourceToggleHTML}
-    <div class="proc-row">${tabsHTML}</div>
-    ${groupRowHTML}
-    ${compareChipsHTML}
-    ${refinePanelHTML}
   </div>
-  ${bodyHTML}`;
+  <section class="card pr-box"><div class="pr-box-h"><h2>Pacientes</h2><small>${esc(per.label)}${filtered?' · sem os filtros de dentista, idade e sexo':''}</small></div>
+    <div class="pr-pgrid">
+      <div><div class="pq-sec-t">Por mês</div><div class="table-scroll"><table class="pr-table"><thead><tr><th>Mês</th><th class="num">Primeiras consultas</th><th class="num">Dias de atendimento</th><th class="num">Tratamentos concluídos</th></tr></thead><tbody>${pRows}</tbody></table></div><p class="pr-note">Primeira consulta e tratamento concluído contam 1 vez por pessoa a cada 12 meses, como em M1 e M2.</p></div>
+      <div><div class="pq-sec-t">Quantas vezes cada paciente veio</div>${dist.map(([l,v])=>hb(l,v,distMax,'var(--primary)')).join('')}${patients.size?`<p class="pr-note">${fmtPct(100*dist[0][1]/patients.size,1)} dos pacientes vieram uma vez só no período.</p>`:''}</div>
+      <div><div class="pq-sec-t">Idade e sexo dos procedimentos</div>${PROC_AGE_BANDS.map(a=>hb(`${a.replace('-','–')} anos`,ages.get(a)||0,ageMax,'#2f80ed')).join('')}${sxT?`<div class="pr-sexbar"><i style="width:${100*(sx.get('Feminino')||0)/sxT}%;background:#d9486a"></i><i style="width:${100*(sx.get('Masculino')||0)/sxT}%;background:#2f80ed"></i></div><p class="pr-note">Feminino ${fmtPct(100*(sx.get('Feminino')||0)/sxT,1)} · Masculino ${fmtPct(100*(sx.get('Masculino')||0)/sxT,1)}</p>`:''}</div>
+    </div></section>`;
+}
+function openProcedureDetail(key){
+  const per=procPeriod(),f=procFilters(),byMonth=procCrossByMonth([...new Set([...per.chart,...per.months])]),info=procInfoMap(byMonth)[key]||{name:key,sigtap:'',roles:[]},c=procCategory(info.name),color=PROC_CAT_COLOR[c];
+  const base=mks=>mks.flatMap(mk=>byMonth[mk]?byMonth[mk].cross:[]).filter(r=>r.procKey===key);
+  const flt=(rows,{dent=true,age=true,sex=true}={})=>rows.filter(r=>(!dent||!f.dentist||r.professional===f.dentist)&&(!age||!f.age||r.age===f.age)&&(!sex||!f.sex||r.sex===f.sex));
+  const inPer=flt(base(per.months)),tot=sum(inPer.map(r=>r.quantity));
+  const bars=(pairs,col)=>{const mx=Math.max(1,...pairs.map(x=>x[1]));return pairs.map(([l,v])=>`<div class="pr-hb"><span>${esc(l)}</span><span class="pr-track"><i style="width:${100*v/mx}%;background:${col}"></i></span><span class="pr-q">${fmtNum(v)}</span></div>`).join('')};
+  const mPairs=per.chart.map(mk=>[fmtMonth(mk,true),sum(flt(byMonth[mk]?byMonth[mk].cross.filter(r=>r.procKey===key):[]).map(r=>r.quantity))]);
+  const dPairs=[...procSumBy(flt(base(per.months),{dent:false}),r=>r.professional||'(sem profissional)').entries()].sort((a,b)=>b[1]-a[1]);
+  const aPairs=PROC_AGE_BANDS.map(a=>[`${a.replace('-','–')} anos`,sum(flt(base(per.months),{age:false}).filter(r=>r.age===a).map(r=>r.quantity))]);
+  const sPairs=['Feminino','Masculino'].map(s=>[s,sum(flt(base(per.months),{sex:false}).filter(r=>r.sex===s).map(r=>r.quantity))]);
+  const uses=procedureRoleBadges(info.roles).map(x=>`${x.ind} (${x.part.toLowerCase()})`).join(', ');
+  openDrawer(`<div class="pq-drawer" style="--tint:#f6f7fb;--edge:${color};--ink:${color}" data-proc-detail-open="${esc(key)}">
+    <header class="pq-d-h"><div class="pq-d-h-top"><span class="indicator-id" style="margin-right:auto;color:${color}">${esc(c.toUpperCase())}</span><button class="pq-icon" data-close-drawer aria-label="Fechar">${icon('close')}</button></div>
+      <h2>${esc(info.name)}</h2><p class="pq-d-sub">${info.sigtap?`<span class="mono">${esc(info.sigtap)}</span>`:'sem código SIGTAP no relatório'} ${procChipsHTML(info.roles)}</p><p class="pq-d-sub"><b>${fmtNum(tot)}</b> em ${esc(per.label)}${f.dentist?` · ${esc(f.dentist)}`:''}</p><div style="height:12px"></div></header>
+    <div class="pq-d-b">
+      <section class="pq-d-card"><div class="pq-sec-t">Mês a mês</div>${bars(mPairs,color)}</section>
+      <section class="pq-d-card"><div class="pq-sec-t">Por dentista · ${esc(per.label)}</div>${dPairs.length?bars(dPairs,color):'<p class="pr-note">Sem registros.</p>'}</section>
+      <section class="pq-d-card"><div class="pq-sec-t">Idade</div>${bars(aPairs,'#2f80ed')}</section>
+      <section class="pq-d-card"><div class="pq-sec-t">Sexo</div>${bars(sPairs,'#d9486a')}</section>
+      <p class="ov-why">Onde entra nos indicadores: ${uses?esc(uses):'nenhum indicador'}.</p>
+    </div></div>`);
+  document.getElementById('drawer').classList.add('pq-drawer-host');
+}
+/* ---- Atividades coletivas ---- */
+// Atividades do período: o CSV traz uma linha por participante (idade, sexo, avaliação alterada); o PDF só traz o total.
+function groupActivitiesFor(months,unit=state.preferences.unit){
+  const out=[];
+  for(const mk of months)for(const s of latestSnapshots('celk_atividades_grupo',mk,unit)){const d=s.dataByMonth[mk];if(!d)continue;
+    if(Array.isArray(d.activityDetails))d.activityDetails.forEach((a,i)=>out.push({...a,mk,ref:`${s.id}|${mk}|${i}`,detail:true}));
+    else{(d.brushingEvents||[]).forEach(ev=>out.push({date:ev.date,subject:'Escovação supervisionada',brush:true,total:ev.present,eligible:ev.present,outOfRange:0,altered:null,mk,ref:'',detail:false}));
+      for(const sc of d.subjectCounts||[])if(!/ESCOVACAO SUPERVISIONADA/.test(norm(sc.subject)))out.push({date:'',subject:sc.subject,brush:false,total:sc.present||null,eligible:0,activitiesCount:sc.activities,altered:null,mk,ref:'',detail:false})}}
+  return out.sort((a,b)=>(parseDate(a.date)?.getTime()||0)-(parseDate(b.date)?.getTime()||0));
+}
+function groupActivitiesHTML(per){
+  const acts=groupActivitiesFor(per.months),brush=acts.filter(a=>a.brush),other=acts.filter(a=>!a.brush),hasDetail=acts.some(a=>a.detail);
+  if(!acts.length)return `<article class="card pr-box"><p class="pr-note">Nenhuma atividade em grupo em ${esc(per.label)}. Escolha outro período no topo ou importe o relatório.</p></article>`;
+  const partTotal=sum(acts.map(a=>a.total||0)),elig=sum(brush.map(a=>a.eligible||0)),alt=sum(acts.map(a=>a.altered||0)),nAct=sum(acts.map(a=>a.activitiesCount||1));
+  const kpis=`<section class="pr-kpis" aria-label="Resumo das atividades coletivas">
+    <div class="card pr-kpi"><span class="pq-sec-t">Atividades</span><b>${fmtNum(nAct)}</b><small>${fmtNum(brush.length)} escovaç${brush.length===1?'ão':'ões'} · ${fmtNum(nAct-brush.length)} outra${nAct-brush.length===1?'':'s'}</small></div>
+    <div class="card pr-kpi"><span class="pq-sec-t">Participantes</span><b>${hasDetail?fmtNum(partTotal):'—'}</b><small>${hasDetail?'somando todas as atividades':'o PDF não traz participantes'}</small></div>
+    <div class="card pr-kpi"><span class="pq-sec-t">Escovação supervisionada</span><b>${fmtNum(elig)}</b><small>crianças de 6 a 11 anos · entram em M3 e B4</small></div>
+    <div class="card pr-kpi"><span class="pq-sec-t">Avaliação alterada</span><b>${hasDetail?fmtNum(alt):'—'}</b><small>${hasDetail?'crianças para chamar para consulta':'só o CSV traz esse dado'}</small></div>
+  </section>`;
+  const name=a=>String(a.subject||'').replace(/^Escova[cç][aã]o Supervisionada\s*-\s*/i,'').replace(/^sa[úu]de bucal$/i,'Saúde bucal')||'(sem assunto)';
+  const row=a=>{const sub=a.brush?(a.detail?`${fmtNum(a.eligible)} entram em M3/B4${a.outOfRange?` · <b class="pr-bad">${fmtNum(a.outOfRange)} fora da faixa</b>`:''}${a.noBirth?` · ${fmtNum(a.noBirth)} sem nascimento`:''} · ${fmtNum(a.altered||0)} com avaliação alterada`:`${fmtNum(a.eligible)} presentes (PDF)`):esc([a.publico,a.temas].filter(Boolean).join(' · ')||(a.activitiesCount?`${a.activitiesCount} atividade(s)`:''));
+    return `<button class="pr-row pr-grow" ${a.ref?`data-group-act="${esc(a.ref)}"`:'disabled'}><span class="pr-nm"><b>${esc(name(a))}</b><small>${esc([a.date,a.turno,a.local].filter(Boolean).join(' · '))}</small></span><span class="pr-nm"><small>${sub}</small></span><span class="pr-q">${a.total!=null?fmtNum(a.total):'—'}</span></button>`};
+  const grp=(title,color,list)=>list.length?`<div class="pr-cat open"><div class="pr-cat-h" style="cursor:default"><span class="pr-dot" style="background:${color}"></span><b>${title} <small>· ${list.length} atividade${list.length===1?'':'s'}</small></b><span class="pr-n">${hasDetail?fmtNum(sum(list.map(a=>a.total||0))):''}</span><span class="pr-pct">${hasDetail?'partic.':''}</span><span></span></div><div class="pr-rows">${list.map(row).join('')}</div></div>`:'';
+  const ages={},sx={F:0,M:0};for(const a of acts){for(const [k,v] of Object.entries(a.ages||{}))ages[k]=(ages[k]||0)+v;sx.F+=a.sex?.F||0;sx.M+=a.sex?.M||0}
+  const ageMax=Math.max(1,...Object.values(ages)),sxT=sx.F+sx.M;
+  const mRows=per.chart.map(mk=>{const l=groupActivitiesFor([mk]);return [mk,sum(l.map(a=>a.activitiesCount||1)),sum(l.map(a=>a.total||0))]}),mMax=Math.max(1,...mRows.map(x=>x[1]));
+  return `${kpis}
+  <div class="pr-cols">
+    <section class="card pr-box"><div class="pr-box-h"><h2>Atividades</h2><small>${esc(per.label)}${hasDetail?' · clique para ver os participantes':''}</small></div>
+      ${grp('Escovação supervisionada','#0f9d8a',brush)}${grp('Educação em saúde e outras atividades','#2f80ed',other)}
+      <p class="pr-note">"Participantes" conta todo mundo que estava na atividade. Só as crianças de 6 a 11 anos (até a véspera de completar 12) das escovações entram no numerador de M3 e B4.${acts.some(a=>!a.detail)?' Atividades importadas por PDF ou antes da v2.27 mostram só o total; importe o CSV de novo para ver idade, sexo e avaliação alterada.':''}</p></section>
+    <div class="pr-side">
+      <section class="card pr-box"><div class="pr-box-h"><h2>Quem participou</h2><small>${esc(per.label)}</small></div>${sxT?`${PROC_AGE_BANDS.map(a=>`<div class="pr-hb"><span>${a.replace('-','–')} anos</span><span class="pr-track"><i style="width:${100*(ages[a]||0)/ageMax}%;background:#2f80ed"></i></span><span class="pr-q">${fmtNum(ages[a]||0)}</span></div>`).join('')}<div class="pr-sexbar"><i style="width:${100*sx.F/sxT}%;background:#d9486a"></i><i style="width:${100*sx.M/sxT}%;background:#2f80ed"></i></div><p class="pr-note">Feminino ${fmtPct(100*sx.F/sxT,1)} · Masculino ${fmtPct(100*sx.M/sxT,1)}</p>`:'<p class="pr-note">Idade e sexo só vêm no CSV.</p>'}</section>
+      <section class="card pr-box"><div class="pr-box-h"><h2>Mês a mês</h2><small>atividades</small></div><div class="pr-months" style="grid-template-columns:repeat(${per.chart.length},minmax(0,1fr))">${mRows.map(([mk,n,part])=>`<button class="pr-mcol${per.mode==='M'&&mk===state.preferences.month?' sel':''}" data-proc-month="${mk}" aria-label="${esc(fmtMonth(mk,true))}: ${n} atividades"><span class="pr-mtot">${n||'—'}</span><span class="pr-mstack"><span style="height:${100*n/mMax}%"><i style="height:100%;background:#0f9d8a"></i></span></span><span class="pr-mlab">${MONTHS_SHORT[parseMonthKey(mk).month-1]}</span></button>`).join('')}</div></section>
+    </div>
+  </div>`;
+}
+function openGroupActivity(ref){
+  const [sid,mk,i]=ref.split('|'),s=state.snapshots.find(x=>x.id===sid),a=s?.dataByMonth?.[mk]?.activityDetails?.[Number(i)];if(!a)return;
+  const ageMax=Math.max(1,...Object.values(a.ages||{})),names=a.alteredNames||[];
+  openDrawer(`<div class="pq-drawer" style="--tint:#f6f7fb;--edge:${a.brush?'#0f9d8a':'#2f80ed'};--ink:${a.brush?'#0f9d8a':'#2f80ed'}">
+    <header class="pq-d-h"><div class="pq-d-h-top"><span class="indicator-id" style="margin-right:auto">${a.brush?'ESCOVAÇÃO SUPERVISIONADA':'ATIVIDADE EM GRUPO'}</span><button class="pq-icon" data-close-drawer aria-label="Fechar">${icon('close')}</button></div>
+      <h2>${esc(a.subject||'(sem assunto)')}</h2><p class="pq-d-sub">${esc([a.date,a.turno,a.local].filter(Boolean).join(' · '))}</p><p class="pq-d-sub">${esc([a.tipo,a.publico?`público: ${a.publico}`:''].filter(Boolean).join(' · '))}</p><div style="height:12px"></div></header>
+    <div class="pq-d-b">
+      <section class="pq-d-card"><div class="pq-sec-t">Participantes</div><div class="pr-hb"><span>Total</span><span></span><span class="pr-q">${fmtNum(a.total)}</span></div>${a.brush?`<div class="pr-hb"><span>Entram em M3/B4</span><span class="pr-track"><i style="width:${a.total?100*a.eligible/a.total:0}%;background:#0f9d8a"></i></span><span class="pr-q">${fmtNum(a.eligible)}</span></div>${a.outOfRange?`<p class="ov-why">${fmtNum(a.outOfRange)} participante(s) fora de 6 a 11 anos na data da atividade: não entram em M3/B4.</p>`:''}${a.noBirth?`<p class="ov-why">${fmtNum(a.noBirth)} sem data de nascimento no CSV.</p>`:''}`:''}</section>
+      <section class="pq-d-card"><div class="pq-sec-t">Idade</div>${PROC_AGE_BANDS.filter(b=>a.ages?.[b]).map(b=>`<div class="pr-hb"><span>${b.replace('-','–')} anos</span><span class="pr-track"><i style="width:${100*a.ages[b]/ageMax}%;background:#2f80ed"></i></span><span class="pr-q">${fmtNum(a.ages[b])}</span></div>`).join('')||'<p class="ov-why">Sem data de nascimento.</p>'}<p class="ov-why">Feminino ${fmtNum(a.sex?.F||0)} · Masculino ${fmtNum(a.sex?.M||0)}</p></section>
+      ${a.altered?`<section class="pq-d-card"><div class="pq-sec-t">Avaliação alterada · ${fmtNum(a.altered)} participante${a.altered===1?'':'s'}</div>${names.length?`<ul class="pr-names">${names.map(n=>`<li>${esc(n)}</li>`).join('')}</ul><p class="ov-why">Para chamar para consulta. Os nomes não vão no backup analítico.</p>`:'<p class="ov-why">Os nomes não estão guardados (backup analítico ou importação antiga).</p>'}</section>`:''}
+    </div></div>`);
+  document.getElementById('drawer').classList.add('pq-drawer-host');
 }
 function sourceLabelForProc(source){return source==='group'?'CELK · atividades em grupo':'CELK · procedimentos detalhados'}
 function fullYearProcedureOptions(year,unit){return aggregateProcedureYear(year,unit).procedureCounts.map(p=>p.descriptionNormalized).sort((a,b)=>a.localeCompare(b,'pt-BR'))}
 function procLabelFor(key,year,unit){const p=aggregateProcedureYear(year,unit).procedureCounts.find(x=>x.descriptionNormalized===key);return p?(p.descriptionOriginal||p.descriptionNormalized):key}
 
-const VIEW_META={overview:['Acompanhamento Odontológico','Acompanhamento mensal e quadrimestral com leitura municipal, federal e painel operacional 2I.'],municipal:['Indicadores municipais · M1–M5','Apuração do quadrimestre pelas regras de Florianópolis. Prévia calculada do CELK, não homologada.'],federal:['Leitura federal · B1–B6','Faixas das Notas Metodológicas de maio de 2026, mês a mês e no quadrimestre. Prévia calculada do CELK, não homologada.'],pregnant:['Gestantes · 2I','Fila de contato do indicador 2I: quem ainda falta atender, em que etapa está cada gestante e o que fazer agora.'],procedures:['Procedimentos realizados','Gráficos, tabelas e avaliação do paciente calculados direto sobre os relatórios de Procedimentos Detalhado e Atividades em Grupo já importados — sem fonte adicional.'],settings:['Configurações','Salvamento e backup, arquivos importados, verificação dos dados e conferência por procedimento.'],calculator:['Calculadora odontopediátrica','Doses de antibióticos e analgésicos por peso, para prescrição em quadros odontológicos infantis.']};
+const VIEW_META={overview:['Acompanhamento Odontológico','Acompanhamento mensal e quadrimestral com leitura municipal, federal e painel operacional 2I.'],municipal:['Indicadores municipais · M1–M5','Apuração do quadrimestre pelas regras de Florianópolis. Prévia calculada do CELK, não homologada.'],federal:['Leitura federal · B1–B6','Faixas das Notas Metodológicas de maio de 2026, mês a mês e no quadrimestre. Prévia calculada do CELK, não homologada.'],pregnant:['Gestantes · 2I','Fila de contato do indicador 2I: quem ainda falta atender, em que etapa está cada gestante e o que fazer agora.'],procedures:['Procedimentos realizados','O que a equipe de saúde bucal fez, calculado direto dos relatórios Procedimentos Detalhado e Atividades em Grupo do CELK.'],settings:['Configurações','Salvamento e backup, arquivos importados, verificação dos dados e conferência por procedimento.'],calculator:['Calculadora odontopediátrica','Doses de antibióticos e analgésicos por peso, para prescrição em quadros odontológicos infantis.']};
 function migrateState(raw){const d=defaultState(),s=raw&&typeof raw==='object'?raw:{};const out={...d,...s,preferences:{...d.preferences,...(s.preferences||{})},gestantes:{...d.gestantes,...(s.gestantes||{}),followups:{...d.gestantes.followups,...(s.gestantes?.followups||{})},merges:{...d.gestantes.merges,...(s.gestantes?.merges||{})},excluded:{...d.gestantes.excluded,...(s.gestantes?.excluded||{})},overrides:{...d.gestantes.overrides,...(s.gestantes?.overrides||{})},manual:Array.isArray(s.gestantes?.manual)?s.gestantes.manual:[]},columnMappings:{...d.columnMappings,...(s.columnMappings||{}),consulta2i:{...d.columnMappings.consulta2i,...(s.columnMappings?.consulta2i||{})}}};out.snapshots=Array.isArray(s.snapshots)?s.snapshots:[];for(const sn of out.snapshots)if(CUMULATIVE_2I_PROFILES.includes(sn.profile)&&sn.supersededBy)sn.supersededBy=null;out.patientDirectory=s.patientDirectory&&typeof s.patientDirectory==='object'?s.patientDirectory:{};out.denominators=Array.isArray(s.denominators)?s.denominators:[];out.populationInputs=Array.isArray(s.populationInputs)?s.populationInputs:[];out.audit=Array.isArray(s.audit)?s.audit:[];out.schemaVersion=SCHEMA_VERSION;out.appVersion=APP_VERSION;delete out.security;
   if(out.preferences.view==='imports'||out.preferences.view==='diagnostics'){out.preferences.settingsTab=out.preferences.view;out.preferences.view='settings';out.audit.push({id:uuid(),at:nowISO(),action:'legacy_view_migrated_to_settings',details:{note:'Importações e Diagnóstico viraram subabas de Configurações na v2.0.'}})}
   if(!['geral','imports','diagnostics','conferencia'].includes(out.preferences.settingsTab))out.preferences.settingsTab='geral';
@@ -3024,17 +2950,16 @@ function setupEvents(){
     if(el.dataset.followup){const [id,next]=el.dataset.followup.split('|');return setFollowupWithUndo(id,next,next==='nao_contatada'?'Acompanhamento reiniciado.':`${followupLabel(next)} · registrado.`)}if(el.dataset.mergeManual){const [m,e]=el.dataset.mergeManual.split('|');return mergeManual(m,e)}if(el.dataset.editManual){closeDrawer();return openManualPregnant(el.dataset.editManual)}if(el.dataset.addFollowupNote){const ta=document.getElementById('followupNoteInput');return addFollowupNote(el.dataset.addFollowupNote,ta?ta.value:'')}if(el.dataset.saveAllFields)return saveAllFieldsOverride(el.dataset.saveAllFields);if(el.dataset.archiveManual){const m=state.gestantes.manual.find(x=>x.id===el.dataset.archiveManual);if(m){m.archived=true;audit('2i_manual_archived',{manualId:m.id});closeDrawer();refreshAll();toast('Cadastro manual arquivado.')}return}if(el.dataset.excludeEpisode){closeDrawer();return openExcludeEpisode(el.dataset.excludeEpisode)}if(el.dataset.restoreEpisode)return restoreEpisode(el.dataset.restoreEpisode);
     if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading(`Executando ${SELF_TEST_COUNT} testes`,'Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
     if(el.dataset.settingsTab){state.preferences.settingsTab=el.dataset.settingsTab;if(activeView!=='settings'){switchView('settings')}else{queueSave();refreshAll()}return}
-    if(el.dataset.procSource){state.preferences.procSource=el.dataset.procSource;state.preferences.procGroupBy='procedure';state.preferences.procCompareSelection=[];state.preferences.procCompareOpen=false;state.preferences.procRefineOpen=false;state.preferences.procSex='';state.preferences.procAge='';state.preferences.procDentist='';state.preferences.procMonth='';state.preferences.procSingleAllMonths=false;state.preferences.procSingleProcedure='';if(el.dataset.procSource==='group'&&state.preferences.procTab==='patients')state.preferences.procTab='charts';queueSave();return refreshAll()}
-    if(el.dataset.procTab){state.preferences.procTab=el.dataset.procTab;queueSave();return refreshAll()}
-    if(el.dataset.procGroup){state.preferences.procGroupBy=el.dataset.procGroup;state.preferences.procCompareSelection=[];queueSave();return refreshAll()}
-    if(el.dataset.procChart){state.preferences.procChartType=el.dataset.procChart;queueSave();return refreshAll()}
-    if(el.hasAttribute('data-proc-toggle-refine')){state.preferences.procRefineOpen=!state.preferences.procRefineOpen;queueSave();return refreshAll()}
-    if(el.hasAttribute('data-proc-toggle-compare')){state.preferences.procCompareOpen=!state.preferences.procCompareOpen;state.preferences.procCompareSelection=[];queueSave();return refreshAll()}
-    if(el.dataset.procFilterSex){state.preferences.procSex=state.preferences.procSex===el.dataset.procFilterSex?'':el.dataset.procFilterSex;queueSave();return refreshAll()}
-    if(el.dataset.procFilterAge){state.preferences.procAge=state.preferences.procAge===el.dataset.procFilterAge?'':el.dataset.procFilterAge;queueSave();return refreshAll()}
-    if(el.dataset.procFilterDentist){state.preferences.procDentist=state.preferences.procDentist===el.dataset.procFilterDentist?'':el.dataset.procFilterDentist;queueSave();return refreshAll()}
-    if(el.hasAttribute('data-proc-clear-refine')){for(const k of ['procSex','procAge','procDentist','procMonth'])state.preferences[k]='';queueSave();return refreshAll()}
-    if(el.dataset.procCompareItem){const key=el.dataset.procCompareItem,sel=state.preferences.procCompareSelection||[];state.preferences.procCompareSelection=sel.includes(key)?sel.filter(k=>k!==key):[...sel,key];queueSave();return refreshAll()}
+    if(el.dataset.procSource){state.preferences.procSource=el.dataset.procSource;queueSave();return refreshAll()}
+    if(el.dataset.procPeriod){state.preferences.procPeriod=el.dataset.procPeriod;queueSave();return refreshAll()}
+    if(el.dataset.procMonth){const p=state.preferences;if(p.procPeriod==='M'&&p.month===el.dataset.procMonth){p.procPeriod='Q'}else{p.procPeriod='M';p.month=el.dataset.procMonth;const {year,month}=parseMonthKey(p.month);p.year=year;p.quarter=quarterOfMonth(month)}queueSave();return refreshAll()}
+    if(el.dataset.procAge){state.preferences.procAge=state.preferences.procAge===el.dataset.procAge?'':el.dataset.procAge;queueSave();return refreshAll()}
+    if(el.dataset.procSex){state.preferences.procSex=state.preferences.procSex===el.dataset.procSex?'':el.dataset.procSex;queueSave();return refreshAll()}
+    if(el.dataset.procDentist!=null){state.preferences.procDentist=state.preferences.procDentist===el.dataset.procDentist?'':el.dataset.procDentist;queueSave();return refreshAll()}
+    if(el.hasAttribute('data-proc-clear')){for(const k of ['procSex','procAge','procDentist'])state.preferences[k]='';queueSave();return refreshAll()}
+    if(el.dataset.procCat){const p=state.preferences,open=new Set(Array.isArray(p.procOpenCats)?p.procOpenCats:['Periodontia','Preventivos']);open.has(el.dataset.procCat)?open.delete(el.dataset.procCat):open.add(el.dataset.procCat);p.procOpenCats=[...open];queueSave();return refreshAll()}
+    if(el.dataset.procOpen)return openProcedureDetail(el.dataset.procOpen);
+    if(el.dataset.groupAct)return openGroupActivity(el.dataset.groupAct);
     if(el.hasAttribute('data-clear-browser'))return openClearBrowserModal();if(el.hasAttribute('data-clear-with-backup')){localSave.pendingClearAfterBackup=true;return openBackupModal()}if(el.hasAttribute('data-clear-no-backup')){if(el.dataset.armed!=='1'){el.dataset.armed='1';el.textContent='Confirmar: apagar sem backup';return}return clearBrowserData()}
     if(el.hasAttribute('data-create-backup'))return createBackupFromModal();if(el.hasAttribute('data-restore-backup'))return document.getElementById('backupInput').click();if(el.hasAttribute('data-unlock-backup'))return processPendingBackup(document.getElementById('restorePassword')?.value||'');
   });
@@ -3045,9 +2970,7 @@ function setupEvents(){
   document.getElementById('yearFilter').onchange=e=>{state.preferences.year=Number(e.target.value);state.preferences.month=quarterMonths(state.preferences.year,state.preferences.quarter)[0];queueSave();refreshAll()};document.getElementById('quarterFilter').onchange=e=>{state.preferences.quarter=Number(e.target.value);state.preferences.month=quarterMonths(state.preferences.year,state.preferences.quarter)[0];queueSave();refreshAll()};document.getElementById('monthFilter').onchange=e=>updatePreference('month',e.target.value);document.getElementById('unitFilter').onchange=e=>updatePreference('unit',e.target.value);
   document.getElementById('globalSearch').addEventListener('keydown',e=>{if(e.key==='Enter')globalSearch(e.currentTarget.value)});
   document.addEventListener('change',e=>{if(e.target.hasAttribute('data-autosave-toggle'))return setAutosave(e.target.checked);if(e.target.dataset.toggleEncerrada)return toggleGestacaoEncerrada(e.target.dataset.toggleEncerrada);if(e.target.matches('.preg-filter')){state.preferences[e.target.dataset.pregFilter]=e.target.value;queueSave();refreshAll()}if(e.target.id==='sourceMode')updatePreference('sourceMode',e.target.value);if(e.target.id==='settingsTarget'||e.target.id==='targetScore')updatePreference('targetScore',clamp(Number(e.target.value),0,100));
-    if(e.target.id==='procMonthSelect'){state.preferences.procMonth=e.target.value;queueSave();refreshAll()}
-    if(e.target.id==='procSingleProcedureSelect'){state.preferences.procSingleProcedure=e.target.value;queueSave();refreshAll()}
-    if(e.target.hasAttribute('data-proc-single-toggle')){state.preferences.procSingleAllMonths=e.target.checked;if(!e.target.checked)state.preferences.procSingleProcedure='';queueSave();refreshAll()}
+    if(e.target.hasAttribute('data-proc-dentist-sel')){state.preferences.procDentist=e.target.value;queueSave();refreshAll()}
   });
   document.addEventListener('input',e=>{if(['ovPop','ovEsf','ovDent','ovDenManual'].includes(e.target.id))ovLivePreview(e.target)});
   // Campo de data aceita colar "dd/mm/aaaa" (o navegador sozinho só aceita digitar dígito por dígito).
