@@ -1,4 +1,4 @@
-# Indicadores Saúde Bucal · versão 2.16
+# Indicadores Saúde Bucal · versão 2.17
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -27,6 +27,13 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
   - Os demais: soma dos numeradores e dos denominadores dos meses com dado. Na leitura federal é um cálculo de conveniência, porque as Notas não definem como consolidar o quadrimestre.
 - B1, B2, B4 e B6 usam os mesmos números de M1, M2, M3 e M5; muda só a faixa. B3 e B5 usam as listas de códigos das Notas.
 - Na página Federal, "Para subir de faixa" mostra quantos procedimentos faltam para a próxima faixa. Na B3 (exodontia), a ferramenta nunca recomenda produzir exodontias: mostra quanto o restante da produção precisaria crescer.
+
+## Configurações
+
+- **Geral**: salvamento no navegador e backup em arquivo (com a situação de cada um), denominadores de M1/B1 e M3/B4 com botão para editar, e "Sobre" (versões, regras e passo a passo).
+- **Arquivos**: importação e a lista de arquivos agrupada por tipo, com o estado de cada um (em uso, somado ou substituído). "Conferir" abre a gaveta do arquivo: o que ele trouxe, onde entra no cálculo, avisos, linhas lidas e detalhes técnicos.
+- **Verificação**: primeiro o que precisa de ação, depois as informações dos arquivos, os limites das fontes e os testes internos.
+- **Conferência por procedimento**: quanto de cada procedimento foi lido, excluído e validado no mês, e em que indicador entra, com exportação em CSV.
 
 ## Gestantes (2I)
 

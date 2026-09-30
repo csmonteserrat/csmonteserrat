@@ -1,5 +1,26 @@
 # Histórico de versões
 
+## Versão 2.17 (Configurações redesenhadas: quatro abas com a situação no botão, sem blocos repetidos, e o "Conferir" de cada arquivo numa gaveta)
+
+- **Pedido do usuário**: "repense o design da página de configurações de forma que fique mais limpa, mais fácil de ler e menos redundante", mostrando antes de aplicar. Decisões no protótipo: a "Conferência por procedimento" vira uma subaba própria de Configurações, e o "Conferir" de cada arquivo também foi redesenhado.
+- **Quatro abas** (Geral, Arquivos, Verificação e Conferência por procedimento). Cada botão mostra a situação: se está salvo e se o backup está em dia, quantos arquivos há, quantas pendências no mês e quantos procedimentos. Saem os 4 cartões grandes do Diagnóstico.
+- **Geral**:
+  - "Salvamento e backup" em duas linhas de situação, cada uma com a ação ao lado (interruptor do salvamento; Restaurar e Exportar), e uma frase sobre privacidade. "Limpar dados do navegador" continua perguntando se quer salvar um backup antes.
+  - "Denominadores": uma linha para M1/B1 e outra para M3/B4 com o valor em uso e o botão Editar ou Confirmar, que abre a gaveta do indicador no mês. As versões antigas ficam em "Histórico".
+  - "Sobre": versão, regras municipal e federal, a regra das fontes e o passo a passo atualizado (sem o CSV consolidado do Metabase, com as listas de gestantes).
+  - Saem "Nota quadrimestral desejada" (a pontuação saiu das páginas, o campo não mudava nada), "Prioridade das fontes" como campo travado, "Interpretação do CSV 2I" (a regra é fixa e está em Gestantes › Como é calculado) e o "Manual rápido" antigo.
+- **Arquivos**:
+  - Área de importação com as três regras de duplicidade corrigidas: o mesmo arquivo não entra duas vezes; produção e atividades em grupo substituem o arquivo do mesmo mês; listas de gestantes e Monitora se somam (o aviso antigo dizia que todo arquivo novo substitui o anterior).
+  - Lista agrupada por tipo de relatório, com o estado de cada arquivo (Em uso, Somado ou Substituído). Saem "Sessão atual" (repetia o topo) e "Fontes mais recentes" (repetia a lista, com ícones que apareciam como manchas pretas).
+- **Conferir (cada arquivo)** vira uma gaveta: "O que o arquivo trouxe" em português (por tipo de relatório), onde entra no cálculo, abas só quando fazem sentido (Procedimentos na produção, Atividades nas atividades em grupo, Faixas etárias na população), Avisos, Linhas lidas e "Detalhes técnicos" recolhido com a assinatura SHA-256. Arquivo substituído avisa por qual foi trocado. Sai a tabela em JSON. Os CSVs de gestantes passam a guardar quantas eram novas, atualizadas e iguais para mostrar aqui.
+- **Verificação** (antigo Diagnóstico):
+  - "Para resolver" primeiro, com o botão para resolver: Confirmar (denominador, abre a gaveta no mês), Ver gestantes (abre Gestantes filtrado em "Só Monitora APS"), Abrir gestante ou Abrir arquivo.
+  - Os avisos têm título em português; o código fica pequeno, para suporte. Avisos iguais se juntam (×2).
+  - "O que os arquivos trouxeram" (informativos) e "Limites das fontes" ficam recolhidos. Os avisos que valem para todo arquivo de um tipo (restauração abreviada, presentes sem idade, CSV de gestantes sem data) não contam como pendência: aparecem uma vez em "Limites das fontes", junto com o antigo "Não inventado" e as "Limitações visíveis".
+  - Testes internos numa linha com o botão Executar.
+- **Conferência por procedimento**: a antiga tabela "Resumo por procedimento" de Importações, agora com "Entra em" em chips curtos (M1 num, M2 den…) e a exportação em CSV.
+- **Verificado com Playwright**: 252/252 autotestes passam (teste 189 reescrito e 5 novos, 248–252). Testado de ponta a ponta com dados sintéticos no computador e no celular (390 px, sem rolagem horizontal): as quatro abas, a gaveta Conferir de cada tipo de arquivo, Confirmar denominador e Ver gestantes a partir da Verificação.
+
 ## Versão 2.16 (páginas Municipal e Federal redesenhadas: matriz do quadrimestre, "para subir de faixa" e gaveta federal; B1/B4 pela média dos 4 meses)
 
 - **Pedido do usuário**: "repensar o design da página municipal e federal sem modificar ainda o site, mantendo consistência com o design das gavetas". O desenho foi aprovado num protótipo, com estas decisões:
