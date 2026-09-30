@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.27
+# Acompanhamento Odontológico · versão 2.28
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -33,6 +33,15 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - **Individuais**: número de procedimentos, pacientes atendidos, dias de atendimento e procedimentos por atendimento; "O que foi feito" por categoria clínica (Preventivos, Periodontia, Restauradores, Endodontia, Cirurgia e Outros), com nome, SIGTAP e em que indicador cada procedimento entra; mês a mês e por dentista (clicar filtra); pacientes por mês, quantas vezes cada um veio, idade e sexo. Clicar num procedimento abre a gaveta com mês a mês, dentista, idade e sexo.
 - **Atividades coletivas**: atividades, participantes, crianças que entram em M3/B4 e crianças com avaliação alterada; cada atividade mostra quantos ficaram fora da faixa de 6 a 11 anos e, na gaveta, a lista de quem teve avaliação alterada (o backup analítico não leva os nomes).
 - Período: mês, quadrimestre ou ano, a partir do filtro do topo. Filtros de dentista, idade e sexo.
+
+### Análise estatística (aba da página Procedimentos)
+
+- Três bases, sempre uma linha por pessoa e sem nome: **pacientes da produção** (Procedimentos Detalhado), **gestantes** (Monitora APS, lista mais recente; sem data, então o período não se aplica) e **crianças das escovações** (uma linha por participação; conta todos e avisa quantos estão fora da faixa de 6 a 11 anos de M3/B4).
+- Variáveis dos pacientes: sexo, faixa etária, idade, dentista principal, mais de um dentista, mês e quadrimestre de entrada, 1ª consulta, concluiu (só quem teve 1ª consulta), concluiu no mesmo dia (só quem concluiu), voltou, urgência, preventivo, restauração, exodontia, periodontia, ART, voltou no quadrimestre seguinte, dias de atendimento, nº de procedimentos, dias até a conclusão, nº de dentistas e "Teve o procedimento…" (qualquer procedimento vira Sim/Não).
+- Testes: qui-quadrado (ou Fisher), intervalo de confiança de Wilson, duas proporções (z ou Fisher), tendência de Cochran-Armitage, Mann-Whitney/Kruskal-Wallis, Spearman e **regressão logística** (razão de chances ajustada e "sozinho", IC de Wald, R² de McFadden, aviso de poucos casos por coeficiente e de categoria instável).
+- É possível juntar categorias e analisar só um subgrupo. Com menos de 20 pessoas (30 na regressão) o teste não roda.
+- **Baixar dados para análise** gera o CSV (separado por ";", UTF-8) com as variáveis do período e subgrupo da tela, mais um script R com o dicionário das variáveis e o código que refaz o teste. Por padrão, o nome dos dentistas vira Dentista A, B, C…
+- Arquivos importados antes da versão 2.28 não têm os dados por pessoa: importe de novo para que entrem na análise.
 
 ## Configurações
 
