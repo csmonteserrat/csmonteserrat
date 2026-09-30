@@ -21,8 +21,8 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.11';
-const SELF_TEST_COUNT = 232;
+const APP_VERSION = '2.12';
+const SELF_TEST_COUNT = 233;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -1360,7 +1360,7 @@ function federalHTML(){
 // ---- 2I: fila de trabalho (etapas, próxima ação, cards em cores) ----
 const PREG_TABS=[['a_contatar','A contatar'],['em_contato','Em contato'],['agendada','Agendadas'],['atendida','Atendidas'],['encerrada','Encerradas'],['todas','Todas']];
 const PREG_STAGE={a_contatar:['A contatar','amber'],em_contato:['Em contato','blue'],agendada:['Agendada','teal'],atendida:['Atendida','green'],encerrada:['Gestação encerrada','violet']};
-const PREG_TAB_HINTS={a_contatar:'Ordenadas por prioridade: 3º trimestre sem atendimento primeiro, depois pela data provável do parto.',em_contato:'Contato iniciado e ainda sem consulta marcada. Depois de alguns dias sem resposta ao WhatsApp, a próxima ação sugerida passa a ser a busca ativa.',agendada:'Consulta marcada. Confirme o atendimento quando ele acontecer ou quando aparecer no próximo CSV.',atendida:'Já contam para o indicador 2I.',encerrada:'Parto registrado. Saem da fila de contato, mas continuam no cálculo do indicador.',todas:'Todas as gestantes da lista, em ordem de prioridade.'};
+const PREG_TAB_HINTS={a_contatar:'Ordenadas por prioridade: 3º trimestre sem atendimento primeiro, depois pela data provável do parto.',em_contato:'Contato iniciado e ainda sem consulta marcada. Depois de alguns dias sem resposta ao WhatsApp, a próxima ação sugerida passa a ser a busca ativa.',agendada:'Consulta marcada. Confirme o atendimento quando ele acontecer ou quando aparecer no próximo CSV.',atendida:'Já contam para o indicador 2I.',encerrada:'Parto registrado. Saem da fila de contato, mas continuam no cálculo do indicador.',todas:'Em ordem de prioridade: 3º trimestre sem atendimento, a contatar, em contato, agendadas, atendidas e, no fim, gestações encerradas.'};
 const PREG_QUICK_NOTES=['Não atendeu','Número errado','Pediu retorno à tarde','Vai à UBS esta semana','Já fez consulta em outro serviço'];
 const WHATSAPP_NO_REPLY_DAYS=5;
 const DAY_MS=864e5;
@@ -1407,7 +1407,15 @@ function pregRow(e){
     <div class="pq-contact"><b>${e.telefone?esc(e.telefone):'Sem telefone válido'}</b><span>${esc(lastContactText(e))}</span></div>
     <div class="pq-go"><div>${secondary}${pregNextBtn(e,n)}</div><span class="pq-why${n.alert?' alert':''}">${esc(n.why)}</span></div>
   </div>`}
-function pregSort(a,b){const pa=isPriority2I(a)?0:1,pb=isPriority2I(b)?0:1;if(pa!==pb)return pa-pb;const da=pregDpp(a),db=pregDpp(b);if(da&&db&&+da!==+db)return da-db;if(!!da!==!!db)return da?-1:1;return (a.nome||'').localeCompare(b.nome||'','pt-BR')}
+// Ordem da fila por prioridade: 3º trimestre sem atendimento que ainda precisa de contato, depois a contatar,
+// em contato, agendadas, atendidas e, por último, gestação encerrada. Dentro de cada grupo, a DPP mais próxima
+// primeiro; agendadas pela data da consulta (as que já passaram primeiro); encerradas pelo parto mais recente.
+const PREG_RANK={a_contatar:1,em_contato:2,agendada:3,atendida:4,encerrada:5};
+function pregRank(e){const b=pregBucket(e);return isPriority2I(e)&&(b==='a_contatar'||b==='em_contato')?0:PREG_RANK[b]}
+function pregSort(a,b){const ra=pregRank(a),rb=pregRank(b);if(ra!==rb)return ra-rb;
+  const cmpDate=(x,y,desc=false)=>{if(x&&y&&+x!==+y)return desc?y-x:x-y;if(!!x!==!!y)return x?-1:1;return 0};
+  let c=0;if(ra===PREG_RANK.agendada)c=cmpDate(parseDate(followupFor(a.id).agendaAt),parseDate(followupFor(b.id).agendaAt));else if(ra===PREG_RANK.encerrada)c=cmpDate(parseDate(a.dataParto),parseDate(b.dataParto),true);
+  if(!c)c=cmpDate(pregDpp(a),pregDpp(b));return c||(pregDisplayName(a)).localeCompare(pregDisplayName(b),'pt-BR')}
 function pregQueue(){const p=state.preferences,tab=p.pregTab||'a_contatar';let rows=applyPregFilters(visibleByExclusion(mergedEpisodes()));if(tab!=='todas')rows=rows.filter(e=>pregBucket(e)===tab);if(p.pregPrioOnly)rows=rows.filter(isPriority2I);return rows.sort(pregSort)}
 function toastAction(message,label,fn){const t=document.getElementById('toast');t.innerHTML=`<span>${esc(message)}</span><button type="button" class="toast-action">${esc(label)}</button>`;t.classList.add('show','has-action');t.querySelector('.toast-action').onclick=()=>{t.classList.remove('show','has-action');fn()};clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show','has-action'),6000)}
 function setFollowupWithUndo(id,next,message,extra={}){const prev=state.gestantes.followups[id]?JSON.parse(JSON.stringify(state.gestantes.followups[id])):null;setFollowup(id,next,extra.note||'',extra);toastAction(message,'Desfazer',()=>{if(prev)state.gestantes.followups[id]=prev;else delete state.gestantes.followups[id];audit('2i_followup_undo',{episodeId:id,to:prev?.state||'nao_contatada'});queueSave();refreshAll();reopenDrawerIfOpen(id)})}
@@ -2206,6 +2214,7 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('230. Cadastro de pacientes preenche o nome de uma gestante anonimizada do Monitora APS; o nome digitado à mão continua valendo',()=>{const saved=state.snapshots,dir=state.patientDirectory;state.patientDirectory={...dir,'230001':{nome:'NOME DA PRODUCAO',fonte:'teste'}};state.snapshots=[{id:'sMon230',profile:MONITORA_PROFILE,createdAt:nowISO(),monitoraRows:[{usuaria:'230001',equipe:'120',periodo:'T2',consOdonto:'Não',monitoraOdonto:'pendente'}],puerperio:[]}];const a=mergedEpisodes().find(x=>x.id==='mon-230001');state.gestantes.overrides['mon-230001']={nome:'Nome Digitado'};const b=mergedEpisodes().find(x=>x.id==='mon-230001');delete state.gestantes.overrides['mon-230001'];state.snapshots=saved;state.patientDirectory=dir;return a.nome==='NOME DA PRODUCAO'&&a.nomeDaProducao===true&&b.nome==='Nome Digitado'&&!b.nomeDaProducao});
   await add('231. Cadastro de pacientes: a última importação atualiza o nome, e a busca por código ignora zeros à esquerda',()=>{const dir=state.patientDirectory;state.patientDirectory={};rememberPatientNames({'231001':'GRAFIA ANTIGA'},'teste');const r=rememberPatientNames({'231001':'GRAFIA NOVA'},'teste');const ok=patientNameFor('000231001')==='GRAFIA NOVA'&&r.changed===1&&patientNameFor('')==='';state.patientDirectory=dir;return ok});
   await add('232. Backup analítico não leva o cadastro de pacientes; a mesclagem de backup soma os cadastros',()=>backupState('analytic').patientDirectory&&Object.keys(backupState('analytic').patientDirectory).length===0&&restoreBackup.toString().includes('state.patientDirectory={...(state.patientDirectory||{}),...(incoming.patientDirectory||{})}'));
+  await add('233. Fila completa em ordem de prioridade: 3º tri sem atendimento, a contatar, em contato, agendada, atendida e gestação encerrada por último',()=>{const d=days=>isoDate(new Date(Date.now()+days*864e5));const mk=(id,extra)=>({id,nome:id,status2i:'pendente',...extra});const fu=(id,st,extra={})=>state.gestantes.followups[id]={state:st,updatedAt:nowISO(),history:[],...extra};const enc=mk('t233enc',{dataProvParto:d(5),ultimaMenstruacao:d(-275),dataParto:d(-1)}),at=mk('t233at',{dataProvParto:d(10)}),ag=mk('t233ag',{dataProvParto:d(150)}),ct=mk('t233ct',{dataProvParto:d(160)}),ac=mk('t233ac',{dataProvParto:d(170)}),pr=mk('t233pr',{dataProvParto:d(20)});fu('t233at','ok_manual');fu('t233ag','agendada',{agendaAt:d(3)});fu('t233ct','whatsapp_enviado');const order=[enc,at,ag,ct,ac,pr].sort(pregSort).map(e=>e.id.slice(4)).join(',');['t233at','t233ag','t233ct'].forEach(k=>delete state.gestantes.followups[k]);return order==='pr,ac,ct,ag,at,enc'});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 

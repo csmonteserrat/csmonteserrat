@@ -1,5 +1,20 @@
 # Histórico de versões
 
+## Versão 2.12 (lista de gestantes ordenada por prioridade: encerradas sempre no fim)
+
+- **Pedido do usuário**: "quero que a organização das gestantes na lista seja de acordo com a prioridade dela, ou seja, se eu marcar que a gestação foi encerrada, então eu quero que ela vá lá pra baixo, e assim por diante".
+- **Antes**: `pregSort` só colocava o 3º trimestre sem atendimento na frente e ordenava o resto pela DPP. Na aba "Todas", atendidas e encerradas ficavam misturadas com quem ainda precisava de contato.
+- **Agora a ordem é por grupo de prioridade** (`pregRank`):
+  1. 3º trimestre sem atendimento que ainda precisa de contato (a contatar ou em contato)
+  2. A contatar
+  3. Em contato
+  4. Agendadas
+  5. Atendidas
+  6. Gestação encerrada
+- **Dentro de cada grupo**: a DPP mais próxima vem primeiro. As agendadas seguem a data da consulta, com as que já passaram primeiro, e as encerradas seguem o parto mais recente.
+- **Na prática**: marcar a gestação como encerrada, confirmar o atendimento ou registrar um contato reposiciona a gestante na hora. A ordem vale em todas as abas e na navegação entre gestantes da gaveta.
+- **Verificado com Playwright**: 233/233 autotestes passam, com 1 novo (233, a ordem completa dos seis grupos). No navegador, a primeira gestante da aba "Todas", depois de marcada como encerrada, foi para o grupo das encerradas no fim da lista.
+
 ## Versão 2.11 (cadastro de pacientes código → nome, montado a partir dos relatórios de produção, para completar listas anonimizadas)
 
 - **Pedido do usuário**: "quero que ao importar a produção CSV ou PDF o app guarde o nome também, para que, por exemplo, quando eu colocar uma nova gestante, ou outros relatórios anonimizados no futuro, já pegue automaticamente o nome do paciente".
