@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## Versão 2.20 (página Procedimentos: excisão/sutura num item só e sem a nota de atividade em grupo)
+
+- **Achados no mesmo CSV real (mai a ago/2026)**:
+  - A excisão/sutura aparecia em dois itens na página Procedimentos, porque o CELK usa duas grafias: "Excisão e/ou sutura simples de pequenas lesões…" (19) e "Excisão de lesão e/ou sutura de ferimento…" (2). Agora as duas caem na mesma regra e aparecem como um item só (21).
+  - "Evolução da atividade em grupo" (11) aparecia na página Procedimentos como se fosse um procedimento. É a nota de registro da atividade em grupo: agora é reconhecida, fica fora da página Procedimentos e continua fora de todos os indicadores. Na Conferência por procedimento ela aparece com o nome padronizado e sem papel em indicador, em vez de "Não identificado".
+- **Nenhum resultado muda**: nenhum dos dois entra em M1–M5 ou B1–B6. Conferido com o CSV real: M4/B5 iguais aos da v2.19.
+- **Verificado com Playwright**: 254/254 autotestes (teste 60 reescrito).
+
 ## Versão 2.19 (restaurações reconhecidas pelo tipo, com SIGTAP)
 
 - **Achado ao conferir um CSV real do quadrimestre (mai a ago/2026)**: o CSV do CELK traz a descrição completa das restaurações, mas o app juntava tudo em "Restauração de dente permanente/decíduo (subtipo não exibido)", sem código, e mostrava o aviso "O CELK abrevia descrições de restaurações", que não valia para esse arquivo.

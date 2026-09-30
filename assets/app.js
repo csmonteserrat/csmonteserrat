@@ -21,7 +21,7 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.19';
+const APP_VERSION = '2.20';
 const SELF_TEST_COUNT = 254;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
@@ -89,6 +89,9 @@ const CODES = {
 const PROCEDURE_RULES = [
   {re:/^PRIMEIRA CONSULTA ODONTOLOGICA/,code:'03.01.01.015-3',name:'Primeira consulta odontológica programada',roles:['first'],nonDental:true},
   {re:/^TRATAMENTO CONCLUIDO/,code:'',name:'Tratamento concluído (campo Conduta)',roles:['concluded'],nonDental:true},
+  // Nota de registro da atividade em grupo que vaza para o relatório individual: não é procedimento, não entra em
+  // indicador nem na página Procedimentos (v2.20).
+  {re:/^EVOLUCAO DA ATIVIDADE EM GRUPO/,code:'',name:'Evolução da atividade em grupo (nota de registro)',roles:[],nonDental:true},
   {re:/ATIVIDADE EDUCATIVA\s+ORIENTA(?:C|Ç)AO EM GRUPO/,code:'',name:'Atividade educativa / orientação em grupo na atenção primária',roles:['m4den'],nonDental:true,groupActivity:true},
   {re:/ORIENTA(?:C|Ç)AO (?:DE|EM) HIGIENE BUCAL/,code:'01.01.02.010-4',name:'Orientação em higiene bucal',roles:['preventive','m4den','b5den']},
   {re:/ORIENTA(?:C|Ç)AO DE HIGIENIZA(?:C|Ç)AO DE/,code:'01.01.02.012-0',name:'Orientação de higienização de próteses',roles:['preventive','m4den','b5den','b3den']},
@@ -107,7 +110,9 @@ const PROCEDURE_RULES = [
   {re:/^VISITA DOMICILIAR/,code:'',name:'Visita domiciliar/institucional por profissional de nível superior',roles:['m4den'],nonDental:true},
   {re:/CURETAGEM PERIAPICAL/,code:'',name:'Curetagem periapical',roles:['m4den']},
   {re:/ODONTOSECCAO RADILECTOMIA/,code:'',name:'Odontossecção / radiculectomia',roles:['m4den']},
-  {re:/EXCISAO E OU SUTURA SIMPLES/,code:'',name:'Excisão e/ou sutura simples',roles:['m4den']},
+  // As duas grafias do CELK ("Excisão e/ou sutura simples de pequenas lesões…" e "Excisão de lesão e/ou sutura de
+  // ferimento…") ficam num item só na página Procedimentos (v2.20). Nenhuma entra em indicador.
+  {re:/EXCISAO (?:E OU SUTURA SIMPLES|DE LESAO E OU SUTURA)/,code:'',name:'Excisão e/ou sutura de lesão (pele, anexos e mucosa)',roles:['m4den']},
   {re:/CORRECAO DE IRREGULARIDADES/,code:'',name:'Correção de irregularidades',roles:['m4den']},
   {re:/^AJUSTE OCLUSAL$/,code:'',name:'Ajuste oclusal',roles:['m4den']},
   {re:/EXODONTIA DE DENTE DECIDUO/,code:'',name:'Exodontia de dente decíduo',roles:['m4den']},
@@ -2217,7 +2222,7 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('58. B1/B2/B4/B5/B6 espelham M1/M2/M3/M4/M5 (B5 = M4 desde a v2.18: mesma conta, lista de 28 códigos da Nota B5 no denominador); só B3 é independente',()=>FEDERAL_MIRROR.B1==='M1'&&FEDERAL_MIRROR.B2==='M2'&&FEDERAL_MIRROR.B4==='M3'&&FEDERAL_MIRROR.B5==='M4'&&FEDERAL_MIRROR.B6==='M5'&&!('B3' in FEDERAL_MIRROR)&&procedureRolesFor('M4').includes('b5den')&&!procedureRolesFor('M4').includes('m4den'));
   await add('253. M4 usa a mesma conta da B5: o denominador é a soma dos procedimentos da lista da Nota B5 (b5den), então atendimento genérico, aferição de pressão e exodontia de decíduo ficam fora; B5 dá o mesmo resultado que M4',()=>{const before=state.snapshots.length,u=state.preferences.unit,mk=state.preferences.month;try{const base={firstConsultations:0,firstConsultationQuantity:0,treatmentsConcluded:0,treatmentConcludedQuantity:0,preventive:4,individualProcedures:30,art:0,restorative:0,b5Denominator:10,b3Numerator:0,b3Denominator:0,procedureCounts:[],firstPatients:[],concludedPatients:[]};state.snapshots.push({id:'tm4b5_selftest',profile:'celk_procedimentos_detalhado',unit:u,fileName:'m4b5.pdf',createdAt:nowISO(),status:'x',validations:[],procedureCounts:[],dataByMonth:{[mk]:{...base,kind:'procedure'}}});const m=municipalComponents('M4',mk),f=federalComponents('B5',mk);const generic=procedureMatch('ATENDIMENTO ODONTOLOGICO'),pressao=procedureMatch('AFERICAO DE PRESSAO ARTERIAL'),dec=procedureMatch('EXODONTIA DE DENTE DECIDUO');return m.denominator===10&&Math.abs(m.result-40)<1e-9&&f.result===m.result&&f.mirrorOf==='M4'&&[generic,pressao,dec].every(x=>!x.roles.includes('b5den'))}finally{state.snapshots.length=before}});
   await add('59. Escovação supervisionada não confunde com atividade que só cita saúde bucal',()=>/ESCOVACAO SUPERVISIONADA/.test(norm('Escovação Supervisionada'))&&!/ESCOVACAO SUPERVISIONADA/.test(norm('cuidados em DM (saúde bucal)')));
-  await add('60. Nota de evolução de atividade em grupo não conta como procedimento individual',()=>/^EVOLUCAO DA ATIVIDADE EM GRUPO/.test(norm('EVOLUÇÃO DA ATIVIDADE EM GRUPO'))&&procedureMatch('EVOLUCAO DA ATIVIDADE EM GRUPO').unrecognized);
+  await add('60. Nota de evolução de atividade em grupo não conta como procedimento individual nem aparece na página Procedimentos (nonDental, sem papel em indicador); as duas grafias de excisão/sutura viram um item só',()=>{const g=procedureMatch('EVOLUÇÃO DA ATIVIDADE EM GRUPO'),a=procedureMatch('EXCISÃO E/OU SUTURA SIMPLES DE PEQUENAS LESÕES / FERIMENTOS DE PELE / ANEXOS E MUCOSA'),b=procedureMatch('EXCISAO DE LESAO E/OU SUTURA DE FERIMENTO DA PELE ANEXOS E MUCOSA');return !g.unrecognized&&g.nonDental===true&&g.roles.length===0&&!a.unrecognized&&!b.unrecognized&&a.name===b.name});
   await add('61. Hipótese de B6 herda a ressalva de amálgama/CBO do M5 espelhado',()=>{const h=federalComponents('B6','2026-07').hypothesis;return typeof h==='string'&&/amálgama/i.test(h)&&/CBO/i.test(h)});
   await add('62. Denominador de restaurador (M5/B6): ART, os 5 tipos de restauração da Nota B5 com SIGTAP e 2 regras genéricas para descrição cortada; nenhum código de amálgama',()=>{const rules=PROCEDURE_RULES.filter(r=>r.roles.includes('restorative'));const art=rules.filter(r=>r.code==='03.07.01.007-4'&&!r.ambiguous),trunc=rules.filter(r=>r.ambiguous),typed=rules.filter(r=>['03.07.01.003-1','03.07.01.012-0','03.07.01.008-2','03.07.01.010-4','03.07.01.011-2'].includes(r.code));return rules.length===8&&art.length===1&&trunc.length===2&&typed.length===5&&!rules.some(r=>r.code==='03.07.01.009-0'||r.code==='03.07.01.013-9')});
   await add('63. Numerador B3 cobre as duas exodontias e nada mais',()=>{const perm=procedureMatch('EXODONTIA DE DENTE PERMANENTE'),mult=procedureMatch('EXODONTIA MULTIPLA'),outros=PROCEDURE_RULES.filter(r=>r.roles.includes('b3num'));return perm.roles.includes('b3num')&&mult.roles.includes('b3num')&&outros.length===2});
