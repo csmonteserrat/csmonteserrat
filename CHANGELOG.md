@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Versão 2.25 (atendimento do CELK só conta entre a DUM e a DPP)
+
+- **Pedido do usuário**: só marcar a gestante como atendida pelos dados do CELK quando ela tem DUM ou DPP, e só com atendimento depois da DUM e antes da DPP.
+- **Antes**: sem DUM e sem DPP, valia qualquer atendimento dos últimos 300 dias, o que podia contar uma consulta de antes da gravidez; e o período ia até o parto ou até hoje.
+- **Agora**:
+  - O período vai da DUM até a DPP. Com só uma das datas, a outra é estimada (DPP = DUM + 280 dias, e vice-versa).
+  - Se o parto veio antes da DPP, o período termina no parto.
+  - Sem DUM e sem DPP, o atendimento do CELK não conta. O filtro "Dados incompletos" mostra essas gestantes.
+  - "Sim" no Metabase ou no Monitora APS e a confirmação manual continuam contando como antes.
+- **Verificado com Playwright**: 259/259 autotestes (teste 227 reescrito com os casos: dentro do período, antes da DUM, depois da DPP, depois do parto, sem DUM/DPP e só com DPP).
+
 ## Versão 2.24 (filtro "Dados incompletos" nas gestantes)
 
 - **Pedido do usuário**: um filtro na página de gestantes para ver só as que estão com dados incompletos.
