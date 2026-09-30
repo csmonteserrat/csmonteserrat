@@ -1,5 +1,29 @@
 # Histórico de versões
 
+## Versão 2.13 (os dados voltam a ser salvos no navegador, com opção de limpar e aviso para salvar backup antes)
+
+- **Pedido do usuário**: "quero que você adicione a função do app salvar tudo no navegador, mas que tenha opção de limpar dados do navegador também, porém que apareça um aviso perguntando se quer salvar backup".
+- **Salvamento automático no navegador**:
+  - Desfaz a decisão da v1.13 de não gravar nada no navegador.
+  - Todo o estado é gravado no **IndexedDB**, escolhido pelo espaço (o localStorage tem limite de cerca de 5 MB). A gravação acontece cerca de 0,6 s depois de cada mudança e também quando a aba é escondida.
+  - Ao abrir, o app carrega a última gravação e avisa "Dados restaurados deste navegador".
+  - Vem **ligado por padrão** e pode ser desligado em Configurações → Privacidade e salvamento. Desligar apaga a cópia guardada, mas mantém os dados abertos na aba. A preferência fica no localStorage.
+  - A amostra bruta dos arquivos (`sessionRaw`, com as linhas originais e nomes) **continua só na memória da aba**.
+- **"Limpar dados do navegador"** (Configurações) abre um aviso que resume o que existe (relatórios, gestantes, último backup) e pergunta **"Quer salvar um backup antes de limpar?"**:
+  - **Salvar backup e limpar**: abre o backup, com a nota de que os dados serão apagados depois, e só limpa depois que o arquivo é exportado. Fechar o modal de backup cancela a limpeza.
+  - **Limpar sem backup**: pede uma segunda confirmação ("Confirmar: apagar sem backup").
+  - **Cancelar**.
+  - Depois de limpar, a tela volta ao início e, ao recarregar, continua vazia.
+- **Indicadores de salvamento**:
+  - O topo mostra "Salvo neste navegador às HH:MM · último backup …". O ícone vermelho só aparece se o salvamento estiver desligado com mudanças fora de backup, ou se a gravação falhar (por exemplo em janela anônima ou com o armazenamento cheio).
+  - O texto da barra lateral e o aviso de sair da página seguem o estado do salvamento. O aviso de sair só aparece quando o salvamento está desligado ou falhou.
+- **Backup**: `state.dirty` continua significando "há mudanças que ainda não estão num backup exportado". O backup em arquivo segue sendo o jeito de levar os dados para outro computador.
+- **Verificado com Playwright**: 236/236 autotestes passam. O autoteste 77, que exigia a ausência de IndexedDB, foi reescrito, e há 3 novos (234–236, incluindo gravação e leitura reais no IndexedDB). Testado de ponta a ponta:
+  - Importar, recarregar e continuar com os dados.
+  - Limpar sem backup, com dupla confirmação, e recarregar vazio.
+  - Salvar backup e limpar: o arquivo foi baixado e os dados apagados.
+  - Desligar o salvamento e recarregar vazio.
+
 ## Versão 2.12 (lista de gestantes ordenada por prioridade: encerradas sempre no fim)
 
 - **Pedido do usuário**: "quero que a organização das gestantes na lista seja de acordo com a prioridade dela, ou seja, se eu marcar que a gestação foi encerrada, então eu quero que ela vá lá pra baixo, e assim por diante".

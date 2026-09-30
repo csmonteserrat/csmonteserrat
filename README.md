@@ -1,4 +1,4 @@
-# Indicadores Saúde Bucal · versão 2.12
+# Indicadores Saúde Bucal · versão 2.13
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -6,8 +6,9 @@ Ferramenta estática para leitura de relatórios do CELK e consolidados do Metab
 
 - A leitura de PDF/CSV, os cálculos e a geração dos painéis acontecem no navegador.
 - Os arquivos importados não são enviados ao GitHub, ao Render ou a uma API.
-- **O navegador não salva nada.** Desde a v1.13, nada fica gravado em IndexedDB, localStorage ou qualquer outro armazenamento do navegador — o estado só existe na memória da aba enquanto ela está aberta. Fechar ou recarregar a página sem exportar um backup apaga tudo, sem aviso além do próprio alerta de "sair sem salvar" do navegador.
-- **Exporte um backup para salvar de verdade**, sempre que quiser preservar o trabalho — é o único jeito. Um ícone vermelho no topo da tela (e o texto ao lado do contador de snapshots) avisam quando há alteração ainda não exportada. Para continuar de onde parou numa próxima abertura, restaure esse backup ("Restaurar backup anterior", disponível assim que a ferramenta abre sem dados).
+- **Os dados ficam salvos neste navegador** (IndexedDB) e voltam quando você reabre o app, a partir da versão 2.13. O salvamento pode ser desligado em Configurações → Privacidade e salvamento. Ele vale só para este computador e este perfil de navegador. A amostra bruta dos arquivos importados (linhas originais, com nomes) não é gravada: só existe enquanto a aba está aberta.
+- **Para levar os dados a outro computador, exporte um backup.** O ícone no topo e o texto ao lado do contador de snapshots mostram quando foi a última gravação no navegador e o último backup exportado.
+- **"Limpar dados do navegador"** apaga tudo o que o app guardou neste navegador. Antes, pergunta se você quer salvar um backup. Em computador compartilhado, use essa opção ao terminar.
 
 O projeto não possui backend, banco de dados remoto ou serviço de telemetria. O PDF.js necessário para ler os relatórios já está incluído em `assets/`.
 
