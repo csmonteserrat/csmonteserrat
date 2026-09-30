@@ -1,5 +1,21 @@
 # Histórico de versões
 
+## Versão 2.22 (gestantes mais rápidas e colar data nos campos de data)
+
+- **Relato do usuário**: "o site está lento, principalmente no carregamento das gestantes e nas edições nas gestantes" e "nas datas o site não aceita eu copiar a data e colar".
+- **Causa da lentidão**:
+  - Cada edição redesenhava as 7 páginas do app (Visão Geral, Municipal, Federal, Gestantes, Procedimentos, Configurações e Calculadora), mesmo com só uma aberta.
+  - A cada atualização, todos os ícones eram redesenhados e a página voltava ao topo, o que forçava o navegador a recalcular o layout.
+  - A ordenação da lista recalculava a situação de cada gestante (atendida, prioridade, datas) a cada comparação.
+- **Agora**:
+  - Só a página aberta é redesenhada; as outras são desenhadas quando você as abre.
+  - Os ícones só são desenhados uma vez.
+  - A página só volta ao topo quando você troca de página (editar uma gestante não joga mais a lista para o topo).
+  - A situação de cada gestante é calculada uma vez por ordenação, e as datas lidas ficam guardadas.
+  - Medido com 207 gestantes e um quadrimestre real de produção: trocar a aba da fila caiu de 85–139 ms para 41–81 ms, e uma ação na gaveta de 115 ms para 57 ms.
+- **Colar data**: nos campos de data (DUM, DPP, parto, agendamento…), Ctrl+V com "14/03/2026", "14-03-26", "14.03.2026" ou "2026-03-14" (com ou sem hora) preenche o campo. Texto que não é data mostra um aviso e não apaga o que já estava.
+- **Verificado com Playwright**: 257/257 autotestes (3 novos, 255–257), e colar com Ctrl+V testado no Chrome no cadastro de gestante (a DPP é recalculada na hora).
+
 ## Versão 2.21 (novo nome e ícone da aba)
 
 - **Pedido do usuário**: trocar o título "Indicadores Saúde Bucal" por "Acompanhamento Odontológico", pôr um ícone de dente na aba do navegador e trocar "Monte Serrat" no canto esquerdo.

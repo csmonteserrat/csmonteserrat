@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.21
+# Acompanhamento Odontológico · versão 2.22
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 

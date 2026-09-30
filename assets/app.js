@@ -21,8 +21,8 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.21';
-const SELF_TEST_COUNT = 254;
+const APP_VERSION = '2.22';
+const SELF_TEST_COUNT = 257;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -175,7 +175,8 @@ const ICONS = {
 };
 
 function icon(name){ return ICONS[name] || ICONS.info; }
-function hydrateIcons(root=document){ root.querySelectorAll('[data-icon]').forEach(el=>{ el.innerHTML=icon(el.dataset.icon); }); }
+// Só redesenha o ícone quando ele ainda não foi desenhado (ou mudou): evita reescrever centenas de SVGs a cada atualização.
+function hydrateIcons(root=document){ root.querySelectorAll('[data-icon]').forEach(el=>{ if(el.dataset.iconDone===el.dataset.icon&&el.firstChild)return; el.innerHTML=icon(el.dataset.icon); el.dataset.iconDone=el.dataset.icon; }); }
 function esc(v){ return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
 function norm(v){ return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[‐‑‒–—]/g,'-').replace(/[^a-zA-Z0-9]+/g,' ').trim().toUpperCase(); }
 function nowISO(){ return new Date().toISOString(); }
@@ -190,14 +191,28 @@ function quarterMonths(year,q){ const start=(q-1)*4+1; return Array.from({length
 function fmtMonth(k,long=false){ if(!k)return '—';const {year,month}=parseMonthKey(k);return `${long?MONTHS[month-1]:MONTHS_SHORT[month-1]}/${year}`; }
 function fmtDate(v){ const d=parseDate(v); return d?d.toLocaleDateString('pt-BR'):'—'; }
 function fmtDateTime(v){ const d=parseDate(v); return d?d.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'—'; }
+// Guarda o resultado por texto: a lista de gestantes lê as mesmas datas centenas de vezes a cada atualização (v2.22).
+const parseDateCache=new Map();
 function parseDate(v){
   if(!v)return null;if(v instanceof Date)return isNaN(v)?null:v;
+  if(typeof v==='string'&&parseDateCache.has(v)){const t=parseDateCache.get(v);return t==null?null:new Date(t)}
+  const d=parseDateRaw(v);if(typeof v==='string'){if(parseDateCache.size>20000)parseDateCache.clear();parseDateCache.set(v,d?+d:null)}return d;
+}
+function parseDateRaw(v){
   const s=String(v).trim();let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
   if(m){const d=new Date(+m[3],+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0));return isNaN(d)?null:d;}
   m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
   if(m){const d=new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0));return isNaN(d)?null:d;}
   m=s.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})/);if(m&&EN_MONTH[m[1].toLowerCase()])return new Date(+m[3],EN_MONTH[m[1].toLowerCase()]-1,+m[2]);
   const d=new Date(s);return isNaN(d)?null:d;
+}
+// Converte uma data colada (dd/mm/aaaa, dd-mm-aaaa, dd.mm.aa, aaaa-mm-dd, com ou sem hora) para aaaa-mm-dd,
+// o formato do campo de data do navegador; devolve '' quando o texto não é uma data válida (v2.22).
+function pastedDateToIso(text){
+  const t=String(text||'').trim();let m=t.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2}|\d{4})\b/),y,mo,d;
+  if(m){d=+m[1];mo=+m[2];y=m[3].length===2?2000+Number(m[3]):+m[3]}else{m=t.match(/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})\b/);if(!m)return '';y=+m[1];mo=+m[2];d=+m[3]}
+  const dt=new Date(y,mo-1,d);if(dt.getFullYear()!==y||dt.getMonth()!==mo-1||dt.getDate()!==d)return '';
+  return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 function isoDate(v){ const d=parseDate(v); return d?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`:''; }
 function numeric(v){
@@ -1698,11 +1713,14 @@ function pregRow(e){
 // primeiro; agendadas pela data da consulta (as que já passaram primeiro); encerradas pelo parto mais recente.
 const PREG_RANK={a_contatar:1,em_contato:2,agendada:3,atendida:4,encerrada:5};
 function pregRank(e){const b=pregBucket(e);return isPriority2I(e)&&(b==='a_contatar'||b==='em_contato')?0:PREG_RANK[b]}
-function pregSort(a,b){const ra=pregRank(a),rb=pregRank(b);if(ra!==rb)return ra-rb;
+// A ordenação calcula a situação de cada gestante uma vez só (antes recalculava a cada comparação, v2.22).
+function pregSortKey(e){return {rank:pregRank(e),agenda:parseDate(followupFor(e.id).agendaAt),parto:parseDate(e.dataParto),dpp:pregDpp(e),name:pregDisplayName(e)}}
+function pregSortKeys(ka,kb){if(ka.rank!==kb.rank)return ka.rank-kb.rank;
   const cmpDate=(x,y,desc=false)=>{if(x&&y&&+x!==+y)return desc?y-x:x-y;if(!!x!==!!y)return x?-1:1;return 0};
-  let c=0;if(ra===PREG_RANK.agendada)c=cmpDate(parseDate(followupFor(a.id).agendaAt),parseDate(followupFor(b.id).agendaAt));else if(ra===PREG_RANK.encerrada)c=cmpDate(parseDate(a.dataParto),parseDate(b.dataParto),true);
-  if(!c)c=cmpDate(pregDpp(a),pregDpp(b));return c||(pregDisplayName(a)).localeCompare(pregDisplayName(b),'pt-BR')}
-function pregQueue(){const p=state.preferences,tab=p.pregTab||'a_contatar';let rows=applyPregFilters(visibleByExclusion(mergedEpisodes()));if(tab!=='todas')rows=rows.filter(e=>pregBucket(e)===tab);if(p.pregPrioOnly)rows=rows.filter(isPriority2I);return rows.sort(pregSort)}
+  let c=0;if(ka.rank===PREG_RANK.agendada)c=cmpDate(ka.agenda,kb.agenda);else if(ka.rank===PREG_RANK.encerrada)c=cmpDate(ka.parto,kb.parto,true);
+  if(!c)c=cmpDate(ka.dpp,kb.dpp);return c||ka.name.localeCompare(kb.name,'pt-BR')}
+function pregSort(a,b){return pregSortKeys(pregSortKey(a),pregSortKey(b))}
+function pregQueue(){const p=state.preferences,tab=p.pregTab||'a_contatar';let rows=applyPregFilters(visibleByExclusion(mergedEpisodes()));if(tab!=='todas')rows=rows.filter(e=>pregBucket(e)===tab);if(p.pregPrioOnly)rows=rows.filter(isPriority2I);const keys=new Map(rows.map(e=>[e,pregSortKey(e)]));return rows.sort((a,b)=>pregSortKeys(keys.get(a),keys.get(b)))}
 function toastAction(message,label,fn){const t=document.getElementById('toast');t.innerHTML=`<span>${esc(message)}</span><button type="button" class="toast-action">${esc(label)}</button>`;t.classList.add('show','has-action');t.querySelector('.toast-action').onclick=()=>{t.classList.remove('show','has-action');fn()};clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show','has-action'),6000)}
 function setFollowupWithUndo(id,next,message,extra={}){const prev=state.gestantes.followups[id]?JSON.parse(JSON.stringify(state.gestantes.followups[id])):null;setFollowup(id,next,extra.note||'',extra);toastAction(message,'Desfazer',()=>{if(prev)state.gestantes.followups[id]=prev;else delete state.gestantes.followups[id];audit('2i_followup_undo',{episodeId:id,to:prev?.state||'nao_contatada'});queueSave();refreshAll();reopenDrawerIfOpen(id)})}
 function firstName(e){return String(e?.nome||pregDisplayName(e)).split(' ')[0]}
@@ -2658,6 +2676,9 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('251. Arquivos importados ficam agrupados por tipo de relatório, com o estado de cada um: Em uso, Somado (listas de gestantes) ou Substituído',()=>{const before=state.snapshots.length;try{state.snapshots.push({id:'tsA_selftest',profile:'celk_procedimentos_detalhado',fileName:'p1.pdf',createdAt:nowISO(),procedureCounts:[],dataByMonth:{}},{id:'tsB_selftest',profile:'celk_procedimentos_detalhado',fileName:'p0.pdf',createdAt:nowISO(),procedureCounts:[],dataByMonth:{},supersededBy:'tsA_selftest'},{id:'tsC_selftest',profile:'monitora_aps_gestantes',fileName:'m.csv',createdAt:nowISO(),monitoraRows:[{}],puerperio:[],dataByMonth:{}});const h=importsHTML();return h.includes('Produção <span>CELK · Procedimentos Detalhado</span>')&&h.includes('Gestantes <span>Monitora APS</span>')&&h.includes('st-tag use">Em uso')&&h.includes('st-tag old">Substituído')&&h.includes('st-tag sum">Somado')&&h.includes('1 gestantes e 0 puérperas')}finally{state.snapshots.length=before}});
   await add('252. Conferência por procedimento mostra em que indicador cada procedimento entra como "M1 num"/"M2 den" e mantém a exportação em CSV',()=>{const chips=procedureRoleChips({roles:['first']});const src=procedureCheckHTML.toString();return chips.includes('M1 num')&&chips.includes('B1 num')&&chips.includes('M2 den')&&src.includes('data-export-procedures')});
   await add('254. Restauração com descrição completa (como no CSV do CELK) é reconhecida pelo tipo, com o SIGTAP da Nota B5, sem o aviso de descrição abreviada; a descrição cortada continua na regra genérica com o aviso',()=>{const c=[['RESTAURAÇÃO DE DENTE PERMANENTE ANTERIOR COM RESINA COMPOSTA','03.07.01.003-1'],['RESTAURAÇÃO DE DENTE PERMANENTE POSTERIOR COM RESINA COMPOSTA','03.07.01.012-0'],['RESTAURAÇÃO DE DENTE DECÍDUO POSTERIOR COM RESINA COMPOSTA','03.07.01.008-2'],['RESTAURAÇÃO DE DENTE DECÍDUO POSTERIOR COM IONÔMERO DE VIDRO','03.07.01.010-4'],['RESTAURAÇÃO DE DENTE DECÍDUO ANTERIOR COM RESINA COMPOSTA.','03.07.01.011-2']];const cut=procedureMatch('RESTAURAÇÃO DE DENTE PERMANENTE POS');return c.every(([d,code])=>{const m=procedureMatch(d);return m.code===code&&!m.ambiguous&&['restorative','m4den','b5den','b3den'].every(r=>m.roles.includes(r))})&&cut.ambiguous===true&&cut.roles.includes('b5den')});
+  await add('255. Colar data: dd/mm/aaaa, dd-mm-aa, dd.mm.aaaa e aaaa-mm-dd (com ou sem hora) viram aaaa-mm-dd; data impossível ou texto qualquer não é aceito',()=>pastedDateToIso('05/03/2026')==='2026-03-05'&&pastedDateToIso(' 5-3-26 ')==='2026-03-05'&&pastedDateToIso('05.03.2026 14:30')==='2026-03-05'&&pastedDateToIso('2026-03-05')==='2026-03-05'&&pastedDateToIso('2026-03-05 08:05:13.478')==='2026-03-05'&&pastedDateToIso('31/02/2026')===''&&pastedDateToIso('ontem')===''&&pastedDateToIso('')==='');
+  await add('256. Lista de gestantes: a ordenação calcula a situação de cada gestante uma vez (pregSortKey) e dá o mesmo resultado que a comparação direta; parseDate guarda o resultado sem devolver o mesmo objeto',()=>{const eps=visibleByExclusion(mergedEpisodes());const a=[...eps].sort(pregSort).map(e=>e.id),keys=new Map(eps.map(e=>[e,pregSortKey(e)])),b=[...eps].sort((x,y)=>pregSortKeys(keys.get(x),keys.get(y))).map(e=>e.id);const d1=parseDate('05/03/2026'),d2=parseDate('05/03/2026');return a.join()===b.join()&&d1!==d2&&+d1===+d2&&parseDate('xx')===null&&parseDate('xx')===null});
+  await add('257. refreshAll desenha só a página aberta; as outras são desenhadas ao abrir (switchView) e renderAllViews desenha as pendentes',()=>{const prev=activeView;try{switchView('overview',{save:false});refreshAll();const staleOk=staleViews.has('settings')&&!staleViews.has('overview');switchView('settings',{save:false});const rendered=!staleViews.has('settings')&&document.getElementById('view-settings').innerHTML.includes('Salvamento e backup');renderAllViews();return staleOk&&rendered&&staleViews.size===0}finally{switchView(prev,{save:false})}});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -2925,7 +2946,7 @@ function fillContextFilters(){
   const months=quarterMonths(Number(state.preferences.year),Number(state.preferences.quarter));if(!months.includes(state.preferences.month))state.preferences.month=months[0];mEl.innerHTML=months.map(m=>`<option value="${m}" ${state.preferences.month===m?'selected':''}>${fmtMonth(m,true)}</option>`).join('');
   const units=[...new Set(state.snapshots.map(s=>s.unit).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));uEl.innerHTML=`<option value="">Todas as unidades</option>`+units.map(u=>`<option value="${esc(u)}" ${state.preferences.unit===u?'selected':''}>${esc(u)}</option>`).join('');if(state.preferences.unit&&!units.includes(state.preferences.unit)){state.preferences.unit='';uEl.value=''}
 }
-function switchView(view,{save=true}={}){if(!VIEW_META[view])view='overview';activeView=view;state.preferences.view=view;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('hidden',el.id!==`view-${view}`));document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===view));const [title,sub]=VIEW_META[view];document.getElementById('pageTitle').textContent=title;document.getElementById('pageSubtitle').textContent=sub;document.getElementById('eyebrow').textContent=view==='calculator'?title:`Indicadores / ${view==='overview'?'Saúde Bucal':title.split('·')[0].trim()}`;document.getElementById('appShell').classList.toggle('is-calculator-view',view==='calculator');document.getElementById('appShell').classList.toggle('is-pregnant-view',view==='pregnant');if(save)queueSave();document.querySelector('.workspace').scrollTop=0}
+function switchView(view,{save=true}={}){if(!VIEW_META[view])view='overview';const changed=view!==activeView;activeView=view;if(staleViews.has(view))renderView(view);state.preferences.view=view;document.querySelectorAll('.view').forEach(el=>el.classList.toggle('hidden',el.id!==`view-${view}`));document.querySelectorAll('[data-view]').forEach(el=>el.classList.toggle('active',el.dataset.view===view));const [title,sub]=VIEW_META[view];document.getElementById('pageTitle').textContent=title;document.getElementById('pageSubtitle').textContent=sub;document.getElementById('eyebrow').textContent=view==='calculator'?title:`Indicadores / ${view==='overview'?'Saúde Bucal':title.split('·')[0].trim()}`;document.getElementById('appShell').classList.toggle('is-calculator-view',view==='calculator');document.getElementById('appShell').classList.toggle('is-pregnant-view',view==='pregnant');if(save)queueSave();if(changed)document.querySelector('.workspace').scrollTop=0}
 function refreshSaveStatus(){
   const btn=document.getElementById('saveBtn'),badge=document.getElementById('saveBadge'),status=document.getElementById('backupStatus'),side=document.getElementById('sideSaveNote');
   const onBrowser=localSave.enabled&&!localSave.error,savedTxt=localSave.lastSavedAt?`Salvo neste navegador às ${new Date(localSave.lastSavedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`:'Salvando neste navegador…';
@@ -2936,9 +2957,15 @@ function refreshSaveStatus(){
   if(status){status.textContent=localSave.error?'Não foi possível salvar no navegador — exporte um backup':onBrowser?`${savedTxt} · ${backupTxt}`:state.dirty?'Alterações não salvas — exporte um backup':state.lastBackupAt?`Backup salvo ${fmtDateTime(state.lastBackupAt)}`:'Nada para salvar ainda';status.classList.toggle('save-warn',warn)}
   if(side)side.textContent=onBrowser?'Tudo fica salvo neste navegador. Para outro computador, exporte um backup.':'Salvamento no navegador desligado. Só o backup exportado guarda os dados.';
 }
+const VIEW_RENDERERS={overview:()=>overviewHTML(),municipal:()=>municipalHTML(),federal:()=>federalHTML(),pregnant:()=>pregnancyHTML(),procedures:()=>proceduresHTML(),settings:()=>settingsHTML(),calculator:()=>calculatorHTML()};
+let staleViews=new Set(Object.keys(VIEW_RENDERERS));
+function renderView(v){const el=document.getElementById(`view-${v}`);if(!el||!VIEW_RENDERERS[v])return;el.innerHTML=VIEW_RENDERERS[v]();hydrateIcons(el);staleViews.delete(v)}
+function renderAllViews(){for(const v of Object.keys(VIEW_RENDERERS))if(staleViews.has(v))renderView(v)}
 function refreshAll(){
   fillContextFilters();
-  document.getElementById('view-overview').innerHTML=overviewHTML();document.getElementById('view-municipal').innerHTML=municipalHTML();document.getElementById('view-federal').innerHTML=federalHTML();document.getElementById('view-pregnant').innerHTML=pregnancyHTML();document.getElementById('view-procedures').innerHTML=proceduresHTML();document.getElementById('view-settings').innerHTML=settingsHTML();document.getElementById('view-calculator').innerHTML=calculatorHTML();
+  // Desenha só a página aberta; as outras ficam marcadas e são desenhadas quando forem abertas (v2.22).
+  // Antes as 7 páginas eram redesenhadas a cada edição, o que deixava lenta a lista de gestantes.
+  staleViews=new Set(Object.keys(VIEW_RENDERERS));renderView(VIEW_RENDERERS[activeView]?activeView:'overview');
   const newest=[...state.snapshots].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt))[0];document.getElementById('lastUpdate').textContent=newest?`Atualizado ${fmtDateTime(newest.createdAt)}`:'Nenhum relatório importado';document.getElementById('snapshotCount').textContent=`${state.snapshots.length} snapshot${state.snapshots.length===1?'':'s'}`;refreshSaveStatus();hydrateIcons();switchView(activeView,{save:false});
 }
 function updatePreference(key,value){state.preferences[key]=value;queueSave();refreshAll()}
@@ -2986,6 +3013,8 @@ function setupEvents(){
     if(e.target.hasAttribute('data-proc-single-toggle')){state.preferences.procSingleAllMonths=e.target.checked;if(!e.target.checked)state.preferences.procSingleProcedure='';queueSave();refreshAll()}
   });
   document.addEventListener('input',e=>{if(['ovPop','ovEsf','ovDent','ovDenManual'].includes(e.target.id))ovLivePreview(e.target)});
+  // Campo de data aceita colar "dd/mm/aaaa" (o navegador sozinho só aceita digitar dígito por dígito).
+  document.addEventListener('paste',e=>{const t=e.target;if(!(t instanceof HTMLInputElement)||t.type!=='date')return;const iso=pastedDateToIso(e.clipboardData?.getData('text'));if(!iso){toast('A data colada não foi reconhecida. Use dd/mm/aaaa.');e.preventDefault();return}e.preventDefault();t.value=iso;t.dispatchEvent(new Event('input',{bubbles:true}));t.dispatchEvent(new Event('change',{bubbles:true}))},true);
   document.addEventListener('input',debounce(e=>{if(e.target.id==='pregSearch'){state.preferences.pregSearch=e.target.value;queueSave();document.getElementById('view-pregnant').innerHTML=pregnancyHTML();hydrateIcons(document.getElementById('view-pregnant'))}if(e.target.id==='calcPeso'){state.preferences.calcPeso=e.target.value;queueSave();const hadFocus=document.activeElement&&document.activeElement.id==='calcPeso';const selStart=hadFocus?document.activeElement.selectionStart:null;document.getElementById('view-calculator').innerHTML=calculatorHTML();if(hadFocus){const el=document.getElementById('calcPeso');if(el){el.focus();if(selStart!==null)el.setSelectionRange(selStart,selStart)}}}},250));
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeDrawer()}});document.getElementById('modalBackdrop').addEventListener('click',e=>{if(e.target.id==='modalBackdrop')closeModal()});document.getElementById('drawerBackdrop').addEventListener('click',e=>{if(e.target.id==='drawerBackdrop')closeDrawer()});
   let dragDepth=0;window.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;document.getElementById('dropOverlay').classList.add('open')});window.addEventListener('dragover',e=>e.preventDefault());window.addEventListener('dragleave',e=>{e.preventDefault();if(--dragDepth<=0){dragDepth=0;document.getElementById('dropOverlay').classList.remove('open')}});window.addEventListener('drop',e=>{e.preventDefault();dragDepth=0;document.getElementById('dropOverlay').classList.remove('open');if(e.dataTransfer.files.length)importFiles(e.dataTransfer.files)});
