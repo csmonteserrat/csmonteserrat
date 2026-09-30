@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Versão 2.26 (histórico da gestante com todos os atendimentos do CELK)
+
+- **Pedido do usuário**: em "Histórico e notas", mostrar todos os atendimentos da gestante que estão nos relatórios do CELK, de qualquer data, mesmo os que não contam para a gestação.
+- Agora aparecem todos. Os que contam (entre a DUM e a DPP, ou até o parto) seguem em roxo com "conta para a meta"; os outros aparecem em cinza com "fora do período da gestação (DUM a DPP), não conta" ou, sem DUM/DPP, "sem DUM/DPP, não conta".
+- A régua da gestação continua marcando só os atendimentos que contam.
+- **Verificado com Playwright**: 260/260 autotestes (1 novo, 260). Com o CSV real de produção e 180 gestantes de teste, 15 tinham atendimentos dentro e fora do período, e a gaveta mostra os dois tipos.
+
 ## Versão 2.25 (atendimento do CELK só conta entre a DUM e a DPP)
 
 - **Pedido do usuário**: só marcar a gestante como atendida pelos dados do CELK quando ela tem DUM ou DPP, e só com atendimento depois da DUM e antes da DPP.
