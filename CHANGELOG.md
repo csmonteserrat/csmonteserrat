@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## Versão 2.21 (novo nome e ícone da aba)
+
+- **Pedido do usuário**: trocar o título "Indicadores Saúde Bucal" por "Acompanhamento Odontológico", pôr um ícone de dente na aba do navegador e trocar "Monte Serrat" no canto esquerdo.
+- Título da aba do navegador e da Visão Geral: **Acompanhamento Odontológico**.
+- Canto superior esquerdo: **Acompanhamento** · Saúde Bucal · v2.21 (antes "Monte Serrat").
+- Ícone da aba (favicon): dente branco sobre o roxo do app, em `assets/favicon.svg`.
+- 254/254 autotestes passam.
+
 ## Versão 2.20 (página Procedimentos: excisão/sutura num item só e sem a nota de atividade em grupo)
 
 - **Achados no mesmo CSV real (mai a ago/2026)**:
