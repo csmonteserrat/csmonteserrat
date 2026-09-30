@@ -1,5 +1,44 @@
 # Histórico de versões
 
+## Versão 2.8 (página de Gestantes redesenhada como fila de trabalho: abas por etapa, cards em cores, próxima ação, nova gaveta e nova janela de cadastro)
+
+- **Pedido do usuário**: "eu quero repensar o design da página de gestantes". O que mais incomodava era a dificuldade de saber quem contatar e o excesso de filtros e informação antes da lista. O desenho foi aprovado por etapas num protótipo navegável com dados fictícios. Primeiro a página, depois os cards ("em lista como na versão atual, porém com uma corzinha pastel leve de acordo com os tipos e condições"), depois a gaveta da gestante e por fim a janela de cadastro. Só uma correção foi pedida no fim: o campo é "Prontuário (CELK)", não CNS.
+- **Página como fila de trabalho**:
+  - Os 4 KPIs, o aviso longo e o "Resumo por equipe" deram lugar a uma barra de meta segmentada (Panorama atual: atendidas, agendadas, em contato, a contatar e parto sem atendimento), com o % de atendidas em destaque.
+  - Um alerta mostra quantas gestantes estão no 3º trimestre sem atendimento, com o botão "Ver só essas".
+  - Os filtros "Status", "Acompanhamento" e "Gestação" viraram abas: A contatar (padrão), Em contato, Agendadas, Atendidas, Encerradas e Todas.
+  - As equipes viraram chips com mini-progresso. Origem, telefone e removidas ficaram em "Mais filtros".
+  - Importar, Exportar, "Como o 2I é calculado" e "Limpar tudo" foram para o menu "Mais".
+  - Os seletores de ano, quadrimestre e mês ficam ocultos nesta view, porque não afetam o 2I.
+- **Ordem da fila**: 3º trimestre sem atendimento primeiro, depois a data provável do parto mais próxima.
+- **Cards horizontais em cores pastel conforme a situação**:
+  - Vermelho claro para 3º trimestre sem atendimento; pêssego, azul, verde-água, verde e lilás para as etapas.
+  - Cada card mostra idade, régua de idade gestacional com DPP e semanas que faltam, telefone e último contato, e selos (3º tri, sem telefone, adolescente).
+  - Um botão de **próxima ação** leva o motivo embaixo:
+    - Enviar WhatsApp, que abre a conversa e registra o envio.
+    - Pedir busca ativa, quando não há telefone ou quando o WhatsApp está sem resposta há 5 dias ou mais.
+    - Agendar consulta.
+    - Confirmar atendimento, em alerta quando a data da consulta já passou.
+  - Todo registro feito pela fila ou pela gaveta tem "Desfazer" no aviso.
+- **Nova gaveta da gestante**:
+  - O topo tem a cor do card e setas para passar à gestante anterior ou seguinte da aba sem fechar.
+  - Aba "Acompanhamento": próxima ação em destaque, etapas, atalhos de registro (WhatsApp, busca ativa, agendar com **data e horário da consulta**, atendida), contato com "Abrir WhatsApp" e copiar, gestação numa régua de 40 semanas com os contatos marcados no tempo e "Registrar parto", e histórico com notas rápidas.
+  - Aba "Dados cadastrais": leitura primeiro e formulário só ao clicar em Editar, com os mesmos campos e a mesma correção local de antes, mais "Detalhes técnicos".
+  - Copiar, "confirmado no Metabase", reiniciar, arquivar e remover da lista ficam no menu ⋯.
+- **Nova janela de cadastro manual em 4 blocos**:
+  - Quem é, gestação, contato e saúde bucal, com "Prontuário (CELK)" e equipe escolhida entre as existentes.
+  - Você informa a DUM ou a DPP e a outra é calculada (280 dias), com a idade gestacional e o aviso de 3º trimestre na hora.
+  - O telefone é validado enquanto se digita.
+  - Há uma prévia ao vivo do card e da aba em que ele entra, e aviso de duplicidade por prontuário (bloqueante na leitura) e por nome parecido (só alerta, nunca mescla).
+  - Há o botão "Salvar e adicionar outra".
+- **Mudança de regra aprovada**:
+  - A data e a observação do atendimento odontológico só são exigidas quando se responde "Sim, já foi atendida". Assim dá para cadastrar uma gestante que ainda vai ser contatada.
+  - Nesse caso, o cadastro também registra a confirmação manual no acompanhamento, para ela contar na meta.
+  - O cadastro guarda só a data informada (DUM ou DPP), para a mesclagem com o CSV continuar comparando exatamente a mesma data.
+- **Dados**: o formato do backup não mudou. O acompanhamento ganhou o campo opcional `agendaAt` (data e horário da consulta) e o cadastro manual ganhou `endereco`. As preferências `pregStatus`, `pregFollowup` e `pregStage` saíram e deram lugar a `pregTab`, `pregPrioOnly` e `pregMoreFilters`. A idade gestacional passa a ser calculada também só com a DPP (DUM estimada = DPP − 280 dias).
+- **Nenhuma fórmula municipal ou federal foi alterada.** A regra de "atendida" do 2I (`isAttended`: "Sim" no CSV ou confirmação manual) e o KPI de gestantes da Visão Geral também não mudaram.
+- **Verificado com Playwright**: 217/217 autotestes passam. Onze testes que descreviam a tela antiga foram reescritos para a nova (66, 106, 107, 110, 112, 113, 116, 117, 119, 120, 126) e há 8 novos (210–217), cobrindo a busca ativa depois de 5 dias sem resposta, a falta de telefone, a IG só com DPP, a ordem da fila, o cadastro com "Prontuário (CELK)", a data guardada para mesclagem, o "Desfazer" e os filtros de período ocultos. O fluxo foi testado de ponta a ponta com um CSV sintético de 20 gestantes, no desktop e no celular (390px, sem rolagem horizontal): fila, agendamento com data e Desfazer, edição de dados, e cadastro com prévia e aviso de nome parecido.
+
 ## Versão 2.7 (correção: importação real do CSV de "Relação das Atividades em Grupo" falhava — o cabeçalho verdadeiro do CELK é "Data de Nascimento", não "Data Nascimento" como havia sido assumido sem nunca testar um arquivo real)
 
 - **Pedido do usuário**: "eu quero que a ferramenta seja capaz de ler esse csv que é de atividades coletivas", anexando o primeiro CSV real de "Relação das Atividades em Grupo" que a ferramenta recebeu — até aqui, esse relatório em CSV (suportado desde a v1.35) só tinha sido testado com cabeçalhos sintéticos, nunca com um export de verdade do CELK. Essa lacuna já estava documentada como pendência conhecida nos docs do projeto.
