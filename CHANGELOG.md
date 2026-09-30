@@ -1,5 +1,49 @@
 # Histórico de versões
 
+## Versão 2.14 (Visão Geral redesenhada: resumo, "o que falta para bater as metas", situação dos dados, cartões com os meses do quadrimestre e gaveta do indicador com denominador editável)
+
+- **Pedido do usuário**: "repense o design da aba visão geral", mostrando antes de aplicar. O desenho foi aprovado num protótipo navegável, com estas decisões:
+  - A leitura federal B1–B6 fica só na aba Federal.
+  - A lista do que falta segue sempre a ordem M1, M2, M3, M4, M5.
+  - As barras mostram só os meses do quadrimestre.
+  - "Metabase consolidado" sai da situação dos dados, porque esse dado foi removido do Metabase.
+  - A gaveta não tem o bloco "por profissional".
+  - M4 e M5 mostram também o que entrou no denominador.
+  - O denominador pode ser digitado nas gavetas de M1 e de M3. No M1, a conta aparece aberta (população ativa ÷ ESF × dentistas), com os três números editáveis.
+- **Resumo no topo**, no lugar dos 4 cartões da coluna direita ("Competência em foco" repetia o filtro):
+  - Metas municipais batidas, com M1–M5 coloridos pela situação e quantos aguardam denominador.
+  - Gestantes 2I: % atendidas, barra por etapa, alerta de 3º trimestre e atalho para a fila.
+  - Dados do mês: fontes prontas e diagnósticos.
+  - Um aviso de tempo ("Hoje é o último dia de setembro", "Q3 termina em 31/12") segue a data real.
+- **"O que falta para bater as metas"**:
+  - Uma linha por indicador, na ordem fixa M1–M5, com quanto falta e uma barra até a meta.
+  - Indicador sem denominador aparece como tarefa ("Confirmar"), e indicador sem relatório aparece com "Importar".
+- **"Situação dos dados"**:
+  - Produção CELK, atividades em grupo, denominador de M1/B1, denominador de M3/B4 e gestantes, cada um com a data de importação ou a ação que falta.
+  - Um atalho leva aos diagnósticos.
+- **Cartões M1–M5 compactos**:
+  - Os 5 cabem numa linha: valor, faixa, meta, régua fina com a posição atual, o que falta e barras dos 4 meses do quadrimestre com o valor escrito. Os meses que ainda não chegaram ficam tracejados.
+  - A legenda aparece uma vez só, e o cartão não é mais pintado inteiro.
+  - O "i" abre a nova gaveta.
+- **Gaveta do indicador** (`openIndicatorDetail`), aberta por "Detalhes", "Confirmar" ou "i":
+  - **Para bater a meta**: a conta de antes e depois, por exemplo 110 ÷ 303 = 36,30% → 129 ÷ 322 = 40,06%. Os dois lados somam em M4 e M5, e só o numerador em M1, M2 e M3. No quadrimestre de M1/M3, explica a média dos 4 meses.
+  - **Denominador** (M1 e M3):
+    - O status mostra o valor confirmado, a vigência e a origem.
+    - No M1, população ativa ÷ ESF × dentistas: a população vem do CSV importado ou é digitada, e fica marcada como "digitada". A prévia recalcula o resultado e o que falta, e "Salvar" atualiza o mesmo registro, sem duplicar.
+    - "Digitar o valor direto" continua como alternativa.
+    - O valor digitado à mão vale do mês em foco até o fim do quadrimestre, sem alterar meses anteriores.
+  - **Mês a mês no quadrimestre**: numerador, denominador e resultado de cada mês.
+  - **O que entrou no numerador**, e em M4/M5 também **no denominador**, com os procedimentos que contam nos dois lados marcados como "também no numerador".
+  - **Como é calculado**: fórmula, observações, arquivos de origem e um atalho para a conferência completa, com SIGTAP e páginas (a gaveta técnica de antes, preservada).
+- **Nenhuma fórmula mudou**:
+  - `metaProgress`, `metaGap`, `metaGoalsHit` e as médias do quadrimestre de M1/M3 são as mesmas.
+  - `metaCard` foi redesenhado, mas mantém o selo de faixa e o texto de tempo verbal que os autotestes 185/186 conferem.
+- **Verificado com Playwright**: 241/241 autotestes passam. Os testes 87 e 89 foram reescritos para a nova tela, e há 5 novos (237–241): ordem M1–M5, denominador faltando como tarefa, a conta da população ativa sem duplicar registro, só os meses do quadrimestre com vigência do denominador manual a partir do mês em foco, e a composição e o denominador na gaveta.
+- **Testado de ponta a ponta** com produção, atividades em grupo e gestantes de teste, mais um CSV de população ativa (45.434 pessoas, 8 ESF, 2 dentistas = 11.358,5):
+  - Confirmar o denominador do M3 na gaveta (4.200) recalculou para 0,71% e "Faltam 12 crianças".
+  - Trocar para 3 dentistas no M1 recalculou para 17.037,8 e "Faltam 153", com a prévia antes de salvar.
+  - A tela funcionou no desktop e no celular, sem rolagem horizontal.
+
 ## Versão 2.13 (os dados voltam a ser salvos no navegador, com opção de limpar e aviso para salvar backup antes)
 
 - **Pedido do usuário**: "quero que você adicione a função do app salvar tudo no navegador, mas que tenha opção de limpar dados do navegador também, porém que apareça um aviso perguntando se quer salvar backup".

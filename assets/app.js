@@ -21,8 +21,8 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.13';
-const SELF_TEST_COUNT = 236;
+const APP_VERSION = '2.14';
+const SELF_TEST_COUNT = 241;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -1081,25 +1081,6 @@ function overviewTint(cardState){
   if(cardState==='bad')return {bg:'var(--mz-regular-soft)',accent:'var(--mz-regular)',pill:'mz-regular'};
   return {bg:'var(--inner)',accent:'var(--muted)',pill:'mz-neutral'};
 }
-function metaCard(id,mk,scope){
-  const p=metaProgress(id,mk),rule=RULESETS.municipal.indicators[id],unit=META_UNIT_LABEL[id],entry=scope==='quarter'?p.quarter:p.month;
-  const ended=scope==='quarter'?isQuarterOver(quarterMonths(state.preferences.year,state.preferences.quarter)):isMonthOver(mk);
-  const metaLabel=id==='M1'?'faixas oficiais (Ótimo >1,25%)':fmtPct(p.meta,p.meta<2?1:0);
-  const band=id==='M1'?m1Band(entry.result):null;
-  const label=id==='M1'?(band?.label||'Sem dados'):(entry.result==null?'Sem dados':entry.achieved?(scope==='quarter'?'Meta garantida':'Meta batida'):(scope==='quarter'?(ended?'Meta não atingida':'Ainda falta'):'Abaixo da meta'));
-  const cardState=id==='M1'?(band?statusClass(band.label):'neutral'):(entry.result==null?'neutral':entry.achieved?'success':'warn');
-  const noData=entry.result==null;
-  const missing=noData?(scope==='month'&&entry.denomRecord===null&&['M1','M3'].includes(id)?'Denominador do mês ainda não confirmado.':scope==='quarter'?'Ainda sem meses suficientes com dado confirmado.':'Sem relatório desta competência ainda.'):'';
-  const scopeLabel=scope==='quarter'?`Quadrimestre · acumulado (${entry.validMonths}/4 meses)`:'Este mês';
-  const tint=overviewTint(cardState);
-  return `<article class="card indicator-card overview-card${noData?' no-data':''}" style="--accent:${tint.accent};background:${tint.bg}">
-<div class="indicator-head"><div><div class="indicator-id">${id} · MUNICIPAL</div><div class="indicator-name">${esc(rule.name)}</div></div><button class="info-btn" data-composition="municipal|${id}|${mk}" aria-label="Como foi calculado?">i</button></div>
-<div class="indicator-result"><strong>${fmtPct(entry.result)}</strong>${pill(label,tint.pill)}</div>
-<div class="numerator-row"><span>${esc(scopeLabel)}</span><span>meta <strong>${metaLabel}</strong></span></div>
-${metaRulerHTML(id,entry.result)}
-<div class="need">${metaLine(entry,unit,missing,scope==='quarter'?'no quadrimestre':'agora',ended)}</div>
-</article>`;
-}
 function metaGoalsHit(mk,scope){
   const ids=['M1','M2','M3','M4','M5'];const withData=[];let hit=0;
   for(const id of ids){const p=metaProgress(id,mk),entry=scope==='quarter'?p.quarter:p.month;if(entry.result!=null){withData.push(id);if(id==='M1'?m1Band(entry.result)?.label==='Ótimo':entry.achieved)hit++}}
@@ -1351,15 +1332,193 @@ function federalQuadrimestralOutlook(id,q){
     :`Resultado acumulado do quadrimestre: ${fmtPct(cum.result,pctDecimals(id))} (${fmtNum(cum.numerator,0)} ÷ ${fmtNum(cum.denominator,2)}), classificado como ${label} pela Nota ${id}. Cálculo de conveniência da ferramenta (soma dos numeradores/denominadores dos meses com dado) — a Nota não define regra oficial de consolidação quadrimestral.`;
   return {cls,label:federalShortLabel(label),detail};
 }
-function overviewHTML(){
-  if(!state.snapshots.length)return emptyState('Importe os primeiros relatórios','Use o PDF “Procedimentos Detalhado” durante o mês, o relatório de atividades em grupo para M3/B4 e o CSV do Metabase como referência consolidada.');
-  const mk=state.preferences.month,diag=buildDiagnostics(),pregExpanded=visibleByExclusion(mergedEpisodes()),attended=pregExpanded.filter(isAttended).length;
-  const scope=state.preferences.overviewScope==='quarter'?'quarter':'month';
-  const goals=metaGoalsHit(mk,scope);
-  const goalsLabel=scope==='quarter'?'Metas garantidas no quadrimestre':'Metas batidas este mês';
-  const sideStats=`${overviewStat('Competência em foco',fmtMonth(mk,true),`Q${state.preferences.quarter} de ${state.preferences.year}`,'var(--primary)','var(--primary-soft)','clock')}${overviewStat(goalsLabel,goals.total?`${goals.hit} de ${goals.total}`:'—',goals.total?`${goals.total} indicador(es) com dado nesse recorte`:'Nenhum indicador com dado ainda','var(--mz-suficiente)','var(--mz-suficiente-soft)','trend')}${overviewStat('Gestantes',pregExpanded.length?fmtPct(100*attended/pregExpanded.length,1):'—',`${attended} gestante(s) com meta batida do total de ${pregExpanded.length} na lista operacional`,'var(--mz-otimo)','var(--mz-otimo-soft)','heart')}${overviewStat('Diagnósticos',fmtNum(diag.length),`${diag.filter(d=>d.level==='error').length} crítico(s) · ${diag.filter(d=>d.level==='warning').length} alerta(s)`,'var(--mz-regular)','var(--mz-regular-soft)','alert')}`;
-  return `<div class="overview-layout"><div class="overview-main"><div class="scope-toggle-row"><div class="scope-toggle" role="tablist" aria-label="Ver indicadores por"><button class="scope-btn ${scope==='month'?'active':''}" data-overview-scope="month">Por mês</button><button class="scope-btn ${scope==='quarter'?'active':''}" data-overview-scope="quarter">Por quadrimestre</button></div><span class="muted" style="font-size:11.5px">${scope==='month'?`Resultado de ${fmtMonth(mk,true)} contra a meta mensal.`:`Acumulado de Q${state.preferences.quarter}/${state.preferences.year} contra a mesma meta.`}</span></div><div class="indicator-grid" style="margin-top:12px">${['M1','M2','M3','M4','M5'].map(id=>metaCard(id,mk,scope)).join('')}</div></div><div class="overview-side">${sideStats}</div></div>`
+/* ---------- Visão Geral (v2.14): resumo, "o que falta" em ordem M1–M5, situação dos dados, cartões com os meses do quadrimestre e gaveta do indicador ---------- */
+const OVERVIEW_IDS=['M1','M2','M3','M4','M5'];
+const OV_SHORT_UNIT={M1:['primeira consulta','primeiras consultas'],M2:['tratamento concluído','tratamentos concluídos'],M3:['criança','crianças'],M4:['procedimento preventivo','procedimentos preventivos'],M5:['ART','ARTs']};
+const OV_ZONE_COLOR={otimo:'var(--mz-otimo)',bom:'var(--mz-bom)',suf:'var(--mz-suficiente)',reg:'var(--mz-regular)'};
+function ovZone(id,v){if(v==null)return null;if(id==='M1')return v>1.25?'otimo':v>.75?'bom':v>.25?'suf':'reg';const r=RULESETS.municipal.indicators[id];return v>=r.meta?'otimo':v>=r.cutoff?'suf':'reg'}
+function ovDenDecimals(v){return v!=null&&v%1?1:0}
+function ovMissingDenom(id,mk){return ['M1','M3'].includes(id)&&!getDenominator(id,'municipal',mk)}
+function ovCurrentMonthKey(){const d=new Date();return monthKey(d.getFullYear(),d.getMonth()+1)}
+function metaCardState(id,mk,scope){
+  const p=metaProgress(id,mk),rule=RULESETS.municipal.indicators[id],unit=META_UNIT_LABEL[id],entry=scope==='quarter'?p.quarter:p.month;
+  const months=quarterMonths(state.preferences.year,state.preferences.quarter),ended=scope==='quarter'?isQuarterOver(months):isMonthOver(mk);
+  const metaLabel=id==='M1'?'Ótimo >1,25%':fmtPct(p.meta,p.meta<2?1:0);
+  const band=id==='M1'?m1Band(entry.result):null;
+  const label=id==='M1'?(band?.label||'Sem dados'):(entry.result==null?'Sem dados':entry.achieved?(scope==='quarter'?'Meta garantida':'Meta batida'):(scope==='quarter'?(ended?'Meta não atingida':'Ainda falta'):'Abaixo da meta'));
+  const cardState=id==='M1'?(band?statusClass(band.label):'neutral'):(entry.result==null?'neutral':entry.achieved?'success':'warn');
+  const noData=entry.result==null,missingDenom=ovMissingDenom(id,mk);
+  const missing=noData?(missingDenom&&scope==='month'?'Denominador do mês ainda não confirmado.':scope==='quarter'?'Ainda sem meses suficientes com dado confirmado.':'Sem relatório desta competência ainda.'):'';
+  const done=id==='M1'?band?.label==='Ótimo':!!entry.achieved;
+  return {p,rule,unit,entry,ended,metaLabel,label,cardState,tint:overviewTint(cardState),noData,missing,missingDenom,done};
 }
+function ovRulerHTML(id,result){
+  let segs,max;
+  if(id==='M1'){max=1.7;segs=[[.25,'reg'],[.5,'suf'],[.5,'bom'],[.45,'otimo']]}else{const r=RULESETS.municipal.indicators[id];max=r.meta*1.3;segs=[[r.cutoff,'reg'],[r.meta-r.cutoff,'suf'],[max-r.meta,'otimo']]}
+  const pos=result==null?null:clamp(100*result/max);
+  return `<div class="ov-ruler${result==null?' empty':''}">${segs.map(([w,k])=>`<span style="width:${100*w/max}%;background:${OV_ZONE_COLOR[k]}"></span>`).join('')}${pos==null?'':`<em style="left:calc(${pos}% - 1.5px)"></em>`}</div>`;
+}
+function ovQuarterBarsHTML(id,mk){
+  const months=quarterMonths(state.preferences.year,state.preferences.quarter),cur=ovCurrentMonthKey(),dec=pctDecimals(id);
+  const vals=months.map(m=>({m,v:municipalComponents(id,m).result,future:m>cur}));
+  const max=Math.max(...vals.map(x=>x.v??0),metaTarget(id))*1.1||1;
+  return `<div class="ov-bars" title="Meses do quadrimestre Q${state.preferences.quarter}">${vals.map(x=>{const {month}=parseMonthKey(x.m),z=ovZone(id,x.v);return `<div class="${x.m===mk?'cur':''}">${x.v==null?`<i class="empty" title="${x.future?'Mês ainda não chegou':'Sem dado'}"></i>`:`<b>${fmtNum(x.v,dec)}%</b><i style="height:${Math.max(4,28*x.v/max)}px;background:${OV_ZONE_COLOR[z]}"></i>`}<span>${MONTHS_SHORT[month-1]}</span></div>`}).join('')}</div>`;
+}
+function ovNumText(id,s,scope){const e=s.entry;if(e.result==null)return '—';if(scope==='quarter'&&['M1','M3'].includes(id))return `média dos 4 meses · ${e.validMonths}/4 com dado`;const t=`${fmtNum(e.numerator)} de ${fmtNum(e.denominator,ovDenDecimals(e.denominator))}`;return scope==='quarter'?`${t} · ${e.validMonths}/4 meses`:t}
+function metaCard(id,mk,scope){
+  const s=metaCardState(id,mk,scope),{entry,tint,unit}=s;
+  return `<article class="card ov-tile${s.noData?' no-data':''}">
+<div class="ov-tile-h"><div><div class="indicator-id">${id} · MUNICIPAL</div><div class="ov-tile-name">${esc(s.rule.name)}</div></div><button class="ov-info" data-indicator-detail="${id}" aria-label="Detalhes de ${id}" title="Detalhes">i</button></div>
+<div class="ov-val"><strong>${fmtPct(entry.result)}</strong>${pill(s.label,tint.pill)}</div>
+<div class="ov-meta"><span>${esc(ovNumText(id,s,scope))}</span><span>meta <b>${s.metaLabel}</b></span></div>
+${ovRulerHTML(id,entry.result)}
+<div class="ov-gap">${metaLine(entry,unit,s.missing,scope==='quarter'?'no quadrimestre':'agora',s.ended)}</div>
+${ovQuarterBarsHTML(id,mk)}
+</article>`;
+}
+function ovPlanRow(id,mk,scope){
+  const s=metaCardState(id,mk,scope),e=s.entry,u=OV_SHORT_UNIT[id],monthName=fmtMonth(mk,true).split('/')[0];
+  const badge=`<span class="ov-id" style="color:${s.tint.accent};background:${s.tint.bg}">${id}</span>`;
+  if(e.result==null&&s.missingDenom)return `<li class="block">${badge}<div class="ov-what"><b>Denominador de ${esc(monthName)} não confirmado</b><small>${esc(s.rule.name)} · sem ele, ${id} não é calculado.</small></div><div class="ov-prog"><div class="ov-prog-top"><span>resultado</span><b>—</b></div><div class="ov-track"></div></div><button class="btn small primary" data-indicator-detail="${id}">Confirmar</button></li>`;
+  if(e.result==null)return `<li class="block">${badge}<div class="ov-what"><b>${esc(s.missing||'Sem dados')}</b><small>${esc(s.rule.name)}</small></div><div class="ov-prog"><div class="ov-prog-top"><span>resultado</span><b>—</b></div><div class="ov-track"></div></div><button class="btn small" data-action="import">Importar</button></li>`;
+  const target=metaTarget(id),max=target*1.25,pos=clamp(100*e.result/max),tpos=clamp(100*target/max),z=ovZone(id,e.result);
+  const title=s.done?(scope==='quarter'?'Meta garantida':'Meta batida'):`${s.ended?(e.gap===1?'Faltou':'Faltaram'):'Faltam'} ${fmtNum(e.gap)} ${e.gap===1?u[0]:u[1]}`;
+  return `<li class="${s.done?'done':''}">${badge}<div class="ov-what"><b>${title}</b><small>${esc(s.rule.name)}${id==='M1'?' · para a faixa Ótimo':''}</small></div><div class="ov-prog"><div class="ov-prog-top"><span>${fmtPct(e.result)}</span><b>meta ${id==='M1'?'>1,25%':fmtPct(target,target<2?1:0)}</b></div><div class="ov-track"><i style="width:${pos}%;background:${OV_ZONE_COLOR[z]}"></i><em style="left:${tpos}%"></em></div></div><button class="btn small" data-indicator-detail="${id}">Detalhes</button></li>`;
+}
+function ovPlanHTML(mk,scope){return `<ol class="ov-plan">${OVERVIEW_IDS.map(id=>ovPlanRow(id,mk,scope)).join('')}</ol>`}
+function ovSources(mk){
+  const month=fmtMonth(mk,true),last=snaps=>[...snaps].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt))[0];
+  const prod=latestSnapshots('celk_procedimentos_detalhado',mk),grp=latestSnapshots('celk_atividades_grupo',mk),d1=getDenominator('M1','municipal',mk),d3=getDenominator('M3','municipal',mk),g2i=getActive2ISnapshot(),mon=getActiveMonitoraSnapshot();
+  const den=(d,id,fed)=>d?{ok:true,title:`Denominador de ${id} e ${fed}`,sub:`${fmtNum(d.value,ovDenDecimals(Number(d.value)))} · ${d.origin||'confirmado'}`}:{ok:false,title:`Denominador de ${id} e ${fed}`,sub:`Não confirmado para ${month}`,action:`<button class="btn small primary" data-indicator-detail="${id}">Confirmar</button>`};
+  return [
+    prod.length?{ok:true,title:'Produção CELK',sub:`Procedimentos Detalhado · importado ${fmtDate(last(prod).createdAt)}`}:{ok:false,title:'Produção CELK',sub:`Procedimentos Detalhado de ${month} não importado`,action:'<button class="btn small" data-action="import">Importar</button>'},
+    grp.length?{ok:true,title:'Atividades em grupo',sub:`Escovação supervisionada · importado ${fmtDate(last(grp).createdAt)}`}:{ok:false,title:'Atividades em grupo',sub:`Relatório de ${month} não importado`,action:'<button class="btn small" data-action="import">Importar</button>'},
+    den(d1,'M1','B1'),den(d3,'M3','B4'),
+    g2i||mon||state.gestantes.manual.length?{ok:true,title:'Gestantes',sub:[g2i?`Metabase ${fmtDate(g2i.createdAt)}`:'',mon?`Monitora APS ${fmtDate(mon.createdAt)}`:'',!g2i&&!mon?'Só cadastros manuais':''].filter(Boolean).join(' · ')}:{ok:false,title:'Gestantes',sub:'Nenhuma lista importada',action:'<button class="btn small" data-action="import">Importar</button>'}
+  ];
+}
+function ovSourcesHTML(mk,sources,diag){
+  const errs=diag.filter(d=>d.level==='error').length,warns=diag.filter(d=>d.level==='warning').length;
+  return `<ul class="ov-sources">${sources.map(s=>`<li><span class="ov-st ${s.ok?'ok':'no'}">${s.ok?'✓':'!'}</span><div>${esc(s.title)}<small>${esc(s.sub)}</small></div>${s.action||'<span></span>'}</li>`).join('')}</ul><div class="ov-diag"><span><b>${fmtNum(warns)} alerta(s)</b> · ${fmtNum(errs)} crítico(s) nos diagnósticos</span><button class="ov-link" data-settings-tab="diagnostics">Ver →</button></div>`;
+}
+function ovTimeChip(mk,scope){
+  const now=new Date(),cur=ovCurrentMonthKey();
+  if(scope==='quarter'){const months=quarterMonths(state.preferences.year,state.preferences.quarter);if(isQuarterOver(months))return 'Quadrimestre encerrado';const {year,month}=parseMonthKey(months.at(-1)),ahead=months.filter(m=>m>cur).length;return `Q${state.preferences.quarter} termina em ${fmtDate(new Date(year,month,0))}${ahead?` · ${ahead} ${ahead===1?'mês':'meses'} pela frente`:' · último mês'}`}
+  if(mk<cur)return 'Mês encerrado';if(mk>cur)return 'Mês ainda não começou';
+  const days=new Date(now.getFullYear(),now.getMonth()+1,0).getDate()-now.getDate();return days?`Faltam ${days} dia(s) para o fim de ${MONTHS[now.getMonth()]}`:`Hoje é o último dia de ${MONTHS[now.getMonth()]}`;
+}
+function overviewHTML(){
+  if(!state.snapshots.length)return emptyState('Importe os primeiros relatórios','Use o PDF “Procedimentos Detalhado” durante o mês, o relatório de atividades em grupo para M1–M5 e a lista de gestantes para o 2I.');
+  const mk=state.preferences.month,scope=state.preferences.overviewScope==='quarter'?'quarter':'month',diag=buildDiagnostics(),monthName=fmtMonth(mk,true).split('/')[0];
+  const goals=metaGoalsHit(mk,scope),states=OVERVIEW_IDS.map(id=>metaCardState(id,mk,scope)),waiting=OVERVIEW_IDS.filter(id=>ovMissingDenom(id,mk)).length;
+  const pregExpanded=visibleByExclusion(mergedEpisodes()),attended=pregExpanded.filter(isAttended).length,priority=pregExpanded.filter(isPriority2I).length;
+  const seg={atendida:attended,agendada:0,em_contato:0,a_contatar:0};for(const e of pregExpanded){if(isAttended(e))continue;const b=pregBucket(e);if(seg[b]!=null)seg[b]++}
+  const segBar=pregExpanded.length?[['atendida','#39b980'],['agendada','#3dc1d3'],['em_contato','#6f84e8'],['a_contatar','#e7a23b']].filter(([k])=>seg[k]).map(([k,c])=>`<i style="width:${100*seg[k]/pregExpanded.length}%;background:${c}"></i>`).join(''):'';
+  const sources=ovSources(mk),okCount=sources.filter(s=>s.ok).length,firstMissing=sources.find(s=>!s.ok);
+  const dots=OVERVIEW_IDS.map((id,i)=>`<span class="ov-dot" style="color:${states[i].tint.accent};background:${states[i].tint.bg}" title="${esc(states[i].rule.name)}: ${esc(states[i].label)}"><i></i>${id}</span>`).join('');
+  return `<div class="ov-ctx"><div class="scope-toggle" role="tablist" aria-label="Recorte"><button class="scope-btn ${scope==='month'?'active':''}" data-overview-scope="month">${esc(monthName.charAt(0).toUpperCase()+monthName.slice(1))}</button><button class="scope-btn ${scope==='quarter'?'active':''}" data-overview-scope="quarter">Quadrimestre Q${state.preferences.quarter}</button></div><span class="ov-chip">${esc(ovTimeChip(mk,scope))}</span></div>
+  <section class="card ov-summary" aria-label="Resumo">
+    <div class="ov-sum"><div class="ov-sec-t">Metas municipais</div><div class="ov-big">${fmtNum(goals.hit)}<small> de ${OVERVIEW_IDS.length} ${scope==='quarter'?'garantidas':'batidas'}</small></div><div class="ov-dots">${dots}</div><div class="ov-line">${fmtNum(goals.total)} com dado${waiting?` · <b>${waiting} aguardando denominador</b>`:''}.</div></div>
+    <div class="ov-sum"><div class="ov-sec-t">Gestantes · 2I</div>${pregExpanded.length?`<div class="ov-big">${fmtPct(100*attended/pregExpanded.length,1)}<small> atendidas</small></div><div class="ov-gbar">${segBar}</div><div class="ov-line">${fmtNum(attended)} de ${fmtNum(pregExpanded.length)} gestante(s) na lista de trabalho.${priority?` <b class="ov-alert">${fmtNum(priority)} no 3º trimestre sem atendimento.</b>`:''}</div><button class="ov-link" data-go="pregnant">Abrir fila de gestantes →</button>`:`<div class="ov-line">Nenhuma gestante na lista ainda.</div><button class="ov-link" data-go="pregnant">Ir para Gestantes →</button>`}</div>
+    <div class="ov-sum"><div class="ov-sec-t">Dados de ${esc(monthName)}</div><div class="ov-big">${okCount}<small> de ${sources.length} fontes</small></div><div class="ov-line">${firstMissing?`Falta: <b>${esc(firstMissing.title.charAt(0).toLowerCase()+firstMissing.title.slice(1))}</b>.`:'Tudo pronto para calcular.'} ${fmtNum(diag.filter(d=>d.level==='warning').length)} alerta(s) nos diagnósticos, ${fmtNum(diag.filter(d=>d.level==='error').length)} crítico(s).</div><button class="ov-link" data-ov-jump="ovDados">Ver situação dos dados →</button></div>
+  </section>
+  <div class="ov-two">
+    <section class="card ov-panel" aria-labelledby="ovPlanTitle"><div class="ov-panel-h"><h2 id="ovPlanTitle">O que falta para bater as metas</h2><span>${scope==='quarter'?`Acumulado do Q${state.preferences.quarter} · ${fmtMonth(mk,true)} em foco`:fmtMonth(mk,true)}</span></div>${ovPlanHTML(mk,scope)}</section>
+    <section class="card ov-panel" id="ovDados" aria-labelledby="ovSrcTitle"><div class="ov-panel-h"><h2 id="ovSrcTitle">Situação dos dados</h2><span>${esc(fmtMonth(mk,true))}</span></div>${ovSourcesHTML(mk,sources,diag)}</section>
+  </div>
+  <div class="ov-grp-h"><h2>Indicadores municipais · M1–M5</h2><div class="ov-legend"><span><i style="background:var(--mz-regular)"></i>Abaixo do corte</span><span><i style="background:var(--mz-suficiente)"></i>Entre corte e meta</span><span><i style="background:var(--mz-otimo)"></i>Meta batida</span><span>M1 usa as faixas oficiais: Regular, Suficiente, Bom e Ótimo</span></div></div>
+  <section class="ov-tiles" aria-label="Indicadores municipais">${OVERVIEW_IDS.map(id=>metaCard(id,mk,scope)).join('')}</section>`;
+}
+
+// ---- Gaveta do indicador ----
+const OV_WHY={M1:'O denominador não muda: cada primeira consulta a mais sobe o resultado. A faixa Ótimo começa acima de 1,25%.',M2:'O denominador são as primeiras consultas do período, que não mudam quando um tratamento é concluído.',M3:'O denominador (crianças de 6 a 12 anos) não muda: cada criança a mais em escovação supervisionada sobe o resultado.',M4:'Cada preventivo a mais também entra no total de procedimentos, por isso a conta soma nos dois lados.',M5:'Cada ART a mais também entra no total de restaurações, por isso a conta soma nos dois lados.'};
+const OV_QWHY={M1:'No quadrimestre, M1 é a média dos 4 meses (soma dos resultados ÷ 4), sobre o denominador do mês em foco.',M3:'No quadrimestre, M3 é a média dos 4 meses (soma dos resultados ÷ 4), sobre o denominador do mês em foco.',M2:'No quadrimestre, soma os tratamentos concluídos e as primeiras consultas dos 4 meses.',M4:'No quadrimestre, soma preventivos e procedimentos individuais dos 4 meses.',M5:'No quadrimestre, soma ART e restaurações dos 4 meses.'};
+function populationSnapshotLatest(){return state.snapshots.filter(s=>s.profile==='metabase_populacao_ativa'&&s.population).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt))[0]||null}
+function ovGapPreview(id,numerator,den){if(!(den>0)||numerator==null)return '';const r=100*numerator/den,g=metaGap(id,numerator,den),u=OV_SHORT_UNIT[id];return `Com esse denominador, ${id} fica em <b>${fmtPct(r)}</b>${g?` e faltam <b>${fmtNum(g)} ${g===1?u[0]:u[1]}</b>${id==='M1'?' para a faixa Ótimo':' para a meta'}`:' e a meta está batida'}.`}
+function ovDenomSection(id,mk){
+  const rec=getDenominator(id,'municipal',mk),comp=municipalComponents(id,mk),month=fmtMonth(mk,true),fed=id==='M1'?'B1':'B4';
+  const status=rec?`<p class="ov-why"><b class="ov-ok">✓ Confirmado em ${fmtDate(rec.updatedAt)} · vale de ${fmtMonth(rec.start,true)} a ${fmtMonth(rec.end,true)} · também para o ${fed}.</b> Origem: ${esc(rec.origin||'—')}.</p>`:`<p class="ov-why"><b class="ov-warn">Ainda não confirmado para ${esc(month)}.</b> Também vale para o ${fed}.</p>`;
+  const manual=`<div class="ov-denom" id="ovManualBox"${id==='M1'?' hidden':''}><label><span>Denominador do ${id} (${esc(month)})</span><input id="ovDenManual" data-ov-den-id="${id}" inputmode="decimal" value="${rec?esc(fmtNum(Number(rec.value),ovDenDecimals(Number(rec.value)))):''}" placeholder="ex.: 4200"></label><button class="btn small ${id==='M3'?'primary':''}" data-ov-den-save="${id}">${rec?'Salvar alteração':'Confirmar denominador'}</button></div>`;
+  if(id!=='M1')return `<section class="pq-d-card"><div class="pq-sec-t">Denominador de ${esc(month)}</div>${status}${manual}<p class="ov-why" id="ovDenPreview">${rec?ovGapPreview(id,comp.reconstructedNumerator,Number(rec.value)):''}</p></section>`;
+  const pop=activePopulationInput(mk),popSnap=populationSnapshotLatest(),total=pop?.totalPopulation??popSnap?.population?.totalPopulation??'',esf=pop?.esfCount??'',dent=pop?.dentistCount??'';
+  const src=popSnap?`Do CSV "${popSnap.fileName}" importado em ${fmtDate(popSnap.createdAt)} · soma da coluna "Todos os serviços"`:'Nenhum CSV de população ativa importado: digite o total de pessoas.';
+  const den=total>0&&esf>0&&dent>0?total/esf*dent:null;
+  return `<section class="pq-d-card"><div class="pq-sec-t">Denominador de ${esc(month)}</div>${status}
+    <label class="ov-pop-src"><span>População ativa (pessoas)</span><input id="ovPop" inputmode="numeric" value="${total===''?'':esc(fmtNum(total))}" data-csv="${popSnap?popSnap.population.totalPopulation:''}"><small id="ovPopSrc">${esc(pop?.manualTotal?`Digitado à mão${popSnap?` · o CSV importado traz ${fmtNum(popSnap.population.totalPopulation)}`:''}`:src)}</small></label>
+    <div class="ov-popcalc"><span class="ov-op">÷</span><label class="ov-pc"><span>ESF do CS</span><input id="ovEsf" inputmode="numeric" value="${esc(esf)}"></label><span class="ov-op">×</span><label class="ov-pc"><span>Dentistas <em>(sem residentes)</em></span><input id="ovDent" inputmode="numeric" value="${esc(dent)}"></label><span class="ov-op">=</span><div class="ov-pc res"><span>Denominador</span><b id="ovPopOut">${den==null?'—':fmtNum(den,ovDenDecimals(den))}</b></div></div>
+    <p class="ov-why" id="ovDenPreview">${den!=null?ovGapPreview('M1',comp.reconstructedNumerator,den):''}</p>
+    <div class="ov-pc-actions"><button class="btn small primary" data-ov-pop-save>Salvar</button><button class="ov-link" data-ov-manual-toggle>Digitar o valor direto</button></div>
+    ${manual}
+  </section>`;
+}
+function ovDetailRows(items,numSet){const max=Math.max(1,...items.map(x=>x.q));return `<div class="ov-blist">${items.map(x=>`<div class="ov-brow"><span>${esc(x.n)}${numSet&&numSet.has(x.k)?' <em class="ov-both">também no numerador</em>':''}</span><b>${fmtNum(x.q)}</b><div class="ov-bt"><i style="width:${100*x.q/max}%;background:${!numSet||numSet.has(x.k)?'var(--primary)':'#9aa0bd'}"></i></div></div>`).join('')}</div>`}
+function ovComposition(id,mk){
+  const proc=aggregateProcedureMonth(mk),group=aggregateGroupMonth(mk),comp=municipalComponents(id,mk),pcs=proc?.procedureCounts||[],month=fmtMonth(mk,true);
+  const has=role=>p=>(p.roles||[]).includes(role),row=p=>({k:p.descriptionNormalized,n:p.descriptionNormalized,q:p.quantityValid});
+  const isGroupNote=p=>/^EVOLUCAO DA ATIVIDADE EM GRUPO/.test(norm(p.descriptionOriginal));
+  let num='',den='';
+  if(id==='M1'||id==='M2'){const role=id==='M1'?'first':'concluded',people=id==='M1'?proc?.firstConsultations:proc?.treatmentsConcluded,qty=id==='M1'?proc?.firstConsultationQuantity:proc?.treatmentConcludedQuantity,excl=(id==='M1'?proc?.firstConsultationsExcluded:proc?.treatmentsConcludedExcluded)||[];
+    const items=pcs.filter(has(role)).map(p=>({k:p.descriptionNormalized,n:`${p.descriptionNormalized} · pessoas distintas`,q:people??0}));
+    num=proc?`${ovDetailRows(items.length?items:[{k:role,n:id==='M1'?'Primeira consulta programada':'Tratamento concluído',q:people??0}])}<p class="ov-why">${fmtNum(qty??0)} lançamento(s) no relatório, ${fmtNum(people??0)} pessoa(s) distinta(s).${excl.length?` ${fmtNum(excl.length)} já tinha(m) ${id==='M1'?'primeira consulta':'tratamento concluído'} nos últimos 12 meses e não conta(m) de novo.`:''}</p>`:'';}
+  if(id==='M3'&&group){num=group.brushingEvents?.length?`${ovDetailRows(group.brushingEvents.map((ev,i)=>({k:i,n:`Escovação supervisionada · ${ev.date}`,q:ev.present})))}<p class="ov-why">${fmtNum(group.supervisedBrushingPresent)} criança(s) presente(s) em ${fmtNum(group.eligibleActivities)} atividade(s) elegível(is).</p>`:'<p class="ov-why">Nenhuma escovação supervisionada encontrada neste mês.</p>'}
+  if(id==='M4'){const n=pcs.filter(has('preventive')).sort((a,b)=>b.quantityValid-a.quantityValid);const set=new Set(n.map(p=>p.descriptionNormalized));const d=pcs.filter(p=>!(p.roles||[]).includes('first')&&!(p.roles||[]).includes('concluded')&&!isGroupNote(p)).sort((a,b)=>(set.has(b.descriptionNormalized)-set.has(a.descriptionNormalized))||b.quantityValid-a.quantityValid);
+    num=n.length?`${ovDetailRows(n.map(row))}<p class="ov-why">Soma: ${fmtNum(comp.reconstructedNumerator)} procedimento(s) preventivo(s).</p>`:'';den=d.length?`${ovDetailRows(d.map(row),set)}<p class="ov-why">Soma: ${fmtNum(comp.reconstructedDenominator)} procedimento(s) individual(is). Não entram primeira consulta, tratamento concluído nem atividade em grupo.</p>`:''}
+  if(id==='M5'){const n=pcs.filter(has('art')).sort((a,b)=>b.quantityValid-a.quantityValid);const set=new Set(n.map(p=>p.descriptionNormalized));const d=pcs.filter(has('restorative')).sort((a,b)=>(set.has(b.descriptionNormalized)-set.has(a.descriptionNormalized))||b.quantityValid-a.quantityValid);
+    num=n.length?`${ovDetailRows(n.map(row))}<p class="ov-why">Soma: ${fmtNum(comp.reconstructedNumerator)} ART.</p>`:'';den=d.length?`${ovDetailRows(d.map(row),set)}<p class="ov-why">Soma: ${fmtNum(comp.reconstructedDenominator)} procedimento(s) restaurador(es).</p>`:''}
+  return `${num?`<section class="pq-d-card"><div class="pq-sec-t">O que entrou no numerador · ${esc(month)}</div>${num}</section>`:''}${den?`<section class="pq-d-card"><div class="pq-sec-t">O que entrou no denominador · ${esc(month)}</div>${den}</section>`:''}`;
+}
+function openIndicatorDetail(id){
+  const mk=state.preferences.month,scope=state.preferences.overviewScope==='quarter'?'quarter':'month',s=metaCardState(id,mk,scope),e=s.entry,comp=municipalComponents(id,mk),u=OV_SHORT_UNIT[id],month=fmtMonth(mk,true),monthName=month.split('/')[0];
+  const tone={success:'green',good:'blue',warn:'amber',bad:'red',neutral:'violet'}[s.cardState]||'violet';
+  let hero;
+  if(e.result==null&&s.missingDenom)hero=`<div class="pq-sec-t">Para calcular</div><p class="pq-d-why alert">Falta o denominador de ${esc(monthName)}</p><p class="ov-why">${comp.reconstructedNumerator!=null?`O numerador já está pronto: <b>${fmtNum(comp.reconstructedNumerator)} ${comp.reconstructedNumerator===1?u[0]:u[1]}</b>. `:''}Confirme o denominador abaixo para calcular ${id}.</p>`;
+  else if(e.result==null)hero=`<div class="pq-sec-t">Para calcular</div><p class="pq-d-why alert">${esc(s.missing||'Sem dados')}</p><div><button class="btn small" data-action="import">Importar relatório</button></div>`;
+  else{const title=s.done?(scope==='quarter'?'Meta garantida':'Meta batida'):`${s.ended?(e.gap===1?'Faltou':'Faltaram'):'Faltam'} ${fmtNum(e.gap)} ${e.gap===1?u[0]:u[1]}${id==='M1'?' para a faixa Ótimo':''}${scope==='quarter'?' no quadrimestre':` em ${monthName}`}`;
+    const sim=['M4','M5'].includes(id),avg=scope==='quarter'&&['M1','M3'].includes(id);
+    const calc=!avg&&e.numerator!=null&&e.denominator>0?`<div class="ov-calc"><div><span>Hoje</span><span>${fmtNum(e.numerator)} ÷ ${fmtNum(e.denominator,ovDenDecimals(e.denominator))}</span><b>${fmtPct(e.result)}</b></div>${e.gap?`<div class="after"><span>Com +${fmtNum(e.gap)}</span><span>${fmtNum(e.numerator+e.gap)} ÷ ${fmtNum(e.denominator+(sim?e.gap:0),ovDenDecimals(e.denominator))}</span><b>${fmtPct(100*(e.numerator+e.gap)/(e.denominator+(sim?e.gap:0)))}${id==='M1'?' → faixa Ótimo':' ✓'}</b></div>`:''}</div>`:'';
+    hero=`<div class="pq-sec-t">Para bater a meta</div><p class="pq-d-why${s.done?' ov-ok':''}">${title}</p>${calc}<p class="ov-why">${scope==='quarter'?OV_QWHY[id]:OV_WHY[id]}</p>`}
+  const months=quarterMonths(state.preferences.year,state.preferences.quarter),cur=ovCurrentMonthKey();
+  const monthRows=months.map(m=>{const c=municipalComponents(id,m),z=ovZone(id,c.result),future=m>cur;return `<tr class="${future?'future':''}"><td><span class="ov-zd" style="background:${z?OV_ZONE_COLOR[z]:'#d7dbe6'}"></span>${fmtMonth(m,true)}</td><td class="num">${c.reconstructedNumerator==null?'—':fmtNum(c.reconstructedNumerator)}</td><td class="num">${c.denominator==null?'—':fmtNum(c.denominator,ovDenDecimals(c.denominator))}</td><td class="num">${c.result!=null?`<b>${fmtPct(c.result)}</b>`:future?'a chegar':'sem dado'}</td></tr>`}).join('');
+  const files=(comp.snapshots||[]).map(sn=>`<button class="btn small" data-open-snapshot="${sn.id}">${icon('file')}${esc(sn.fileName)}</button>`).join('');
+  openDrawer(`<div class="pq-drawer tone-${tone}" data-ov-detail="${id}">
+    <header class="pq-d-h"><div class="pq-d-h-top"><span class="indicator-id" style="margin-right:auto">${id} · MUNICIPAL</span><button class="pq-icon" data-close-drawer aria-label="Fechar">${icon('close')}</button></div>
+      <h2>${esc(s.rule.name)}</h2><p class="pq-d-sub">${pill(s.label,s.tint.pill)} ${scope==='quarter'?`Quadrimestre Q${state.preferences.quarter} · acumulado`:esc(month)} · resultado <b>${fmtPct(e.result)}</b> · meta <b>${s.metaLabel}</b></p><div style="height:12px"></div></header>
+    <div class="pq-d-b">
+      <section class="pq-d-next">${hero}</section>
+      ${['M1','M3'].includes(id)?ovDenomSection(id,mk):''}
+      <section class="pq-d-card"><div class="pq-sec-t">Mês a mês no quadrimestre</div><div class="ov-mm-wrap"><table class="ov-mm"><thead><tr><th>Mês</th><th class="num">Numerador</th><th class="num">Denominador</th><th class="num">Resultado</th></tr></thead><tbody>${monthRows}</tbody></table></div></section>
+      ${ovComposition(id,mk)}
+      <details class="pq-d-card pq-tech"><summary>Como é calculado</summary><div class="formula">${esc(s.rule.formula)}</div><p class="ov-why">${esc(comp.hypothesis||'')}</p><p class="ov-why">Regra municipal: ${esc(RULESETS.municipal.fonte_normativa)}. Fonte do cálculo: ${esc(comp.source)}.</p><div class="drawer-actions">${files}<button class="btn small" data-composition="municipal|${id}|${mk}">Conferência completa (SIGTAP e páginas)</button></div></details>
+    </div></div>`);
+  document.getElementById('drawer').classList.add('pq-drawer-host');
+}
+function ovReopenDetail(id){const b=document.getElementById('drawerBackdrop');if(b?.classList.contains('open')&&document.querySelector(`#drawer [data-ov-detail="${id}"]`))openIndicatorDetail(id)}
+// Denominador de M1 pela população ativa: população ÷ ESF × dentistas. A população pode vir do CSV importado ou
+// ser digitada. Atualiza o mesmo registro de população/denominador quando já existe para o mês (não duplica).
+function applyPopulationDenominator(mk,total,esf,dent){
+  const months=quarterMonths(state.preferences.year,state.preferences.quarter),popSnap=populationSnapshotLatest();
+  let rec=activePopulationInput(mk);
+  if(!rec){rec={id:uuid(),snapshotId:popSnap?.id||null,fileName:popSnap?.fileName||'',unit:state.preferences.unit,createdAt:nowISO(),start:mk,end:months.at(-1)};state.populationInputs.push(rec)}
+  rec.totalPopulation=total;rec.esfCount=esf;rec.dentistCount=dent;rec.manualTotal=!popSnap||Number(total)!==Number(popSnap.population.totalPopulation);rec.updatedAt=nowISO();
+  const value=total/esf*dent,note=`População ativa ${rec.manualTotal?'digitada':'do CSV'}: ${fmtNum(total,0)} pessoas ÷ ${esf} ESF × ${dent} dentistas.`;
+  const existing=rec.denomRecordId?state.denominators.find(d=>d.id===rec.denomRecordId):null;
+  if(existing){existing.value=value;existing.note=note;existing.start=rec.start;existing.end=rec.end;existing.origin=rec.manualTotal?'População ativa digitada':'População ativa (CSV)';existing.updatedAt=nowISO();audit('denominator_confirmed',{indicator:'M1',scope:'municipal',value,start:rec.start,end:rec.end,origin:existing.origin})}
+  else rec.denomRecordId=commitDenominator('M1','municipal',value,rec.start,rec.end,rec.manualTotal?'População ativa digitada':'População ativa (CSV)',note).id;
+  audit('population_input_confirmed',{esfCount:esf,dentistCount:dent,totalPopulation:total,manualTotal:rec.manualTotal,start:rec.start,end:rec.end});
+  return {record:rec,value};
+}
+function applyManualDenominator(id,mk,value){const months=quarterMonths(state.preferences.year,state.preferences.quarter);return commitDenominator(id,'municipal',value,mk,months.at(-1),'Informado manualmente (Visão Geral)')}
+function ovNumInput(id){return numeric(String(document.getElementById(id)?.value||'').trim())}
+function ovSavePopulation(){const mk=state.preferences.month,total=ovNumInput('ovPop'),esf=ovNumInput('ovEsf'),dent=ovNumInput('ovDent');if(!(total>0)||!(esf>0)||!(dent>0)){toast('Informe população ativa, ESF e dentistas (todos maiores que zero).');return}const {value}=applyPopulationDenominator(mk,total,esf,dent);queueSave();refreshAll();openIndicatorDetail('M1');toast(`Denominador de M1 e B1 salvo: ${fmtNum(value,ovDenDecimals(value))}.`)}
+function ovSaveManual(id){const mk=state.preferences.month,v=ovNumInput('ovDenManual');if(!(v>0)){toast('Informe um denominador maior que zero.');return}applyManualDenominator(id,mk,v);queueSave();refreshAll();openIndicatorDetail(id);toast(`Denominador de ${id} e ${id==='M1'?'B1':'B4'} salvo: ${fmtNum(v,ovDenDecimals(v))}.`)}
+function ovLivePreview(target){
+  const box=document.querySelector('#drawer [data-ov-detail]');if(!box)return;const id=box.dataset.ovDetail,mk=state.preferences.month,num=municipalComponents(id,mk).reconstructedNumerator,out=document.getElementById('ovDenPreview');
+  if(id==='M1'&&target?.id!=='ovDenManual'&&document.getElementById('ovPop')){const total=ovNumInput('ovPop'),esf=ovNumInput('ovEsf'),dent=ovNumInput('ovDent'),csv=Number(document.getElementById('ovPop').dataset.csv)||null,src=document.getElementById('ovPopSrc');
+    if(src)src.textContent=csv&&total===csv?`Do CSV importado · soma da coluna "Todos os serviços"`:`Digitado à mão${csv?` · o CSV importado traz ${fmtNum(csv)}`:''}`;
+    const den=total>0&&esf>0&&dent>0?total/esf*dent:null;document.getElementById('ovPopOut').textContent=den==null?'—':fmtNum(den,ovDenDecimals(den));if(out)out.innerHTML=den==null?'':`${ovGapPreview('M1',num,den)} <span class="ov-warn">Prévia: clique em Salvar para aplicar.</span>`;return}
+  const v=ovNumInput('ovDenManual');if(out)out.innerHTML=v>0?`${ovGapPreview(id,num,v)} <span class="ov-warn">Prévia: clique em salvar para aplicar.</span>`:'';
+}
+
 
 function municipalHTML(){
   const mk=state.preferences.month,ids=['M1','M2','M3','M4','M5'],qs=ids.map(id=>quarterMunicipal(id)),recon=reconciliationForMonth(mk);
@@ -1862,9 +2021,9 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('84. Leitura por meta (M1, meta = faixa Ótimo >1,25%): 57/11358,5 ainda precisa de 85 primeiras consultas a mais',()=>metaGap('M1',57,11358.5)===85);
   await add('85. m1Band classifica corretamente as 4 faixas oficiais de M1 usadas na régua da Visão Geral',()=>m1Band(1.3)?.label==='Ótimo'&&m1Band(0.8)?.label==='Bom'&&m1Band(0.3)?.label==='Suficiente'&&m1Band(0.1)?.label==='Regular');
   await add('86. metaGoalsHit devolve contagem coerente (batidas ≤ com dado) tanto para o mês quanto para o quadrimestre, sem lançar erro',()=>{const mk=state.preferences.month,gm=metaGoalsHit(mk,'month'),gq=metaGoalsHit(mk,'quarter');return gm.hit<=gm.total&&gq.hit<=gq.total&&Number.isFinite(gm.hit)&&Number.isFinite(gq.hit)});
-  await add('87. Visão Geral não usa mais pontuação em pontos (\"pts\") — cada régua de meta tem escala e cor próprias, com toggle mês/quadrimestre',()=>{const src=metaCard.toString()+metaRulerHTML.toString()+overviewHTML.toString();return !src.includes('pts')&&src.includes('metaRulerHTML')&&src.includes('overviewScope')});
+  await add('87. Visão Geral não usa pontuação em pontos ("pts"): cada cartão tem régua com a meta, faixa e os meses do quadrimestre, com toggle mês/quadrimestre',()=>{const src=metaCard.toString()+ovRulerHTML.toString()+overviewHTML.toString();return !src.includes('pts')&&src.includes('ovRulerHTML')&&src.includes('ovQuarterBarsHTML')&&src.includes('overviewScope')});
   await add('88. Preferência padrão de escopo da Visão Geral é "por mês"',()=>defaultState().preferences.overviewScope==='month');
-  await add('89. KPI de gestantes na Visão Geral usa isAttended() (CSV + confirmação manual) sobre a lista operacional visível',()=>{const src=overviewHTML.toString();return src.includes('gestante(s) com meta batida do total de')&&src.includes('na lista operacional')&&src.includes('attended/pregExpanded.length')});
+  await add('89. Resumo de gestantes na Visão Geral usa isAttended() (CSV, Monitora, produção e confirmação manual) sobre a lista de trabalho visível e leva à fila',()=>{const src=overviewHTML.toString();return src.includes('visibleByExclusion(mergedEpisodes())')&&src.includes('filter(isAttended)')&&src.includes('100*attended/pregExpanded.length')&&src.includes('data-go="pregnant"')});
   await add('90. Selo "Consolidado informado" reconhece o motivo detalhado do Metabase (regressão do bug em que a comparação exata de string nunca batia e todo resultado do Metabase aparecia como "Prévia não homologada")',()=>{const html=dataQuality({result:10,resultKind:'informado pelo Metabase porque não há CELK para o mês'});return html.includes('Consolidado informado')&&!html.includes('Prévia não homologada')});
   await add('91. Apuração do quadrimestre não usa mais pontuação em pontos, nem a coluna Auditoria, e passa a usar as reguas por meta',()=>{const src=municipalHTML.toString();return !src.includes('pts')&&!src.includes('Agregações divergem')&&!src.includes('Auditoria')&&src.includes('apuracaoMonthBoxes')&&src.includes('quadrimestralOutlook')});
   await add('92. zoneClass/zoneLabel classificam M2 (corte 25, meta 50) nas 3 faixas coerentes com a régua principal',()=>zoneClass('M2',60)==='zone-good'&&zoneLabel('M2',60)==='Meta batida'&&zoneClass('M2',30)==='zone-warn'&&zoneLabel('M2',30)==='Em progresso'&&zoneClass('M2',10)==='zone-bad'&&zoneLabel('M2',10)==='Abaixo do corte');
@@ -2232,6 +2391,11 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('234. Toda mudança (queueSave) agenda a gravação no navegador, e a gravação volta igual na leitura',async()=>{const src=queueSave.toString().includes('scheduleBrowserSave');if(!localSave.enabled)return src;const marker=state.updatedAt;await saveToBrowserNow();const r=await loadFromBrowser();return src&&!!r&&r.state.updatedAt===marker&&r.appVersion===APP_VERSION});
   await add('235. "Limpar dados do navegador" pergunta se quer salvar backup antes (Salvar backup e limpar / Limpar sem backup com segunda confirmação / Cancelar)',()=>{const m=openClearBrowserModal.toString(),ev=setupEvents.toString();return m.includes('Quer salvar um backup antes de limpar?')&&m.includes('data-clear-with-backup')&&m.includes('data-clear-no-backup')&&ev.includes('Confirmar: apagar sem backup')&&createBackupFromModal.toString().includes('clearAfter')&&clearBrowserData.toString().includes('state=defaultState()')});
   await add('236. Ao abrir, o app carrega o que estava salvo neste navegador (se o salvamento estiver ligado)',()=>{const src=bootstrap.toString();return src.includes('readAutosavePref()')&&src.includes('loadFromBrowser()')&&src.includes('migrateState(state)')});
+  await add('237. "O que falta para bater as metas" lista sempre M1, M2, M3, M4 e M5 nessa ordem, sem reordenar pela distância da meta',()=>{const mk=state.preferences.month,html=ovPlanHTML(mk,'month'),order=[...html.matchAll(/class="ov-id"[^>]*>(M\d)</g)].map(m=>m[1]),pos=OVERVIEW_IDS.map(id=>order.indexOf(id));return order.join()===OVERVIEW_IDS.join()&&pos.every((p,i)=>p===i)});
+  await add('238. Sem denominador confirmado, M1/M3 aparecem na lista como tarefa "Confirmar" (não como cartão vazio), e a situação dos dados aponta a falta',()=>{const before=state.denominators.length,mk='2099-01',prev={month:state.preferences.month,year:state.preferences.year,quarter:state.preferences.quarter};try{state.preferences.year=2099;state.preferences.quarter=1;state.preferences.month=mk;const row=ovPlanRow('M3',mk,'month'),src=ovSources(mk).find(x=>x.title.startsWith('Denominador de M3'));return row.includes('não confirmado')&&row.includes('>Confirmar<')&&src&&!src.ok&&!ovSourcesHTML.toString().includes('Metabase consolidado')}finally{state.denominators.length=before;Object.assign(state.preferences,prev)}});
+  await add('239. Denominador de M1 pela população ativa: população ÷ ESF × dentistas; salvar de novo atualiza o mesmo registro (sem duplicar) e população digitada fica marcada como digitada',()=>{const beforeD=state.denominators.length,beforeP=state.populationInputs.length,prev={month:state.preferences.month,year:state.preferences.year,quarter:state.preferences.quarter};try{state.preferences.year=2098;state.preferences.quarter=1;state.preferences.month='2098-01';const a=applyPopulationDenominator('2098-01',45434,8,2),v1=Number(getDenominator('M1','municipal','2098-01').value);const b=applyPopulationDenominator('2098-01',50000,8,2),d2=getDenominator('M1','municipal','2098-01');return a.value===11358.5&&v1===11358.5&&b.value===12500&&Number(d2.value)===12500&&state.denominators.length===beforeD+1&&state.populationInputs.length===beforeP+1&&b.record.manualTotal===true&&d2.origin==='População ativa digitada'}finally{state.denominators.length=beforeD;state.populationInputs.length=beforeP;Object.assign(state.preferences,prev)}});
+  await add('240. Cartões da Visão Geral mostram só os 4 meses do quadrimestre, e o denominador digitado à mão vale do mês em foco até o fim do quadrimestre (não altera meses anteriores)',()=>{const beforeD=state.denominators.length,prev={month:state.preferences.month,year:state.preferences.year,quarter:state.preferences.quarter};try{state.preferences.year=2097;state.preferences.quarter=1;state.preferences.month='2097-02';const bars=ovQuarterBarsHTML('M2','2097-02'),labels=(bars.match(/<span>[a-z]{3}<\/span>/g)||[]).length;const r=applyManualDenominator('M3','2097-02',4200);return labels===4&&r.start==='2097-02'&&r.end==='2097-04'&&!getDenominator('M3','municipal','2097-01')}finally{state.denominators.length=beforeD;Object.assign(state.preferences,prev)}});
+  await add('241. Gaveta do indicador: M4 e M5 mostram o que entrou no numerador e no denominador (marcando o que conta nos dois), M1 tem a conta da população ativa e todos levam à conferência completa com SIGTAP',()=>{const c=ovComposition.toString(),d=ovDenomSection.toString(),o=openIndicatorDetail.toString();return c.includes('O que entrou no denominador')&&ovDetailRows.toString().includes('também no numerador')&&d.includes('id="ovPop"')&&d.includes('id="ovEsf"')&&d.includes('id="ovDent"')&&o.includes('data-composition="municipal|')&&!o.includes('Por profissional')});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -2519,10 +2683,11 @@ function updatePreference(key,value){state.preferences[key]=value;queueSave();re
 function globalSearch(value){const n=norm(value);if(!n)return;if(/^M[1-5]$/.test(n)){switchView('municipal');openComposition('municipal',n,state.preferences.month);return}if(/^B[1-6]$/.test(n)){switchView('federal');openComposition('federal',n,state.preferences.month);return}if(n.includes('GEST')||n.includes('2I')||mergedEpisodes().some(e=>norm(e.equipe).includes(n))){state.preferences.pregSearch=value;switchView('pregnant');refreshAll();return}const snap=state.snapshots.find(s=>norm(s.fileName).includes(n));if(snap){state.preferences.settingsTab='imports';switchView('settings');refreshAll();openSnapshot(snap.id);return}toast('Nenhuma correspondência direta encontrada.')}
 
 function setupEvents(){
-  document.addEventListener('click',async ev=>{const el=ev.target.closest('button,[data-go],[data-open-episode],[data-open-snapshot],[data-team-filter],[data-overview-scope]');if(!el||!el.hasAttribute('data-preg-menu'))document.querySelectorAll('.pq-menu:not([hidden])').forEach(m=>m.hidden=true);if(!el)return;
+  document.addEventListener('click',async ev=>{const el=ev.target.closest('button,[data-go],[data-open-episode],[data-open-snapshot],[data-team-filter],[data-overview-scope],[data-indicator-detail]');if(!el||!el.hasAttribute('data-preg-menu'))document.querySelectorAll('.pq-menu:not([hidden])').forEach(m=>m.hidden=true);if(!el)return;
     if(el.dataset.pregTab){state.preferences.pregTab=el.dataset.pregTab;queueSave();return refreshAll()}if(el.hasAttribute('data-preg-prio')){state.preferences.pregPrioOnly=!state.preferences.pregPrioOnly;if(state.preferences.pregPrioOnly&&['atendida','encerrada'].includes(state.preferences.pregTab))state.preferences.pregTab='todas';queueSave();return refreshAll()}if(el.hasAttribute('data-preg-more')){state.preferences.pregMoreFilters=!state.preferences.pregMoreFilters;queueSave();return refreshAll()}if(el.hasAttribute('data-preg-menu')){const m=el.nextElementSibling,willOpen=m.hidden;document.querySelectorAll('.pq-menu').forEach(x=>x.hidden=true);m.hidden=!willOpen;return}if(el.hasAttribute('data-preg-howto'))return openPregHowTo();
     if(el.dataset.pregAct){const [k,id]=el.dataset.pregAct.split('|');return pregAct(k,id)}if(el.dataset.pregNav){const q=pregQueue(),i=q.findIndex(x=>x.id===pregDrawer.id),nx=q[i+Number(el.dataset.pregNav)];if(nx)openEpisode(nx.id);return}if(el.dataset.pregDtab){pregDrawer.tab=el.dataset.pregDtab;pregDrawer.edit=false;return openEpisode(pregDrawer.id)}if(el.hasAttribute('data-preg-edit')){pregDrawer.edit=!pregDrawer.edit;return openEpisode(pregDrawer.id)}if(el.dataset.pregSched){pregDrawer.sched=!pregDrawer.sched;return openEpisode(el.dataset.pregSched)}if(el.dataset.pregSchedSave)return pregSaveSchedule(el.dataset.pregSchedSave);if(el.dataset.pregQn){const ta=document.getElementById('followupNoteInput');if(ta){const cur=ta.value.trim();ta.value=(cur?cur.replace(/\.?$/,'. '):'')+el.dataset.pregQn;ta.focus()}return}if(el.dataset.pregParto)return toggleGestacaoEncerrada(el.dataset.pregParto);if(el.dataset.copyText!=null){try{await navigator.clipboard.writeText(el.dataset.copyText);toast('Copiado.')}catch{toast(el.dataset.copyText)}return}
     if(el.dataset.overviewScope)return updatePreference('overviewScope',el.dataset.overviewScope);
+    if(el.dataset.indicatorDetail)return openIndicatorDetail(el.dataset.indicatorDetail);if(el.dataset.ovJump){document.getElementById(el.dataset.ovJump)?.scrollIntoView({behavior:'smooth',block:'start'});return}if(el.hasAttribute('data-ov-pop-save'))return ovSavePopulation();if(el.dataset.ovDenSave)return ovSaveManual(el.dataset.ovDenSave);if(el.hasAttribute('data-ov-manual-toggle')){const box=document.getElementById('ovManualBox');if(box){box.hidden=!box.hidden;el.textContent=box.hidden?'Digitar o valor direto':'Esconder valor direto'}return}
     if(el.matches('[data-close-modal]'))return closeModal();if(el.matches('[data-close-drawer]'))return closeDrawer();if(el.hasAttribute('data-toggle-details')){el.classList.toggle('open');el.nextElementSibling.classList.toggle('open');return}if(el.dataset.view)return switchView(el.dataset.view);if(el.dataset.go)return switchView(el.dataset.go);if(el.dataset.action==='import')return document.getElementById('fileInput').click();if(el.dataset.action==='restore-backup')return document.getElementById('backupInput').click();if(el.dataset.action==='export-backup')return openBackupModal();
     if(el.dataset.openSnapshot)return openSnapshot(el.dataset.openSnapshot);if(el.dataset.snapshotTab)return openSnapshot(el.dataset.snapshotId,el.dataset.snapshotTab);if(el.dataset.composition){const [scope,id,mk]=el.dataset.composition.split('|');return openComposition(scope,id,mk)}
     if(el.dataset.saveDenom){const [id,scope]=el.dataset.saveDenom.split('|'),input=el.closest('.denom-inline')?.querySelector(`[data-denom-input="${id}|${scope}"]`);return openDenominatorModal(id,scope,input?.value||'')}
@@ -2558,6 +2723,7 @@ function setupEvents(){
     if(e.target.id==='procSingleProcedureSelect'){state.preferences.procSingleProcedure=e.target.value;queueSave();refreshAll()}
     if(e.target.hasAttribute('data-proc-single-toggle')){state.preferences.procSingleAllMonths=e.target.checked;if(!e.target.checked)state.preferences.procSingleProcedure='';queueSave();refreshAll()}
   });
+  document.addEventListener('input',e=>{if(['ovPop','ovEsf','ovDent','ovDenManual'].includes(e.target.id))ovLivePreview(e.target)});
   document.addEventListener('input',debounce(e=>{if(e.target.id==='pregSearch'){state.preferences.pregSearch=e.target.value;queueSave();document.getElementById('view-pregnant').innerHTML=pregnancyHTML();hydrateIcons(document.getElementById('view-pregnant'))}if(e.target.id==='calcPeso'){state.preferences.calcPeso=e.target.value;queueSave();const hadFocus=document.activeElement&&document.activeElement.id==='calcPeso';const selStart=hadFocus?document.activeElement.selectionStart:null;document.getElementById('view-calculator').innerHTML=calculatorHTML();if(hadFocus){const el=document.getElementById('calcPeso');if(el){el.focus();if(selStart!==null)el.setSelectionRange(selStart,selStart)}}}},250));
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeDrawer()}});document.getElementById('modalBackdrop').addEventListener('click',e=>{if(e.target.id==='modalBackdrop')closeModal()});document.getElementById('drawerBackdrop').addEventListener('click',e=>{if(e.target.id==='drawerBackdrop')closeDrawer()});
   let dragDepth=0;window.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;document.getElementById('dropOverlay').classList.add('open')});window.addEventListener('dragover',e=>e.preventDefault());window.addEventListener('dragleave',e=>{e.preventDefault();if(--dragDepth<=0){dragDepth=0;document.getElementById('dropOverlay').classList.remove('open')}});window.addEventListener('drop',e=>{e.preventDefault();dragDepth=0;document.getElementById('dropOverlay').classList.remove('open');if(e.dataTransfer.files.length)importFiles(e.dataTransfer.files)});
