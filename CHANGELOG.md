@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Versão 2.24 (filtro "Dados incompletos" nas gestantes)
+
+- **Pedido do usuário**: um filtro na página de gestantes para ver só as que estão com dados incompletos.
+- Novo botão **Dados incompletos** ao lado de "Mais filtros", com o número de gestantes nessa situação. Ligado, a lista e a contagem das abas mostram só quem não tem **nome**, **telefone válido** ou **DUM/DPP** (nem data do parto), e cada linha ganha a etiqueta "Falta: …" dizendo o que falta. Funciona junto com as abas, equipes, busca e os outros filtros; "Limpar filtros" também desliga.
+- **Verificado com Playwright**: 259/259 autotestes (1 novo, 259).
+
 ## Versão 2.23 (excluir um arquivo importado)
 
 - **Pedido do usuário**: poder excluir um arquivo específico em Configurações › Arquivos importados, removendo os dados dele do histórico.
