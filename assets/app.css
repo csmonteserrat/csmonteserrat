@@ -769,3 +769,48 @@ table.pr-table{min-width:0;width:100%;font-size:12.5px}table.pr-table tr.sel td{
 @media (max-width:1100px){.sx-cols{grid-template-columns:1fr}.sx-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:640px){.sx-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.sx-box{padding:14px}.sx-frow{grid-template-columns:minmax(0,1fr) minmax(0,120px)}.sx-frow .sx-track,.sx-frow .sx-bplot{grid-column:1/-1;grid-row:2}.sx-axis{margin:0}}
 @media print{.sx-cols{grid-template-columns:1fr}.sx-cols>section:first-child{display:none}}
+
+/* ---------- PSE: avaliações nas escolas (v2.29) ---------- */
+.ps-count{font-size:10.5px;font-weight:750;background:var(--amber-soft);color:#a96c16;border-radius:99px;padding:1px 7px;margin-left:6px}.ps-count.v{background:var(--primary-soft);color:var(--primary)}
+.ps-chip{display:inline-flex;align-items:center;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;white-space:nowrap;background:var(--inner);color:var(--muted)}.ps-chip.wrap{white-space:normal}
+.ps-chip.red{background:var(--red-soft);color:#c9472b}.ps-chip.amber{background:var(--amber-soft);color:#a96c16}.ps-chip.green{background:var(--green-soft);color:#247a4b}.ps-chip.blue{background:#eff1ff;color:#3a52c4}.ps-chip.violet{background:var(--primary-soft);color:var(--primary)}.ps-chip.gray{background:var(--inner);color:var(--muted)}
+.ps-scope{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:0 0 12px}
+.ps-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}.ps-kpis.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.ps-kpi{padding:14px 16px;display:grid;gap:2px}.ps-kpi>span{font-size:12px;color:var(--muted);font-weight:650}.ps-kpi b{font-size:26px;font-variant-numeric:tabular-nums;line-height:1.15}.ps-kpi small{font-size:11.5px;color:var(--muted)}.ps-kpi.hi b{color:#c9472b}
+.ps-grid2{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start;margin-bottom:16px}.ps-grid2>*{min-width:0}
+.ps-box{padding:16px 18px;display:grid;gap:12px;margin-bottom:0}.ps-box>*{min-width:0}
+.ps-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}.ps-h h2{margin:0;font-size:15px}.ps-h small{font-size:11.5px;color:var(--muted)}
+.ps-trow{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) 64px;gap:10px;align-items:center;font-size:12.5px}.ps-trow .n{font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ps-t{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums;font-size:12px}
+.ps-stack{display:flex;height:18px;border-radius:6px;overflow:hidden;background:var(--inner)}.ps-stack span{display:block;height:100%}
+.ps-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--muted)}.ps-legend span{display:inline-flex;gap:6px;align-items:center}.ps-legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.ps-dist{display:grid;gap:7px}.ps-drow{display:grid;grid-template-columns:minmax(0,130px) minmax(0,1fr) 72px;gap:10px;align-items:center;font-size:12.5px}.ps-dbar{height:12px;border-radius:5px;background:var(--inner);overflow:hidden}.ps-dbar span{display:block;height:100%}
+.ps-funnel{display:grid;gap:8px}.ps-fstep{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;font-size:12.5px}.ps-fstep small{color:var(--muted)}.ps-fstep b{font-variant-numeric:tabular-nums}.ps-track{grid-column:1/-1;height:7px;border-radius:99px;background:var(--inner);overflow:hidden}.ps-track span{display:block;height:100%}
+.ps-hint{margin:0;font-size:12.5px;color:var(--muted)}.ps-hint b{color:var(--text)}.ps-big{font-size:22px;margin-right:4px}
+.ps-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ps-sel-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}.ps-sel-h h2{margin:0;font-size:15px}
+.ps-search{border:1px solid var(--border);background:#fff;border-radius:9px;height:32px;padding:0 10px;font-size:12.5px;width:220px;max-width:100%}
+.ps-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:720px}.ps-table th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--placeholder);font-weight:750;text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)}.ps-table td{padding:9px 10px;border-bottom:1px solid var(--inner);vertical-align:middle}.ps-table td small{display:block;color:var(--muted);font-size:11px}.ps-table td.cb,.ps-table th.cb{width:34px}
+.ps-row{cursor:pointer}.ps-row:hover td{background:var(--surface-2)}
+.ps-cb{width:17px;height:17px;accent-color:var(--primary)}
+.ps-name{border:0;background:none;padding:0;font:inherit;font-weight:650;color:var(--text);text-align:left;cursor:pointer}.ps-name:hover{color:var(--primary)}
+.ps-srcs{display:inline-flex;gap:3px}.ps-srcs i{font-style:normal;font-size:10px;font-weight:750;border-radius:4px;padding:1px 5px;background:var(--inner);color:var(--placeholder)}.ps-srcs i.on{background:#eff1ff;color:#3a52c4}.ps-srcs i.warn{background:var(--amber-soft);color:#a96c16}
+.ps-stackv{display:grid;gap:12px}
+.ps-tri{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+.ps-side{border:1px solid var(--inner);background:var(--surface-2);border-radius:10px;padding:10px 12px;display:grid;gap:6px;font-size:12px;align-content:start}.ps-side.none{border-style:dashed;background:none;color:var(--placeholder);place-content:center;text-align:center;min-height:90px}
+.ps-src{font-size:10px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:var(--placeholder)}
+.ps-kv{display:grid;grid-template-columns:78px minmax(0,1fr);gap:3px 8px}.ps-kv span{color:var(--muted)}.ps-kv b{font-weight:650;overflow-wrap:anywhere}
+.ps-mk{font-style:normal;font-size:10px;font-weight:750;border-radius:4px;padding:0 5px;margin-left:5px}.ps-mk.ok{background:var(--green-soft);color:#247a4b}.ps-mk.no{background:var(--amber-soft);color:#a96c16}
+.ps-good{background:#247a4b;border-color:#247a4b;color:#fff}
+.ps-rules{margin:0;padding-left:18px;display:grid;gap:6px;font-size:12.5px;color:var(--muted)}.ps-rules b{color:var(--text)}
+.drawer .ps-tri{grid-template-columns:1fr}.drawer .ps-side.none{min-height:0;padding:8px}
+.ps-links{display:grid;gap:6px}.ps-links>div{display:grid;grid-template-columns:120px minmax(0,1fr);gap:2px 8px;font-size:12.5px}.ps-links span{color:var(--muted)}.ps-links small{grid-column:2;color:var(--muted);font-size:11px}
+.ps-mine{display:grid;grid-template-columns:1fr 1fr;gap:6px}.ps-mine button{border:1px solid var(--border);background:#fff;border-radius:10px;padding:8px;font-size:12.5px;font-weight:650;color:var(--muted);cursor:pointer}.ps-mine button[aria-pressed="true"]{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary);background:var(--primary-soft);color:var(--primary)}
+.ps-flags{display:flex;flex-wrap:wrap;gap:5px}.ps-flags span{border:1px solid var(--border);border-radius:99px;padding:2px 9px;font-size:11.5px;color:var(--muted)}.ps-flags span.on{border-color:var(--primary);background:var(--primary-soft);color:var(--primary)}
+.ps-teeth{display:flex;flex-wrap:wrap;gap:4px}.ps-teeth span{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;background:var(--inner);font-variant-numeric:tabular-nums}.ps-teeth span.ok{background:var(--green-soft);color:#247a4b}
+.ps-src-tag{font-style:normal;font-size:9.5px;font-weight:750;color:#3a52c4;background:#eff1ff;border-radius:4px;padding:0 4px}
+.pq-f select{border:1px solid var(--border);border-radius:8px;padding:7px 9px;background:#fff;width:100%;font:inherit;font-size:12.5px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (max-width:1100px){.ps-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.ps-grid2{grid-template-columns:1fr}}
+@media (max-width:640px){.ps-kpis,.ps-kpis.four{grid-template-columns:repeat(2,minmax(0,1fr))}.ps-trow,.ps-drow{grid-template-columns:minmax(0,1fr) 64px}.ps-trow .ps-stack,.ps-drow .ps-dbar{grid-column:1/-1;grid-row:2}.ps-search{width:100%}}
+.sx-tabs{overflow-x:auto;scrollbar-width:none}.sx-tabs button{white-space:nowrap;flex:none}

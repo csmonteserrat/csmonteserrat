@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.28
+# Acompanhamento Odontológico · versão 2.29
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -42,6 +42,16 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - É possível juntar categorias e analisar só um subgrupo. Com menos de 20 pessoas (30 na regressão) o teste não roda.
 - **Baixar dados para análise** gera o CSV (separado por ";", UTF-8) com as variáveis do período e subgrupo da tela, mais um script R com o dicionário das variáveis e o código que refaz o teste. Por padrão, o nome dos dentistas vira Dentista A, B, C…
 - Arquivos importados antes da versão 2.28 não têm os dados por pessoa: importe de novo para que entrem na análise.
+
+## PSE (avaliações nas escolas)
+
+- Importa o CSV exportado da ferramenta de avaliação do PSE (Nome, Escola, Ano, Turma, Nascimento, CPF, Status Bucal, Lesões cariosas cavitadas, Necessidade de exodontia, Risco, Conduta, ART…). Os arquivos se somam: cada importação vira uma campanha, e a mesma criança é reconhecida pelo CPF ou por nome + nascimento. A data da avaliação vem do "Editado por … em".
+- **Panorama**: todas as avaliações do período escolhido, de qualquer CS (avaliadas, risco alto, dor, lesões cavitadas, exodontia, dentes de ART, risco por turma).
+- **Meus alunos**: você marca quem é da sua área adscrita. Só eles vão para o **Acompanhamento** (A contatar, Em contato, Agendada, Atendida), com WhatsApp, bilhete pela escola, busca ativa, agendamento e notas.
+- **Cruzamento com o CELK**, só com dado igual: atividade coletiva (Relação das Atividades em Grupo) por CPF ou nome + nascimento, trazendo CPF, CNS e sexo; produção (Procedimentos Detalhado) por nome igual e idade no atendimento igual à calculada pelo nascimento, trazendo o prontuário e todos os atendimentos. Nome ou nascimento diferente, idade que não confere ou dois prontuários com o mesmo nome ficam em **Vínculos a definir**. Quando aparece atendimento no prontuário depois da avaliação, a criança vira "Atendida" sozinha.
+- A gaveta da criança tem Acompanhamento, Cruzamento CELK e Dados cadastrais editáveis (equipe, responsável, telefone, endereço, CPF, CNS, prontuário).
+- A base **Crianças do PSE** entra na análise estatística. Nome, CPF e contato ficam só no navegador e no backup completo; o backup analítico sai sem o PSE.
+- Relatórios de atividades em grupo importados antes da versão 2.29 precisam ser importados de novo para entrar no cruzamento.
 
 ## Configurações
 
