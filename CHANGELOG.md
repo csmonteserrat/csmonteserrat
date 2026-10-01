@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## Versão 2.33 (correção: app não abria)
+
+- O navegador podia continuar usando o `app.js` da versão 2.32 publicada com erro de sintaxe, e o app não abria. Agora o `index.html` pede `app.js` e `app.css` com a versão no endereço (`?v=2.33`), e o Render manda `Cache-Control: no-cache`, então o navegador sempre confere se há versão nova.
+
+## Versões 2.28 a 2.32
+
+- 2.28: aba Análise estatística em Procedimentos (7 testes, regressão logística, exportação do CSV + script R).
+- 2.29: página PSE (avaliações nas escolas, cruzamento com atividade coletiva e produção, meus alunos, acompanhamento).
+- 2.30–2.31: só fica de fora do PSE quem está pendente no Status Bucal e no Status ART.
+- 2.32: lançamento do flúor da escola (orientação + flúor) não conta como atendida; filtro de equipes no acompanhamento.
+
 ## Versão 2.27 (página Procedimentos redesenhada)
 
 - **Pedido do usuário**: repensar o design da página de procedimentos, aprovado num protótipo com os dados reais do CSV de mai a ago/2026 e do CSV de atividades em grupo de set/2026.

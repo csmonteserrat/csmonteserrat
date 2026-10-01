@@ -21,7 +21,7 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.32';
+const APP_VERSION = '2.33';
 const SELF_TEST_COUNT = 273;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';

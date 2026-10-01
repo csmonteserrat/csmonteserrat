@@ -16,5 +16,8 @@ services:
         name: Referrer-Policy
         value: no-referrer
       - path: /*
+        name: Cache-Control
+        value: no-cache
+      - path: /*
         name: Permissions-Policy
         value: camera=(), microphone=(), geolocation=()
