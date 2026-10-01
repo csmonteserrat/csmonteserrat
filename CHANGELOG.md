@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Versão 2.34
+
+- PSE: na gaveta da criança, os registros feitos por você (agendamento, WhatsApp, bilhete, busca ativa, atendida, notas) têm lixeira com "Desfazer"; ao remover, a etapa volta a ser calculada.
+- PSE: corrige os botões da gaveta que não gravavam ("Sim, é meu aluno", WhatsApp, bilhete, busca ativa, atendida, "É este prontuário"): a chave da criança tem "|" entre nome e nascimento e o valor era separado no lugar errado.
+- PSE: nova aba "Histórico" na gaveta, com todos os atendimentos do prontuário (procedimentos, quantidade e dentista), as escovações da atividade coletiva e todas as avaliações do PSE.
+
 ## Versão 2.33 (correção: app não abria)
 
 - O navegador podia continuar usando o `app.js` da versão 2.32 publicada com erro de sintaxe, e o app não abria. Agora o `index.html` pede `app.js` e `app.css` com a versão no endereço (`?v=2.33`), e o Render manda `Cache-Control: no-cache`, então o navegador sempre confere se há versão nova.

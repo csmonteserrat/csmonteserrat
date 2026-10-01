@@ -815,3 +815,8 @@ table.pr-table{min-width:0;width:100%;font-size:12.5px}table.pr-table tr.sel td{
 @media (max-width:640px){.ps-kpis,.ps-kpis.four{grid-template-columns:repeat(2,minmax(0,1fr))}.ps-trow,.ps-drow{grid-template-columns:minmax(0,1fr) 64px}.ps-trow .ps-stack,.ps-drow .ps-dbar{grid-column:1/-1;grid-row:2}.ps-search{width:100%}}
 .sx-tabs{overflow-x:auto;scrollbar-width:none}.sx-tabs button{white-space:nowrap;flex:none}
 .ps-teams{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.ps-teams>span{font-size:10.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:var(--placeholder);margin-right:4px}.ps-teams .pr-chip i{font-style:normal;opacity:.6;margin-left:3px}
+.pq-hist li.ps-hist-del{grid-template-columns:12px 1fr auto;align-items:start}.ps-del{width:28px;height:28px}.ps-del svg{width:13px;height:13px}
+.ps-hv{list-style:none;margin:0;padding:0;display:grid}.ps-hv>li{padding:8px 0;display:grid;gap:3px}.ps-hv>li+li{border-top:1px solid var(--inner)}
+.ps-hv-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px}.ps-hv ul{margin:0;padding-left:16px;font-size:12px;display:grid;gap:1px}
+.ps-hsub{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12.5px}
+.ps-hother{border:1px dashed var(--border);border-radius:10px;padding:8px 10px;opacity:.85}
