@@ -814,3 +814,4 @@ table.pr-table{min-width:0;width:100%;font-size:12.5px}table.pr-table tr.sel td{
 @media (max-width:1100px){.ps-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.ps-grid2{grid-template-columns:1fr}}
 @media (max-width:640px){.ps-kpis,.ps-kpis.four{grid-template-columns:repeat(2,minmax(0,1fr))}.ps-trow,.ps-drow{grid-template-columns:minmax(0,1fr) 64px}.ps-trow .ps-stack,.ps-drow .ps-dbar{grid-column:1/-1;grid-row:2}.ps-search{width:100%}}
 .sx-tabs{overflow-x:auto;scrollbar-width:none}.sx-tabs button{white-space:nowrap;flex:none}
+.ps-teams{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.ps-teams>span{font-size:10.5px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:var(--placeholder);margin-right:4px}.ps-teams .pr-chip i{font-style:normal;opacity:.6;margin-left:3px}
