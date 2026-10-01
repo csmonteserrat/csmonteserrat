@@ -41,6 +41,7 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - Testes: qui-quadrado (ou Fisher), intervalo de confiança de Wilson, duas proporções (z ou Fisher), tendência de Cochran-Armitage, Mann-Whitney/Kruskal-Wallis, Spearman e **regressão logística** (razão de chances ajustada e "sozinho", IC de Wald, R² de McFadden, aviso de poucos casos por coeficiente e de categoria instável).
 - É possível juntar categorias e analisar só um subgrupo. Com menos de 20 pessoas (30 na regressão) o teste não roda.
 - **Baixar dados para análise** gera o CSV (separado por ";", UTF-8) com as variáveis do período e subgrupo da tela, mais um script R com o dicionário das variáveis e o código que refaz o teste. Por padrão, o nome dos dentistas vira Dentista A, B, C…
+- A explicação de cada variável (de que coluna do relatório vem e como é calculada) está em [docs/analise-estatistica-variaveis.md](docs/analise-estatistica-variaveis.md).
 - Arquivos importados antes da versão 2.28 não têm os dados por pessoa: importe de novo para que entrem na análise.
 
 ## PSE (avaliações nas escolas)
