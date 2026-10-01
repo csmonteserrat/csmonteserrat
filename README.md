@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.34
+# Acompanhamento Odontológico · versão 2.35
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -47,7 +47,7 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 ## PSE (avaliações nas escolas)
 
 - Importa o CSV exportado da ferramenta de avaliação do PSE (Nome, Escola, Ano, Turma, Nascimento, CPF, Status Bucal, Lesões cariosas cavitadas, Necessidade de exodontia, Risco, Conduta, ART…). Os arquivos se somam: cada importação vira uma campanha, e a mesma criança é reconhecida pelo CPF ou por nome + nascimento. Só fica de fora quem está pendente no Status Bucal e no Status ART; preenchida em uma das duas, a criança entra. A data da avaliação vem do "Editado por … em".
-- **Panorama**: todas as avaliações do período escolhido, de qualquer CS (avaliadas, risco alto, dor, lesões cavitadas, exodontia, dentes de ART, risco por turma).
+- **Panorama**: todas as avaliações do período escolhido, de qualquer CS (avaliadas, risco alto, dor, lesões cavitadas, exodontia, dentes de ART, risco por turma). Crianças que participaram só da ação ou avaliação de ART (parte bucal pendente ou vazia e Status ART preenchido) ficam fora dos gráficos de risco e aparecem no card "Só ação de ART", por turma.
 - **Meus alunos**: você marca quem é da sua área adscrita. Só eles vão para o **Acompanhamento** (A contatar, Em contato, Agendada, Atendida), com WhatsApp, bilhete pela escola, busca ativa, agendamento e notas.
 - **Cruzamento com o CELK**, só com dado igual: atividade coletiva (Relação das Atividades em Grupo) por CPF ou nome + nascimento, trazendo CPF, CNS e sexo; produção (Procedimentos Detalhado) por nome igual e idade no atendimento igual à calculada pelo nascimento, trazendo o prontuário e todos os atendimentos. Nome ou nascimento diferente, idade que não confere ou dois prontuários com o mesmo nome ficam em **Vínculos a definir**. Quando aparece atendimento no prontuário depois da avaliação, a criança vira "Atendida" sozinha. Um dia só com orientação de higiene bucal + aplicação tópica de flúor (mesmo registrado como atendimento ou urgência) é o lançamento do flúor feito na escola e não conta. A fila de acompanhamento filtra por uma ou mais equipes.
 - A gaveta da criança tem Acompanhamento (registros feitos por você podem ser removidos, com desfazer), Histórico (todos os atendimentos do prontuário com os procedimentos e o dentista, as escovações e as avaliações do PSE; registros com o mesmo nome ainda não ligados aparecem à parte), Cruzamento CELK e Dados cadastrais editáveis (equipe, responsável, telefone, endereço, CPF, CNS, prontuário).

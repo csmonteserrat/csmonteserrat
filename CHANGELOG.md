@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## Versão 2.35
+
+- PSE: crianças que participaram só da ação ou avaliação de ART (só as colunas de ART preenchidas) ficam à parte: não geram barras vazias em "Risco por turma" nem entram nas porcentagens de risco; aparecem no card "Só ação de ART" (status, dentes a fazer e feitos, TCLE, encaminhamento e sem necessidade, por turma), com o chip "Só ART". No acompanhamento, entram quando o ART encaminhou à UBS. Na análise, o status vira "Só ART".
+
 ## Versão 2.34
 
 - PSE: na gaveta da criança, os registros feitos por você (agendamento, WhatsApp, bilhete, busca ativa, atendida, notas) têm lixeira com "Desfazer"; ao remover, a etapa volta a ser calculada.
