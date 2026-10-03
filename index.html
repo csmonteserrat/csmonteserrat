@@ -8,14 +8,14 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'self'; form-action 'self'">
   <title>Acompanhamento Odontológico</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./assets/app.css?v=2.35">
+  <link rel="stylesheet" href="./assets/app.css?v=2.36">
 </head>
 <body>
   <div class="app-shell" id="appShell">
     <aside class="sidebar" aria-label="Navegação principal">
       <div class="brand-row">
         <div class="brand" title="Acompanhamento Odontológico"><span data-icon="tooth"></span></div>
-        <div class="brand-text"><strong>Acompanhamento</strong><span>Saúde Bucal · v2.35</span></div>
+        <div class="brand-text"><strong>Acompanhamento</strong><span>Saúde Bucal · v2.36</span></div>
       </div>
       <nav class="side-nav" aria-label="Módulos da ferramenta">
         <button class="side-btn active" data-view="overview" aria-label="Visão geral" title="Visão geral"><span class="side-btn-icon" data-icon="grid"></span><span class="side-btn-label">Visão geral</span></button>
@@ -47,6 +47,7 @@
         <div class="titlebar">
           <div>
             <h1 id="pageTitle">Acompanhamento Odontológico</h1>
+            <button class="icon-btn m-only m-menu-btn" type="button" data-m-sheet="menu" aria-label="Mais opções"><span data-icon="more"></span></button>
             <p class="subtitle" id="pageSubtitle">Acompanhamento mensal e quadrimestral com leitura municipal, federal e painel operacional 2I.</p>
           </div>
           <div class="actions">
@@ -56,6 +57,7 @@
           </div>
         </div>
 
+        <div class="m-ctx m-only" id="mCtx"></div>
         <section class="source-strip" aria-label="Contexto da análise">
           <div class="source-meta">
             <span id="lastUpdate">Nenhum relatório importado</span><i></i>
@@ -86,6 +88,15 @@
     </main>
   </div>
 
+  <nav class="m-nav" id="mNav" aria-label="Navegação no celular">
+    <button type="button" data-view="overview" data-m-nav="overview"><span class="m-pill" data-icon="grid"></span>Início</button>
+    <button type="button" data-view="pregnant" data-m-nav="pregnant"><span class="m-pill" data-icon="heart"></span>Gestantes<i class="m-badge" data-m-badge="preg" hidden></i></button>
+    <button type="button" data-view="pse" data-m-nav="pse"><span class="m-pill" data-icon="users"></span>PSE<i class="m-badge" data-m-badge="pse" hidden></i></button>
+    <button type="button" data-view="municipal" data-m-nav="municipal"><span class="m-pill" data-icon="building"></span>Indicadores</button>
+    <button type="button" data-m-nav="more"><span class="m-pill" data-icon="more"></span>Mais</button>
+  </nav>
+  <div class="m-sheet-backdrop" id="mSheetBackdrop" aria-hidden="true"><section class="m-sheet" id="mSheet" role="dialog" aria-modal="true" aria-label="Opções"></section></div>
+
   <input id="fileInput" type="file" accept=".pdf,.csv,application/pdf,text/csv" multiple hidden>
   <input id="backupInput" type="file" accept=".json,.saude-bucal-backup.json,application/json" hidden>
 
@@ -106,6 +117,6 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="./assets/app.js?v=2.35"></script>
+  <script type="module" src="./assets/app.js?v=2.36"></script>
 </body>
 </html>

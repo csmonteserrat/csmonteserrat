@@ -1,6 +1,14 @@
-# Acompanhamento Odontológico · versão 2.35
+# Acompanhamento Odontológico · versão 2.36
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
+
+## No celular
+
+- Abaixo de 760 px de largura o app troca a barra lateral por uma barra de navegação embaixo (Início, Gestantes, PSE, Indicadores e Mais) e mostra o cabeçalho numa linha: título, chip do período e menu ⋮ (Importar, Backup, Buscar).
+- O período (ano, quadrimestre, mês e unidade) abre numa folha que sobe de baixo. No Início aparece "Precisa de atenção" (gestantes no 3º trimestre sem atendimento e vínculos a definir no PSE).
+- Abas ficam presas no topo e rolam para o lado; tabelas do PSE viram cartões; botões têm pelo menos 40–44 px.
+- As gavetas ocupam a tela toda, com "Registrar" e a ação principal presos no rodapé.
+- No computador nada muda.
 
 ## Privacidade e funcionamento
 

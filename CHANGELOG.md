@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## Versão 2.36 (layout para celular)
+
+- Abaixo de 760 px: barra de navegação embaixo (Início, Gestantes, PSE, Indicadores, Mais) no lugar da barra lateral; cabeçalho de uma linha com chip do período e menu ⋮ (Importar, Backup, Buscar); período, menu e "Mais" em folhas que sobem de baixo; "Precisa de atenção" no Início; alternância Municipal/Federal em Indicadores; abas fixas no topo e roláveis; tabelas do PSE como cartões; alvos de toque maiores; gavetas em tela cheia com "Registrar" e a ação principal fixos no rodapé; botão "Adicionar gestante" flutuante. No computador nada muda.
+
 ## Versão 2.35
 
 - PSE: crianças que participaram só da ação ou avaliação de ART (só as colunas de ART preenchidas) ficam à parte: não geram barras vazias em "Risco por turma" nem entram nas porcentagens de risco; aparecem no card "Só ação de ART" (status, dentes a fazer e feitos, TCLE, encaminhamento e sem necessidade, por turma), com o chip "Só ART". No acompanhamento, entram quando o ART encaminhou à UBS. Na análise, o status vira "Só ART".
