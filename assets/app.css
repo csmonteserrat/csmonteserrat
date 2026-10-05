@@ -881,3 +881,9 @@ table.pr-table{min-width:0;width:100%;font-size:12.5px}table.pr-table tr.sel td{
   .toast{left:16px;right:16px;bottom:calc(86px + env(safe-area-inset-bottom,0px));max-width:none}
 }
 @media print{.m-nav,.m-ctx,.m-menu-btn,.m-sheet-backdrop{display:none!important}}
+.pq-phone-row{display:flex;gap:6px;align-items:center}.pq-phone-row input{flex:1;min-width:0}.pq-phone-row .pq-icon{font-size:16px;letter-spacing:0}
+#efPhonesExtra{display:grid;gap:6px}#efPhonesExtra:not(:empty){margin-top:6px}
+.pq-add-phone{justify-self:start;margin-top:4px;padding:6px 0}
+.pq-d-phone-x{border-top:1px dashed var(--border);padding-top:10px;margin-top:2px}.pq-d-phone-x b{font-size:14px}
+.pq-qa.wa-sm{color:#1f9d55;border-color:#1f9d55}
+@media (max-width:760px){.pq-phone-row input{height:44px;font-size:15px}.pq-add-phone{min-height:40px}}

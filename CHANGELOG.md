@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## Versão 2.37
+
+- Gaveta da gestante: em "Dados cadastrais" o campo "Telefone" passou a se chamar "Celular", com o botão "+ Adicionar outro número" (e × para remover). O número principal segue valendo para o WhatsApp da lista; os outros aparecem no card Contato, cada um com WhatsApp e copiar.
+
 ## Versão 2.36 (layout para celular)
 
 - Abaixo de 760 px: barra de navegação embaixo (Início, Gestantes, PSE, Indicadores, Mais) no lugar da barra lateral; cabeçalho de uma linha com chip do período e menu ⋮ (Importar, Backup, Buscar); período, menu e "Mais" em folhas que sobem de baixo; "Precisa de atenção" no Início; alternância Municipal/Federal em Indicadores; abas fixas no topo e roláveis; tabelas do PSE como cartões; alvos de toque maiores; gavetas em tela cheia com "Registrar" e a ação principal fixos no rodapé; botão "Adicionar gestante" flutuante. No computador nada muda.
