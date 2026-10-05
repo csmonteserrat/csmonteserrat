@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## Versão 2.38
+
+- Gestantes: nova opção "Registrar aborto" na gaveta (com data editável em Dados cadastrais e reversível).
+- DPP vencida: sem parto registrado, a gestação é considerada encerrada automaticamente depois do dia da DPP (a DPP vale até o próprio dia) e vai para o Histórico. Sem DUM e sem DPP ela nunca encerra sozinha e aparece em "Dados incompletos". Para voltar, basta alterar a DPP para uma data futura.
+- A aba "Encerradas" virou "Histórico", com o motivo em cada linha (parto, aborto, DPP vencida, puerpério), filtro por motivo e botão "Voltar para a lista" (em DPP vencida o botão é "Alterar DPP").
+- Puérperas do Monitora APS (Período = "Puerpério") não são mais removidas: vão para o Histórico. As que tinham sido removidas na versão anterior reaparecem lá.
+- A porcentagem (página Gestantes e card do Início) conta só gestantes ativas; "Parto sem atendimento" deixou de ser uma faixa da barra. Aviso na primeira vez: "N gestantes tinham a DPP vencida e foram para o Histórico", com "Ver quais".
+- Pendente (fica para depois): variáveis de aborto e de puérperas/encerradas na análise estatística.
+
 ## Versão 2.37
 
 - Gaveta da gestante: em "Dados cadastrais" o campo "Telefone" passou a se chamar "Celular", com o botão "+ Adicionar outro número" (e × para remover). O número principal segue valendo para o WhatsApp da lista; os outros aparecem no card Contato, cada um com WhatsApp e copiar.
