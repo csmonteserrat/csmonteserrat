@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## Versão 2.39
+
+- Importar o CSV do Monitora APS ou do Metabase (gestantes 2I) agora abre uma janela de revisão antes de gravar: mostra o impacto na porcentagem do 2I (antes → depois) e o que vai mudar, em blocos recolhíveis (passaram a ter atendimento, novas, vão para o Histórico, dados que mudaram), além de quem veio igual e de quem já estava na ferramenta e não veio no arquivo.
+- Cada gestante tem uma caixinha: desmarcando, ela fica como está (ou não entra, se for nova) e o impacto é recalculado. Há "Desmarcar todas" por bloco. "Cancelar" não altera nada. Na primeira importação (sem gestantes na ferramenta) a janela não aparece.
+
 ## Versão 2.38
 
 - Gestantes: nova opção "Registrar aborto" na gaveta (com data editável em Dados cadastrais e reversível).

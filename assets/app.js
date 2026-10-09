@@ -21,8 +21,8 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.38';
-const SELF_TEST_COUNT = 284;
+const APP_VERSION = '2.39';
+const SELF_TEST_COUNT = 288;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -749,7 +749,7 @@ async function parseUnknownCSV(file,hash,text,headers,rows){
 }
 async function parseUnknownPdf(file,hash,pages){const snap=makeSnapshotBase(file,hash,'pdf_nao_reconhecido',extractPdfMetadata(pages));snap.status='layout não reconhecido';snap.validations.push({level:'error',code:'PDF_UNKNOWN',message:'Layout de PDF não reconhecido. Nenhum resultado foi produzido.'});sessionRaw.set(snap.id,{type:'pdf',rows:pages.slice(0,3).flatMap(p=>p.lines.slice(0,80).map(l=>({page:p.page,text:lineText(l)})))});return snap}
 
-async function importOne(file){
+async function importOne(file,{review=true}={}){
   const buffer=await file.arrayBuffer(),hash=await sha256(buffer);const existing=state.snapshots.find(s=>s.hash===hash);if(existing){toast(`Arquivo já importado: ${existing.fileName}`);openSnapshot(existing.id);return null}
   let snap;const before2i=merged2IEpisodes(),beforeMon=mergedMonitora();
   if(file.name.toLowerCase().endsWith('.pdf')||file.type==='application/pdf'){
@@ -769,6 +769,7 @@ async function importOne(file){
     else snap=await parseUnknownCSV(file,hash,text,headers,parsed.slice(1));
   }
   if(snap.patientNames){const r=rememberPatientNames(snap.patientNames,'Produção CELK');delete snap.patientNames;snap.validations.push({level:'info',code:'PATIENT_NAMES_SAVED',message:`${r.total} paciente(s) com código e nome guardados (${r.changed} novo(s) ou atualizado(s)). Servem para completar o nome em listas anonimizadas, como a do Monitora APS, e no cadastro de gestantes.`})}
+  if(review&&(snap.profile===MONITORA_PROFILE||snap.profile==='metabase_gestantes_2i')){hideLoading();const decision=await reviewImport(snap);showLoading('Importando',file.name);if(!decision){lastImportNotice='Importação cancelada. Nada foi alterado.';return null}if(decision.excluded.size){Object.assign(snap,importSnapWithout(snap,decision.excluded));snap.userExcluded=[...decision.excluded];snap.validations.push({level:'info',code:'IMPORT_EXCLUDED_BY_USER',message:`${decision.excluded.size} gestante(s) foram desmarcadas na janela de revisão e não entraram nesta importação.`})}}
   commitSnapshot(snap);
   if(snap.profile===MONITORA_PROFILE||snap.profile==='metabase_gestantes_2i'){migrateMonitoraLinks();const removed=applyMonitoraPuerperio();const c=cumulativeImportSummary(snap,snap.profile===MONITORA_PROFILE?beforeMon:before2i);snap.mergeSummary={fresh:c.fresh,updated:c.updated,same:c.same,kept:c.kept};const parts=`${c.fresh} nova(s), ${c.updated} atualizada(s), ${c.same} igual(is) ao que já havia${c.kept?`; ${c.kept} que não vieram neste arquivo foram mantidas`:''}`;if(snap.profile===MONITORA_PROFILE)lastImportNotice=`Monitora APS somado aos anteriores: ${parts}. ${c.puerperio} puérpera(s) foram para o Histórico.`;else lastImportNotice=`CSV de gestantes somado aos anteriores: ${parts}.`;queueSave();refreshAll()}
   return snap;
@@ -780,9 +781,65 @@ function commitSnapshot(snap){
   const months=Object.keys(snap.dataByMonth||{}).sort();if(months.length){const latest=months.at(-1),{year,month}=parseMonthKey(latest);state.preferences.year=year;state.preferences.quarter=quarterOfMonth(month);state.preferences.month=latest}
   if(snap.unit&&!state.preferences.unit)state.preferences.unit=snap.unit;queueSave();refreshAll();
 }
-async function importFiles(files){
+
+/* ---------- Janela de revisão da importação (Monitora e Metabase, v2.39) ---------- */
+// Antes de gravar o CSV, mostra o que vai mudar nas gestantes e deixa desmarcar quem não deve mudar.
+// Desmarcar tira a linha do arquivo (a gestante fica como está; se for nova, não entra).
+let pendingImportDecision=null;
+function irKey(e){return pid(e.prontuario)||e.id}
+function irSimulate(snap){state.snapshots.push(snap);try{return mergedEpisodes()}finally{state.snapshots.pop()}}
+function importSnapWithout(snap,ex){return snap.profile===MONITORA_PROFILE?{monitoraRows:snap.monitoraRows.filter(r=>!ex.has(r.usuaria)),puerperio:snap.puerperio.filter(u=>!ex.has(u)),monitoraStat:(snap.monitoraStat||[]).filter(r=>!ex.has(r.u))}:{episodes:(snap.episodes||[]).filter(e=>!ex.has(irKey(e)))}}
+function irPct(list){const act=visibleByExclusion(list).filter(e=>pregnancyStage(e)==='ativa'),att=act.filter(isAttended).length;return {att,n:act.length,pct:act.length?100*att/act.length:null}}
+const IR_FIELDS=[['equipe','Equipe'],['ultimaMenstruacao','DUM',fmtDate],['dataProvParto','DPP',fmtDate],['telefone','Telefone'],['monitoraPeriodo','Período'],['nome','Nome']];
+function buildImportDiff(snap){
+  const before=mergedEpisodes(),after=irSimulate(snap),bm=new Map(before.map(e=>[irKey(e),e])),am=new Map(after.map(e=>[irKey(e),e]));
+  const fileKeys=new Set(snap.profile===MONITORA_PROFILE?[...snap.monitoraRows.map(r=>r.usuaria),...snap.puerperio]:(snap.episodes||[]).map(irKey));
+  const g={atend:[],nova:[],fim:[],dados:[],igual:[]},endTxt=en=>en.reason==='parto'?`Parto ${fmtDate(en.date)}`:en.reason==='aborto'?`Aborto ${fmtDate(en.date)}`:PREG_END_LABEL[en.reason];
+  for(const k of fileKeys){const a=am.get(k);if(!a)continue;const b=bm.get(k),w=gestationalWeeks(a),ea=pregnancyEnd(a),att=isAttended(a);
+    const row={key:k,name:pregDisplayName(a),mt:`Equipe ${a.equipe||'—'}${w!=null?` · ${w} sem.`:a.monitoraPeriodo?` · ${a.monitoraPeriodo}`:''}`,left:'',right:''};
+    if(!b){row.right=`${att?'Atendida':'Sem atendimento'}${ea?` · vai direto para o Histórico (${endTxt(ea).toLowerCase()})`:''}`;g.nova.push(row);continue}
+    const eb=pregnancyEnd(b),ab=isAttended(b);
+    if(ea&&(!eb||eb.reason!==ea.reason)){row.left=PREG_STAGE[pregBucket(b)][0];row.right=`Histórico · ${endTxt(ea)}`;g.fim.push(row);continue}
+    if(att&&!ab){row.left='Sem atendimento';row.right='Com atendimento';g.atend.push(row);continue}
+    const ch=IR_FIELDS.filter(([f])=>(b[f]||'')!==(a[f]||'')).map(([f,l,fn])=>`${l} ${(fn?fn(b[f]):b[f])||'—'} → ${(fn?fn(a[f]):a[f])||'—'}`);
+    if(eb&&!ea)ch.push('volta para a lista (não está mais encerrada)');
+    if(ch.length){row.right=ch.join('<br>');row.html=true;g.dados.push(row)}else g.igual.push(row)}
+  const fora=before.filter(e=>!fileKeys.has(irKey(e)));
+  return {before,after,g,fora,fileKeys};
+}
+function reviewImport(snap){
+  return new Promise(resolve=>{
+    const d=buildImportDiff(snap);if(!d.before.length){resolve({excluded:new Set()});return}
+    const nm=snap.profile===MONITORA_PROFILE?'Monitora APS':'Metabase · gestantes 2I',b0=irPct(d.before);
+    const defs=[['atend','Atendimento','atend','Passaram a contar como atendidas',true],['nova','Nova','nova','Gestantes novas na lista',true],['fim','Histórico','puer','Vão para o Histórico (parto, aborto, DPP vencida ou puerpério)',false],['dados','Dados','troca','Dados que mudaram',false]];
+    const pctTxt=x=>x.pct==null?'—':fmtPct(x.pct,1);
+    const rowHTML=(r,k)=>`<div class="ir-row"><label class="ir-ck"><input type="checkbox" checked data-ir-key="${esc(r.key)}" data-ir-group="${k}" aria-label="Aplicar esta mudança"></label><div class="ir-grow"><div class="ir-nm">${esc(r.name)}</div><div class="ir-mt">${esc(r.mt)}</div></div><span class="ir-side">${r.left?`<span class="ir-b">${esc(r.left)}</span> → <span class="ir-a">${esc(r.right)}</span>`:r.html?r.right:esc(r.right)}</span></div>`;
+    const blocks=defs.filter(([k])=>d.g[k].length).map(([k,l,tone,t,open])=>`<details class="ir-det"${open?' open':''}><summary><span class="ir-pill ${tone}">${l}</span> ${t}<span class="ir-n" data-ir-n="${k}">${d.g[k].length}</span></summary><div class="ir-in"><div class="ir-bulk"><span>Desmarque quem você não quer que mude${k==='nova'?' (não entra na lista)':' (fica como está hoje)'}</span><button type="button" class="ir-lnk" data-ir-bulk="${k}">Desmarcar todas</button></div>${d.g[k].map(r=>rowHTML(r,k)).join('')}</div></details>`).join('');
+    const quiet=d.g.igual.length?`<details class="ir-det quiet"><summary><span class="ir-pill igual">Sem mudança</span> Vieram iguais no arquivo<span class="ir-n">${d.g.igual.length}</span></summary><div class="ir-in">${d.g.igual.map(r=>`<div class="ir-row"><div class="ir-grow"><div class="ir-nm">${esc(r.name)}</div><div class="ir-mt">${esc(r.mt)}</div></div></div>`).join('')}</div></details>`:'';
+    const fora=d.fora.length?`<details class="ir-det quiet"><summary><span class="ir-pill sai">Fora do arquivo</span> Já estavam na ferramenta e não vieram agora<span class="ir-n">${d.fora.length}</span></summary><div class="ir-in"><p class="ir-mt">Ficam como estão, nada é apagado.</p>${d.fora.slice(0,60).map(e=>`<div class="ir-row"><div class="ir-grow"><div class="ir-nm">${esc(pregDisplayName(e))}</div><div class="ir-mt">Equipe ${esc(e.equipe||'—')}</div></div></div>`).join('')}${d.fora.length>60?`<p class="ir-mt">…e mais ${d.fora.length-60}</p>`:''}</div></details>`:'';
+    const bar=(x,c)=>x.pct==null?'':`<i style="width:${x.pct}%;background:${c}"></i>`;
+    const cards=defs.filter(([k])=>d.g[k].length).map(([k,l,t])=>`<div class="ir-card ${t}"><b>${d.g[k].length}</b><span>${{atend:'passaram a ter atendimento',nova:'novas',fim:'vão para o Histórico',dados:'com dados alterados'}[k]}</span></div>`).join('')+`<div class="ir-card"><b>${d.g.igual.length}</b><span>sem mudança</span></div>`;
+    openModal(`<div class="modal-head"><div><h2 id="modalTitle">${nm} · o que vai mudar</h2><p>${esc(snap.fileName||'')} · ${fmtNum(d.fileKeys.size)} no arquivo</p></div></div>
+    <div class="modal-body ir-body"><div class="ir-impact"><div><div class="ir-big"><span id="irBefore">${pctTxt(b0)}</span> → <span id="irAfter" class="ir-a">${pctTxt(irPct(d.after))}</span></div><small id="irCounts">${fmtNum(b0.att)} de ${fmtNum(b0.n)} → ${fmtNum(irPct(d.after).att)} de ${fmtNum(irPct(d.after).n)} gestantes ativas atendidas</small></div><div class="ir-bar"><u>${bar(b0,'#39b98055')}</u><s id="irBarAfter">${bar(irPct(d.after),'#39b980')}</s></div></div>
+    <div class="ir-cards">${cards}</div>${blocks||'<p class="ir-mt">Nenhuma mudança nas gestantes com este arquivo.</p>'}${quiet}${fora}</div>
+    <div class="modal-foot"><span class="ir-note" id="irNote">Nada é apagado: quem não veio no arquivo é mantida.</span><button type="button" class="btn" id="irCancel">Cancelar</button><button type="button" class="btn primary" id="irOk">Confirmar importação</button></div>`,{wide:true,closable:false});
+    const m=document.getElementById('modal'),boxes=()=>[...m.querySelectorAll('input[data-ir-key]')];
+    const done=v=>{pendingImportDecision=null;closeModal();resolve(v)};pendingImportDecision=resolve;
+    const update=()=>{const all=boxes(),off=all.filter(i=>!i.checked),ex=new Set(off.map(i=>i.dataset.irKey)),a=irPct(irSimulate({...snap,...importSnapWithout(snap,ex)}));
+      document.getElementById('irAfter').textContent=pctTxt(a);document.getElementById('irCounts').textContent=`${fmtNum(b0.att)} de ${fmtNum(b0.n)} → ${fmtNum(a.att)} de ${fmtNum(a.n)} gestantes ativas atendidas`;document.getElementById('irBarAfter').innerHTML=bar(a,'#39b980');
+      all.forEach(i=>{const r=i.closest('.ir-row'),isOff=!i.checked;r.classList.toggle('off',isOff);let t=r.querySelector('.ir-skip');if(isOff&&!t){t=document.createElement('span');t.className='ir-skip';t.textContent=i.dataset.irGroup==='nova'?'não será adicionada':'fica como está';r.querySelector('.ir-side').append(t)}else if(!isOff&&t)t.remove()});
+      for(const [k] of defs){const el=m.querySelector(`[data-ir-n="${k}"]`);if(!el)continue;const g=all.filter(i=>i.dataset.irGroup===k);el.textContent=g.every(i=>i.checked)?g.length:`${g.filter(i=>i.checked).length} de ${g.length}`}
+      document.getElementById('irNote').textContent=off.length?`${off.length} mudança(s) não serão aplicadas. Essas gestantes ficam como estão.`:'Nada é apagado: quem não veio no arquivo é mantida.';
+      const ok=document.getElementById('irOk');ok.textContent=off.length?`Confirmar ${all.length-off.length} de ${all.length}`:'Confirmar importação';ok.disabled=!!all.length&&off.length===all.length};
+    m.addEventListener('change',e=>{if(e.target.matches('input[data-ir-key]'))update()});
+    m.addEventListener('click',e=>{const bk=e.target.closest('[data-ir-bulk]');if(!bk)return;const g=boxes().filter(i=>i.dataset.irGroup===bk.dataset.irBulk),all=g.every(i=>i.checked);g.forEach(i=>i.checked=!all);bk.textContent=all?'Marcar todas':'Desmarcar todas';update()});
+    document.getElementById('irCancel').onclick=()=>done(null);
+    document.getElementById('irOk').onclick=()=>done({excluded:new Set(boxes().filter(i=>!i.checked).map(i=>i.dataset.irKey))});
+  });
+}
+async function importFiles(files,{review=true}={}){
   const list=[...files];if(!list.length)return;showLoading('Preparando importação',`${list.length} arquivo(s)`);let ok=0;const failures=[],populationSnaps=[];
-  try{for(let i=0;i<list.length;i++){setLoading(`Importando ${i+1} de ${list.length}`,list[i].name);try{const result=await importOne(list[i]);if(result){ok++;if(result.profile==='metabase_populacao_ativa')populationSnaps.push(result)}}catch(e){console.error(e);failures.push({name:list[i].name,message:e?.message||String(e)||'Erro desconhecido.',stack:e?.stack||''})}}}finally{hideLoading();document.getElementById('fileInput').value='';if(failures.length){audit('import_failed',{ok,failures:failures.map(f=>({name:f.name,message:f.message}))});showImportFailures(ok,failures)}else{toast(lastImportNotice||`${ok} importação(ões) concluída(s)`)}lastImportNotice=''}
+  try{for(let i=0;i<list.length;i++){setLoading(`Importando ${i+1} de ${list.length}`,list[i].name);try{const result=await importOne(list[i],{review});if(result){ok++;if(result.profile==='metabase_populacao_ativa')populationSnaps.push(result)}}catch(e){console.error(e);failures.push({name:list[i].name,message:e?.message||String(e)||'Erro desconhecido.',stack:e?.stack||''})}}}finally{hideLoading();document.getElementById('fileInput').value='';if(failures.length){audit('import_failed',{ok,failures:failures.map(f=>({name:f.name,message:f.message}))});showImportFailures(ok,failures)}else{toast(lastImportNotice||`${ok} importação(ões) concluída(s)`)}lastImportNotice=''}
   if(populationSnaps.length)openPopulationInputsModal(populationSnaps.at(-1));
 }
 
@@ -1995,7 +2052,7 @@ function openSnapshot(id,tab){
 /* ---------- Modais, gavetas e conferência ---------- */
 
 function openModal(html,{wide=false,closable=true}={}){const b=document.getElementById('modalBackdrop'),m=document.getElementById('modal');m.className=`modal${wide?' wide':''}`;m.innerHTML=html;if(closable&&!m.querySelector('[data-close-modal]')){const head=m.querySelector('.modal-head');if(head)head.insertAdjacentHTML('beforeend',`<button class="close-btn" data-close-modal aria-label="Fechar">${icon('close')}</button>`)}b.classList.add('open');b.setAttribute('aria-hidden','false');hydrateIcons(m)}
-function closeModal(){localSave.pendingClearAfterBackup=false;const b=document.getElementById('modalBackdrop');b.classList.remove('open');b.setAttribute('aria-hidden','true');document.getElementById('modal').innerHTML=''}
+function closeModal(){if(pendingImportDecision){const r=pendingImportDecision;pendingImportDecision=null;r(null)}localSave.pendingClearAfterBackup=false;const b=document.getElementById('modalBackdrop');b.classList.remove('open');b.setAttribute('aria-hidden','true');document.getElementById('modal').innerHTML=''}
 function openDrawer(html,opts={}){const b=document.getElementById('drawerBackdrop'),d=document.getElementById('drawer');d.innerHTML=html;d.classList.remove('pq-drawer-host');d.classList.toggle('wide',!!opts.wide);b.classList.add('open');b.setAttribute('aria-hidden','false');hydrateIcons(d)}
 function closeDrawer(){pregDrawer={id:null,tab:'acomp',edit:false,sched:false};const b=document.getElementById('drawerBackdrop');b.classList.remove('open');b.setAttribute('aria-hidden','true');document.getElementById('drawer').innerHTML=''}
 function toast(message){const t=document.getElementById('toast');t.classList.remove('has-action');t.textContent=message;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),3500)}
@@ -2763,6 +2820,10 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('282. Só gestantes ativas entram na porcentagem da página e do card do Início; o Histórico tem motivo por linha e a aba se chama Histórico',()=>{const src=pregnancyHTML.toString();return src.includes("pregnancyStage(e)==='ativa'")&&src.includes('data-preg-reason')&&!src.includes('Parto sem atendimento')&&PREG_TABS.some(([k,l])=>k==='encerrada'&&l==='Histórico')&&Object.keys(PREG_END_LABEL).join()==='parto,aborto,dpp_vencida,puerperio'});
   await add('283. Linha do Histórico mostra "DPP em dd/mm/aaaa" e "encerrada automaticamente" e oferece "Alterar DPP"; aborto/parto oferecem "Voltar para a lista"',()=>{const e={id:'t283',dataProvParto:'2020-03-02'},n=pregNextAction(e),a=pregNextAction({id:'t283b',dataAborto:'2026-02-03'});return n.label==='Alterar DPP'&&n.why.includes('DPP em 02/03/2020')&&n.why.includes('encerrada automaticamente')&&a.label==='Voltar para a lista'&&a.why.includes('Aborto em 03/02/2026')});
   await add('284. Migração: puérperas removidas pelo Monitora na versão anterior voltam a existir (saem de "excluídas") e remoções manuais continuam',()=>{const m=migrateState({gestantes:{excluded:{a:{source:'monitora_puerperio',reason:'Puerpério no Monitora APS'},b:{reason:'mudou de unidade'}}}});return !m.gestantes.excluded.a&&!!m.gestantes.excluded.b});
+  await add('285. Importar CSV do Monitora ou do Metabase abre a janela de revisão antes de gravar (cancelar não altera nada); a API de teste importa sem a janela',()=>{const i=importOne.toString();return i.includes('reviewImport(snap)')&&i.includes('Importação cancelada')&&i.includes('importSnapWithout')&&importFiles.toString().includes('review')&&closeModal.toString().includes('pendingImportDecision')});
+  await add('286. Revisão da importação separa atendimento, novas, Histórico, dados alterados, sem mudança e quem ficou fora do arquivo',()=>{const t0=Date.now(),mk=(id,rows,pu,off)=>({id,profile:MONITORA_PROFILE,createdAt:new Date(t0+9e10+off).toISOString(),monitoraRows:rows,puerperio:pu,monitoraStat:[]}),r=(u,od,per='T2',eq='ESF 120')=>({usuaria:u,equipe:eq,periodo:per,consOdonto:od==='atende'?'Sim':'Não',monitoraOdonto:od});const a=mk('s286a',[r('111','pendente'),r('222','pendente'),r('444','atende'),r('555','pendente')],[],0),b=mk('s286b',[r('111','atende'),r('222','pendente','T3'),r('444','atende'),r('666','pendente')],['555'],1e3);const saved=state.snapshots;state.snapshots=[a];let d;try{d=buildImportDiff(b)}finally{state.snapshots=saved}return d.g.atend.length===1&&d.g.dados.length===1&&d.g.igual.length===1&&d.g.nova.length===1&&d.g.fim.length===1&&d.g.dados[0].right.includes('T2')&&d.g.fim[0].right.includes('Puerpério')});
+  await add('287. Desmarcar gestantes na revisão tira só elas do arquivo (Monitora: linhas, puérperas e estatística; Metabase: episódios)',()=>{const m=importSnapWithout({profile:MONITORA_PROFILE,monitoraRows:[{usuaria:'1'},{usuaria:'2'}],puerperio:['3','4'],monitoraStat:[{u:'1'},{u:'3'}]},new Set(['1','3']));const x=importSnapWithout({profile:'metabase_gestantes_2i',episodes:[{id:'a',prontuario:'10'},{id:'b',prontuario:''}]},new Set(['10']));return m.monitoraRows.length===1&&m.monitoraRows[0].usuaria==='2'&&m.puerperio.join()==='4'&&m.monitoraStat.length===0&&x.episodes.length===1&&x.episodes[0].id==='b'});
+  await add('288. Na primeira importação (sem gestantes na ferramenta) a janela de revisão não abre',async()=>{const saved=state.snapshots,man=state.gestantes.manual;state.snapshots=[];state.gestantes.manual=[];try{const r=await reviewImport({id:'s288',profile:MONITORA_PROFILE,createdAt:nowISO(),monitoraRows:[{usuaria:'9',equipe:'ESF 120',periodo:'T1',consOdonto:'Não',monitoraOdonto:'pendente'}],puerperio:[],monitoraStat:[]});return r.excluded.size===0&&!document.getElementById('irOk')}finally{state.snapshots=saved;state.gestantes.manual=man}});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -3666,5 +3727,5 @@ function setupEvents(){
   let dragDepth=0;window.addEventListener('dragenter',e=>{e.preventDefault();dragDepth++;document.getElementById('dropOverlay').classList.add('open')});window.addEventListener('dragover',e=>e.preventDefault());window.addEventListener('dragleave',e=>{e.preventDefault();if(--dragDepth<=0){dragDepth=0;document.getElementById('dropOverlay').classList.remove('open')}});window.addEventListener('drop',e=>{e.preventDefault();dragDepth=0;document.getElementById('dropOverlay').classList.remove('open');if(e.dataTransfer.files.length)importFiles(e.dataTransfer.files)});
 }
 
-async function bootstrap(){hydrateIcons();setupEvents();setupMobile();localSave.enabled=readAutosavePref();let restored=null;if(localSave.enabled){restored=await loadFromBrowser();if(restored?.state){state=restored.state;localSave.lastSavedAt=restored.savedAt||null}}state=migrateState(state);activeView=state.preferences.view||'overview';refreshAll();if(restored?.state)toast(`Dados restaurados deste navegador (salvos em ${fmtDateTime(restored.savedAt)}).`);window.__APP_TEST_API__={version:APP_VERSION,importFiles,runSelfTests,getState:()=>state,getProcedureMonth:mk=>aggregateProcedureMonth(mk),getGroupMonth:mk=>aggregateGroupMonth(mk),getConsolidatedMonth:mk=>aggregateConsolidatedMonth(mk),getEpisodes:()=>getActive2ISnapshot()?.episodes||[],calculations:{municipalComponents,federalComponents,quarterMunicipal,quarterFederal,federalQuadrimestralOutlook,quadrimestralOutlook,metaProgress,metaCard,quarterMonths,nowISO,isMonthOver,isQuarterOver},reset:async()=>{state=defaultState();sessionRaw=new Map();await persistState();refreshAll()}}}
+async function bootstrap(){hydrateIcons();setupEvents();setupMobile();localSave.enabled=readAutosavePref();let restored=null;if(localSave.enabled){restored=await loadFromBrowser();if(restored?.state){state=restored.state;localSave.lastSavedAt=restored.savedAt||null}}state=migrateState(state);activeView=state.preferences.view||'overview';refreshAll();if(restored?.state)toast(`Dados restaurados deste navegador (salvos em ${fmtDateTime(restored.savedAt)}).`);window.__APP_TEST_API__={version:APP_VERSION,importFiles:(f)=>importFiles(f,{review:false}),runSelfTests,getState:()=>state,getProcedureMonth:mk=>aggregateProcedureMonth(mk),getGroupMonth:mk=>aggregateGroupMonth(mk),getConsolidatedMonth:mk=>aggregateConsolidatedMonth(mk),getEpisodes:()=>getActive2ISnapshot()?.episodes||[],calculations:{municipalComponents,federalComponents,quarterMunicipal,quarterFederal,federalQuadrimestralOutlook,quadrimestralOutlook,metaProgress,metaCard,quarterMonths,nowISO,isMonthOver,isQuarterOver},reset:async()=>{state=defaultState();sessionRaw=new Map();await persistState();refreshAll()}}}
 bootstrap();
