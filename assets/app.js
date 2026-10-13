@@ -21,8 +21,8 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.39';
-const SELF_TEST_COUNT = 288;
+const APP_VERSION = '2.40';
+const SELF_TEST_COUNT = 290;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -2824,6 +2824,8 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('286. Revisão da importação separa atendimento, novas, Histórico, dados alterados, sem mudança e quem ficou fora do arquivo',()=>{const t0=Date.now(),mk=(id,rows,pu,off)=>({id,profile:MONITORA_PROFILE,createdAt:new Date(t0+9e10+off).toISOString(),monitoraRows:rows,puerperio:pu,monitoraStat:[]}),r=(u,od,per='T2',eq='ESF 120')=>({usuaria:u,equipe:eq,periodo:per,consOdonto:od==='atende'?'Sim':'Não',monitoraOdonto:od});const a=mk('s286a',[r('111','pendente'),r('222','pendente'),r('444','atende'),r('555','pendente')],[],0),b=mk('s286b',[r('111','atende'),r('222','pendente','T3'),r('444','atende'),r('666','pendente')],['555'],1e3);const saved=state.snapshots;state.snapshots=[a];let d;try{d=buildImportDiff(b)}finally{state.snapshots=saved}return d.g.atend.length===1&&d.g.dados.length===1&&d.g.igual.length===1&&d.g.nova.length===1&&d.g.fim.length===1&&d.g.dados[0].right.includes('T2')&&d.g.fim[0].right.includes('Puerpério')});
   await add('287. Desmarcar gestantes na revisão tira só elas do arquivo (Monitora: linhas, puérperas e estatística; Metabase: episódios)',()=>{const m=importSnapWithout({profile:MONITORA_PROFILE,monitoraRows:[{usuaria:'1'},{usuaria:'2'}],puerperio:['3','4'],monitoraStat:[{u:'1'},{u:'3'}]},new Set(['1','3']));const x=importSnapWithout({profile:'metabase_gestantes_2i',episodes:[{id:'a',prontuario:'10'},{id:'b',prontuario:''}]},new Set(['10']));return m.monitoraRows.length===1&&m.monitoraRows[0].usuaria==='2'&&m.puerperio.join()==='4'&&m.monitoraStat.length===0&&x.episodes.length===1&&x.episodes[0].id==='b'});
   await add('288. Na primeira importação (sem gestantes na ferramenta) a janela de revisão não abre',async()=>{const saved=state.snapshots,man=state.gestantes.manual;state.snapshots=[];state.gestantes.manual=[];try{const r=await reviewImport({id:'s288',profile:MONITORA_PROFILE,createdAt:nowISO(),monitoraRows:[{usuaria:'9',equipe:'ESF 120',periodo:'T1',consOdonto:'Não',monitoraOdonto:'pendente'}],puerperio:[],monitoraStat:[]});return r.excluded.size===0&&!document.getElementById('irOk')}finally{state.snapshots=saved;state.gestantes.manual=man}});
+  await add('289. "Por dentista" mostra também os atendimentos (paciente × dia) de cada dentista, sem repetir vários procedimentos no mesmo dia, respeitando idade e sexo e sem contar item que não é procedimento odontológico',()=>{const it=(n,d,fl='')=>[n,1,d,fl],pv=(id,date,age,sex,items)=>({id,date,age,sex,items});const snap={dataByMonth:{'2026-08':{patientVisits:[pv('1','2026-08-01',30,'Feminino',[it('A','Dra. A'),it('B','Dr. B')]),pv('1','2026-08-09',30,'Feminino',[it('A','Dra. A')]),pv('2','2026-08-02',8,'Masculino',[it('A','Dra. A')]),pv('3','2026-08-03',40,'Feminino',[it('V','Dr. B','n')])]}}};const bm={'2026-08':{agg:{snapshots:[snap]}}};const all=procPatientsByDentist(['2026-08'],bm),kid=procPatientsByDentist(['2026-08'],bm,{age:'6-11'}),fem=procPatientsByDentist(['2026-08'],bm,{sex:'Feminino'});return all.by.get('Dra. A').size===3&&all.by.get('Dr. B').size===1&&kid.by.get('Dra. A').size===1&&!kid.by.get('Dr. B')&&fem.by.get('Dra. A').size===2&&all.any&&!procPatientsByDentist(['2026-08'],{'2026-08':{agg:{snapshots:[{dataByMonth:{'2026-08':{patientVisits:[{id:'9',date:'2026-08-01'}]}}}]}}}).any});
+  await add('290. Quadro "Por dentista" ganhou a coluna de pacientes (Procedimentos, opção A)',()=>{const h=proceduresHTML.toString(),i=procIndividualHTML.toString();return i.includes('procPatientsByDentist')&&i.includes('pr-pac')&&i.includes('dias de atendimento')});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -2901,6 +2903,17 @@ function procFilters(){const p=state.preferences;return {dentist:p.procDentist||
 // Linhas de cruzamento (procedimento × dentista × sexo × idade) por mês, sem os registros que não são procedimento.
 function procCrossByMonth(months,unit=state.preferences.unit){const out={};for(const mk of months){const agg=aggregateProcedureMonth(mk,unit);out[mk]=agg?{cross:agg.crossRows||[],agg}:null}return out}
 function procInfoMap(byMonth){const info={};for(const v of Object.values(byMonth))if(v)for(const p of v.agg.procedureCounts||[])if(!p.nonDental)info[norm(p.descriptionNormalized)]??={name:p.descriptionNormalized,sigtap:p.sigtap,roles:p.roles||[],unrecognized:!!p.unrecognized};return info}
+// Atendimentos por dentista no período (v2.40): cada paciente × dia conta 1 atendimento (vários procedimentos no
+// mesmo dia não repetem; voltar em outro dia conta de novo). Usa patientVisits guardados na importação. Se o
+// paciente foi atendido por dois dentistas no mesmo dia, conta 1 para cada um.
+function procPatientsByDentist(months,byMonth,{age='',sex=''}={}){
+  const by=new Map(),seen=new Set();let any=false;
+  for(const mk of months)for(const s of byMonth[mk]?.agg?.snapshots||[])for(const v of s.dataByMonth?.[mk]?.patientVisits||[]){
+    if(!v.items)continue;any=true;const vk=`${v.id}|${v.date}`;if(seen.has(vk))continue;seen.add(vk);
+    if(age&&ageBandLabel(v.age)!==age)continue;if(sex&&v.sex!==sex)continue;
+    for(const it of v.items){if(String(it[3]||'').includes('n'))continue;const d=it[2]||'(sem profissional)';(by.get(d)||by.set(d,new Set()).get(d)).add(vk)}}
+  return {by,any};
+}
 function procSumBy(rows,f){const m=new Map();for(const r of rows){const k=f(r);m.set(k,(m.get(k)||0)+r.quantity)}return m}
 function procChipsHTML(roles){const b=procedureRoleBadges(roles).sort((x,y)=>(x.part==='Numerador'?0:1)-(y.part==='Numerador'?0:1));return b.map(x=>`<span class="pr-ic${x.part==='Numerador'?'':' den'}">${esc(x.ind)} ${x.part==='Numerador'?'num':'den'}</span>`).join('')}
 function proceduresHTML(){
@@ -2943,7 +2956,8 @@ function procIndividualHTML(per,f,byMonth){
   const months=`<div class="pr-months" style="grid-template-columns:repeat(${per.chart.length},minmax(0,1fr))">${mRows.map((x,i)=>{const sel=per.mode==='M'&&x.mk===p.month,dim=per.mode==='M'&&!sel;return `<button class="pr-mcol${sel?' sel':''}${dim?' dim':''}" data-proc-month="${x.mk}" aria-label="${esc(fmtMonth(x.mk,true))}: ${fmtNum(mTot[i])} procedimentos"><span class="pr-mtot">${mTot[i]?fmtNum(mTot[i]):'—'}</span><span class="pr-mstack"><span style="height:${100*mTot[i]/mMax}%">${PROC_CATS.map(([c,color])=>x.cat.get(c)?`<i style="height:${100*x.cat.get(c)/mTot[i]}%;background:${color}"></i>`:'').join('')}</span></span><span class="pr-mlab">${MONTHS_SHORT[parseMonthKey(x.mk).month-1]}</span></button>`}).join('')}</div>`;
   const dRows=rowsOf(per.months,{skipDent:true}),dCat=new Map();for(const r of dRows){const d=r.professional||'(sem profissional)',m=dCat.get(d)||new Map();m.set(procCategory(r.procLabel),(m.get(procCategory(r.procLabel))||0)+r.quantity);dCat.set(d,m)}
   const dList=[...dCat.entries()].map(([d,m])=>[d,m,sum([...m.values()])]).sort((a,b)=>b[2]-a[2]),dMax=Math.max(1,...dList.map(x=>x[2]));
-  const dents=dList.map(([d,m,t])=>`<button class="pr-drow${f.dentist===d?' sel':''}${f.dentist&&f.dentist!==d?' dim':''}" data-proc-dentist="${esc(d)}"><b title="${esc(d)}">${esc(d)}</b><span class="pr-mix" style="height:10px;width:${Math.max(4,100*t/dMax)}%">${PROC_CATS.map(([c,color])=>m.get(c)?`<i style="width:${100*m.get(c)/t}%;background:${color}"></i>`:'').join('')}</span><span class="pr-q">${fmtNum(t)}</span></button>`).join('')||'<p class="pr-note">Sem dados.</p>';
+  const dPat=procPatientsByDentist(per.months,byMonth,{age:f.age,sex:f.sex});
+  const dents=dList.map(([d,m,t])=>`<button class="pr-drow${f.dentist===d?' sel':''}${f.dentist&&f.dentist!==d?' dim':''}" data-proc-dentist="${esc(d)}"><b title="${esc(d)}">${esc(d)}</b><span class="pr-mix" style="height:10px;width:${Math.max(4,100*t/dMax)}%">${PROC_CATS.map(([c,color])=>m.get(c)?`<i style="width:${100*m.get(c)/t}%;background:${color}"></i>`:'').join('')}</span><span class="pr-q">${fmtNum(t)}<small>proced.</small></span><span class="pr-q pr-pac">${dPat.any?fmtNum(dPat.by.get(d)?.size||0):'—'}<small>atendim.</small></span></button>`).join('')||'<p class="pr-note">Sem dados.</p>';
   const pRows=per.chart.map(mk=>{const a=byMonth[mk]?.agg;return `<tr class="${per.mode==='M'&&mk===p.month?'sel':''}"><td>${esc(fmtMonth(mk,true))}</td><td class="num">${a?fmtNum(a.firstConsultations):'—'}</td><td class="num">${a?fmtNum((a.visitsList||[]).length):'—'}</td><td class="num">${a?fmtNum(a.treatmentsConcluded):'—'}</td></tr>`}).join('');
   const perPat=new Map();for(const v of visits)perPat.set(v.patient,(perPat.get(v.patient)||0)+1);const dist=[['1 vez',1,1],['2 a 3 vezes',2,3],['4 a 6 vezes',4,6],['7 ou mais',7,Infinity]].map(([l,a,b])=>[l,[...perPat.values()].filter(n=>n>=a&&n<=b).length]),distMax=Math.max(1,...dist.map(x=>x[1]));
   const ageRows=rowsOf(per.months).filter(r=>r.age),ages=procSumBy(ageRows,r=>r.age),ageMax=Math.max(1,...ages.values()),sx=procSumBy(rows.filter(r=>r.sex),r=>r.sex),sxT=(sx.get('Feminino')||0)+(sx.get('Masculino')||0);
@@ -2955,7 +2969,7 @@ function procIndividualHTML(per,f,byMonth){
       <p class="pr-note">Primeira consulta, tratamento concluído e atendimentos gerais não são procedimentos: entram em "Pacientes", abaixo.</p></section>
     <div class="pr-side">
       <section class="card pr-box"><div class="pr-box-h"><h2>Mês a mês</h2><small>clique num mês para filtrar</small></div>${months}</section>
-      <section class="card pr-box"><div class="pr-box-h"><h2>Por dentista</h2><small>clique para filtrar</small></div><div>${dents}</div></section>
+      <section class="card pr-box"><div class="pr-box-h"><h2>Por dentista</h2><small>clique para filtrar</small></div><div>${dents}</div><p class="pr-note">Atendimentos são dias de atendimento: o mesmo paciente em outro dia conta de novo, e vários procedimentos no mesmo dia contam uma vez. Se dois dentistas atenderam a mesma pessoa no mesmo dia, conta para cada um.</p></section>
     </div>
   </div>
   <section class="card pr-box"><div class="pr-box-h"><h2>Pacientes</h2><small>${esc(per.label)}${filtered?' · sem os filtros de dentista, idade e sexo':''}</small></div>

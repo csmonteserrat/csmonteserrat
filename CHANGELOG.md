@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## Versão 2.40
+
+- Procedimentos: o quadro "Por dentista" mostra, além dos procedimentos, quantos atendimentos cada dentista fez no período (mês, quadrimestre ou ano): cada paciente × dia conta 1 (vários procedimentos no mesmo dia não repetem; voltar em outro dia conta de novo), respeitando os filtros de idade e sexo. Meses importados antes de o app guardar o código do paciente aparecem com "—".
+
 ## Versão 2.39
 
 - Importar o CSV do Monitora APS ou do Metabase (gestantes 2I) agora abre uma janela de revisão antes de gravar: mostra o impacto na porcentagem do 2I (antes → depois) e o que vai mudar, em blocos recolhíveis (passaram a ter atendimento, novas, vão para o Histórico, dados que mudaram), além de quem veio igual e de quem já estava na ferramenta e não veio no arquivo.
