@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Versão 2.41
+
+- CSV do Metabase de gestantes no formato novo (Cd Usu Cadsus, Cd Equipe, Ds Unidade, Dt Ult Menst, Ds Periodo, Fl Consulta Saude Bucal, Ts Atualizacao, Nm Usuario, Ds Endereco, Bairro e telefones): reconhecido e lido. DPP = DUM + 280 dias; Fl Consulta Saude Bucal 0 ou vazio = não atendida e qualquer número acima de 0 = atendida; celular é o telefone principal e os outros viram números extras; Período "Puerpério" vai para o Histórico. O formato antigo continua funcionando.
+- O prontuário desse arquivo chega com vírgula de milhar e sem o zero final ("827,84" é 827840); a leitura corrige isso e avisa quantos foram ajustados.
+- A data "Ts Atualizacao" aparece no cabeçalho ("Metabase atualizado em …") e define a ordem dos arquivos: um arquivo mais antigo importado depois não sobrescreve dados mais novos.
+- Arquivo que a ferramenta não consegue ler (CSV com layout desconhecido, vazio, ou PDF não reconhecido) agora abre a janela "Não consegui ler o arquivo", com as colunas que faltam e as que o arquivo trouxe, e não é mais gravado como "layout não reconhecido".
+
 ## Versão 2.40
 
 - Procedimentos: o quadro "Por dentista" mostra, além dos procedimentos, quantos atendimentos cada dentista fez no período (mês, quadrimestre ou ano): cada paciente × dia conta 1 (vários procedimentos no mesmo dia não repetem; voltar em outro dia conta de novo), respeitando os filtros de idade e sexo. Meses importados antes de o app guardar o código do paciente aparecem com "—".
