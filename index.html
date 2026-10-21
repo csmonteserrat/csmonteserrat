@@ -8,14 +8,14 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'self'; form-action 'self'">
   <title>Acompanhamento Odontológico</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./assets/app.css?v=2.49">
+  <link rel="stylesheet" href="./assets/app.css?v=2.50">
 </head>
 <body>
   <div class="app-shell" id="appShell">
     <aside class="sidebar" aria-label="Navegação principal">
       <div class="brand-row">
         <div class="brand" title="Acompanhamento Odontológico"><span data-icon="tooth"></span></div>
-        <div class="brand-text"><strong>Acompanhamento</strong><span>Saúde Bucal · v2.49</span></div>
+        <div class="brand-text"><strong>Acompanhamento</strong><span>Saúde Bucal · v2.50</span></div>
       </div>
       <nav class="side-nav" aria-label="Módulos da ferramenta">
         <button class="side-btn active" data-view="overview" aria-label="Visão geral" title="Visão geral"><span class="side-btn-icon" data-icon="grid"></span><span class="side-btn-label">Visão geral</span></button>
@@ -23,6 +23,7 @@
         <button class="side-btn" data-view="pse" aria-label="PSE: avaliações nas escolas" title="PSE"><span class="side-btn-icon" data-icon="users"></span><span class="side-btn-label">PSE</span></button>
         <button class="side-btn" data-view="criancas" aria-label="Crianças de 0 a 12 anos" title="Crianças"><span class="side-btn-icon" data-icon="child"></span><span class="side-btn-label">Crianças</span></button>
         <button class="side-btn" data-view="idosos" aria-label="Idosos: consulta odontológica, ILPIs e acamados" title="Idosos"><span class="side-btn-icon" data-icon="person"></span><span class="side-btn-label">Idosos</span></button>
+        <button class="side-btn" data-view="condicoes" aria-label="Condições de saúde: hipertensão, diabetes, imunossupressão e deficiência" title="Condições de saúde"><span class="side-btn-icon" data-icon="pulse"></span><span class="side-btn-label">Condições de saúde</span></button>
         <button class="side-btn" data-view="risco" aria-label="Classificação de risco em saúde bucal" title="Classificação de Risco"><span class="side-btn-icon" data-icon="alert"></span><span class="side-btn-label">Classificação de Risco</span></button>
         <button class="side-btn" data-ind-nav aria-label="Indicadores municipais e federais" title="Indicadores"><span class="side-btn-icon" data-icon="building"></span><span class="side-btn-label">Indicadores</span></button>
         <button class="side-btn" data-view="procedures" aria-label="Análise: procedimentos, atividades coletivas e estatística" title="Análise"><span class="side-btn-icon" data-icon="trend"></span><span class="side-btn-label">Análise</span></button>
@@ -86,6 +87,7 @@
         <section class="view hidden" id="view-pse"></section>
         <section class="view hidden" id="view-criancas"></section>
         <section class="view hidden" id="view-idosos"></section>
+        <section class="view hidden" id="view-condicoes"></section>
         <section class="view hidden" id="view-risco"></section>
         <section class="view hidden" id="view-calculator"></section>
         <section class="view hidden" id="view-settings"></section>
@@ -122,6 +124,6 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="./assets/app.js?v=2.49"></script>
+  <script type="module" src="./assets/app.js?v=2.50"></script>
 </body>
 </html>

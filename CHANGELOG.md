@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Versão 2.50
+
+- Nova página **Condições de saúde** (abaixo de Idosos): hipertensão e diabetes pelas listas do Metabase (o tipo é reconhecido pelas colunas), imunossupressão e deficiência marcadas na gaveta com o tipo como etiqueta, e "Marcar condição em alguém" para qualquer pessoa da área. Subabas por condição, contagem por tipo, fila e cor pela Classificação de Risco.
+- Classificação de Risco: B04, B05, B06 e B07 automáticos a partir dessas listas e marcações; as pessoas das listas entram sempre. Etiquetas de condição nos cards da Classificação de Risco, Idosos e Crianças.
+- 5 testes internos novos (321 no total).
+
 ## Versão 2.49
 
 - Nova página **Crianças** (abaixo do PSE e acima de Idosos): crianças de 0 a 12 anos do Metabase (CSVs de desenvolvimento infantil e de vacinação, até 2 anos), do CELK (atendidas nos últimos 2 anos) e de "Meus alunos" do PSE. Dos CSVs do Metabase só o essencial é guardado (prontuário, nascimento, nome, mãe, telefones, endereço, equipe, sexo e data de atualização).
