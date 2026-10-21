@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## Versão 2.48
+
+- Classificação de Risco e Idosos: nova etapa **Em tratamento** e nova regra de **Em dia**, pelo CELK dos últimos 2 anos. Em dia = tratamento concluído nos últimos 2 anos (atendimentos até 12 meses depois do concluído são manutenção); volta para a busca ativa 2 anos depois do concluído. Em tratamento = 1ª consulta ou atendimento nos últimos 2 anos sem tratamento concluído depois; sem atendimento há mais de 6 meses aparece como "Possível abandono". Antes, Em dia era qualquer atendimento nos últimos 12 meses.
+- Idosos: o percentual do topo passa a contar quem está em tratamento ou em dia.
+
 ## Versão 2.47
 
 - Nova página **Idosos** (na barra lateral, abaixo do PSE), a partir do CSV de idosos do Metabase. Lê o formato atual (prontuário, equipe, idade, data de atualização, nome, sexo, endereço e telefones) e o formato antigo, que só completa a data de nascimento de quem já está na lista atual. Os arquivos se somam como os de gestantes.

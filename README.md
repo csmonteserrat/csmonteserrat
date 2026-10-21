@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.47
+# Acompanhamento Odontológico · versão 2.48
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -87,7 +87,7 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 
 - A lista vem do CSV de idosos do **Metabase** (formato atual): Cd Usu Cadsus (prontuário do CELK), Cd Equipe, Nr Idade Fim, Ts Atualizacao, Nm Usuario, Sg Sexo, Ds Endereco e os telefones (celular primeiro). As colunas de consulta médica, peso e vacina são ignoradas. Cada CSV se soma aos anteriores; o mais recente pelo Ts Atualizacao atualiza o que mudou, e quem não vier no último arquivo fica com o aviso "Não veio no último arquivo".
 - O CSV no **formato antigo** (com Data Nascimento) só completa a data de nascimento (e o nome, endereço ou telefone que faltar) de quem já está na lista atual. Ninguém entra na lista por ele. O prontuário com vírgula de milhar ("428,561") é corrigido.
-- Subabas: **Todos os idosos**, **ILPI** e **Acamados e restritos ao domicílio**. "Atendido" = consulta odontológica no CELK nos últimos 12 meses; volta para "A contatar" 12 meses depois. Fila: A contatar, Em contato, Agendado e Atendido (os registros valem também na Classificação de Risco).
+- Subabas: **Todos os idosos**, **ILPI** e **Acamados e restritos ao domicílio**. Fila: A contatar, Em contato, Agendado, Em tratamento e Em dia, com a mesma regra da Classificação de Risco (os registros valem nas duas). O percentual do topo conta quem está em tratamento ou em dia (atendimento nos últimos 2 anos).
 - Cor do card = faixa da Classificação de Risco; a etiqueta mostra a etapa.
 - ILPI: o **Asilo Irmão Joaquim** é reconhecido pela Av. Mauro Ramos, 901, com qualquer complemento. Endereços com ASILO, LAR, REPOUSO, ILPI ou CUIDADOS no complemento viram sugestão para confirmar (criar ILPI, juntar a uma existente ou "Não é"). Na gaveta dá para marcar ou tirar uma pessoa da ILPI.
 - Situação na gaveta (Nenhuma, Acamado, Restrito ao domicílio): leva a pessoa para a subaba e vale como C05 automático na Classificação de Risco.
@@ -99,7 +99,7 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - Total = condição clínica mais grave (0 a 40) + formulário (0 a 12) + ciclo de vida e vulnerabilidade social (teto de 40). Sinal de alarme = Vermelho; dor aguda, abscesso e trauma recente ficam no mínimo em Laranja; outras agudas, lesão suspeita e consequência da cárie sem dor, no mínimo em Amarelo. Verde: 35 pontos ou mais; Azul: 15 a 34; Violeta: menos de 15.
 - Automáticos: idade (pelo nascimento ou, sem ele, pela idade no atendimento do CELK), gestante ativa, nunca consultou (C18) e mais de 2 anos sem consulta (C11) pela produção do CELK, e C10 pelo endereço. A avaliação do PSE sugere a condição clínica (3 ou mais lesões cavitadas ou exodontia = A09a; 1 a 2 = A09b), que o dentista confirma ou troca. Os demais critérios são marcados à mão na gaveta, até haver importação do cadastro e o formulário de pedido de atendimento.
 - **C10**: em Florianópolis não há microárea. Na subaba "Escala de risco" você escreve as ruas de alta vulnerabilidade (ou marca a área inteira); a comparação com o endereço ignora acento, número e o tipo do logradouro.
-- Fila de busca ativa: A contatar, Em contato, Agendada e Em dia. Quem teve atendimento no CELK nos últimos 12 meses (inclui tratamento concluído) fica Em dia e volta para a fila 12 meses depois da última consulta. Ordem: faixa, total, pontos clínicos, tempo sem consulta e idade.
+- Fila: A contatar, Em contato, Agendada, **Em tratamento** e **Em dia**, pelo CELK dos últimos 2 anos. Em dia: tratamento concluído nos últimos 2 anos (atendimentos até 12 meses depois do concluído são manutenção); volta para a busca ativa 2 anos depois do concluído. Em tratamento: 1ª consulta ou atendimento nos últimos 2 anos sem concluído depois; sem atendimento há mais de 6 meses aparece como "possível abandono". Ordem: faixa, total, pontos clínicos, tempo sem consulta e idade.
 - Gaveta por pessoa: Classificação (conta aberta, critério por critério, com a origem), Histórico odontológico (atendimentos do CELK, atividades coletivas, avaliações do PSE, gestação e registros), Acompanhamento e Dados cadastrais.
 - Subaba "Escala de risco": todos os critérios com pontos, nível de evidência, fonte do dado, pergunta do formulário e quantas pessoas têm cada um; ruas do C10; distribuição × meta da pilotagem; regras de cálculo.
 - O backup analítico não leva os dados das pessoas da classificação (só a lista de ruas do C10).
