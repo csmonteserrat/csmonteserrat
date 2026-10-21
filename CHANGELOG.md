@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## Versão 2.51
+
+- Correção: marcar "acamado ou domiciliado" (C05) na Classificação de Risco não aparecia em Idosos. Agora a situação fica num lugar só por pessoa e vale na Classificação de Risco, em Idosos e em Condições de saúde. O que já estava marcado nas duas abas foi juntado (o C05 da Classificação de Risco entra como "acamado ou domiciliado"; dá para escolher qual dos dois na gaveta).
+- Condições de saúde: nova subaba **Acamados e domiciliados** (também para quem não é idoso), situação na gaveta e aba **Dados cadastrais** editável.
+
 ## Versão 2.50
 
 - Nova página **Condições de saúde** (abaixo de Idosos): hipertensão e diabetes pelas listas do Metabase (o tipo é reconhecido pelas colunas), imunossupressão e deficiência marcadas na gaveta com o tipo como etiqueta, e "Marcar condição em alguém" para qualquer pessoa da área. Subabas por condição, contagem por tipo, fila e cor pela Classificação de Risco.

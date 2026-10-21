@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.50
+# Acompanhamento Odontológico · versão 2.51
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -103,7 +103,9 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 
 - Pessoas com **hipertensão** e **diabetes** (listas do Metabase) e com **imunossupressão** ou **deficiência** (marcadas pela equipe na gaveta, com o tipo como etiqueta: deficiência física, visual, auditiva, intelectual, psicossocial, TEA, múltipla ou outra; imunossupressão por HIV/aids, quimio ou radioterapia, transplante, imunossupressor ou outra).
 - Qual lista é cada CSV sai das colunas: a de diabetes tem hemoglobina glicada (Fl Hba1c) e avaliação dos pés; a de hipertensão não tem. Só prontuário, nome, telefones, endereço, equipe, sexo e data de atualização são guardados. As listas não trazem idade.
-- Tudo vale na Classificação de Risco (B04 diabetes, B05 hipertensão, B06 imunossupressão, B07 deficiência), e as pessoas das listas entram nela sempre. As etiquetas de condição aparecem também nos cards da Classificação de Risco, Idosos e Crianças.
+- Subaba **Acamados e domiciliados** (qualquer idade). A situação é uma só por pessoa: marcar em Idosos, em Condições de saúde ou o C05 na Classificação de Risco vale nos três lugares.
+- A gaveta tem Dados cadastrais editáveis (as correções valem em todas as abas).
+- Tudo vale na Classificação de Risco (B04 diabetes, B05 hipertensão, B06 imunossupressão, B07 deficiência, C05 acamado ou domiciliado), e as pessoas das listas entram nela sempre. As etiquetas de condição aparecem também nos cards da Classificação de Risco, Idosos e Crianças.
 
 ## Classificação de Risco (busca ativa)
 
