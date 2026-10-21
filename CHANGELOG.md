@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Versão 2.49
+
+- Nova página **Crianças** (abaixo do PSE e acima de Idosos): crianças de 0 a 12 anos do Metabase (CSVs de desenvolvimento infantil e de vacinação, até 2 anos), do CELK (atendidas nos últimos 2 anos) e de "Meus alunos" do PSE. Dos CSVs do Metabase só o essencial é guardado (prontuário, nascimento, nome, mãe, telefones, endereço, equipe, sexo e data de atualização).
+- Subabas 0 a 2, 3 a 5 e 6 a 12 anos; fila e cor pela Classificação de Risco; aviso "Bebê sem 1ª consulta odontológica"; gaveta com Acompanhamento (responsável e registros), Histórico odontológico, Classificação de risco e Dados cadastrais.
+- Classificação de Risco: crianças do Metabase entram sempre; idade em meses para quem tem menos de 2 anos.
+- 4 testes internos novos (316 no total).
+
 ## Versão 2.48
 
 - Classificação de Risco e Idosos: nova etapa **Em tratamento** e nova regra de **Em dia**, pelo CELK dos últimos 2 anos. Em dia = tratamento concluído nos últimos 2 anos (atendimentos até 12 meses depois do concluído são manutenção); volta para a busca ativa 2 anos depois do concluído. Em tratamento = 1ª consulta ou atendimento nos últimos 2 anos sem tratamento concluído depois; sem atendimento há mais de 6 meses aparece como "Possível abandono". Antes, Em dia era qualquer atendimento nos últimos 12 meses.

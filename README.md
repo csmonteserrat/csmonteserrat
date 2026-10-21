@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.48
+# Acompanhamento Odontológico · versão 2.49
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -82,6 +82,12 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - O relatório de produção **Procedimentos Detalhado** do CELK traz o paciente como "( código ) NOME". Esse código é o mesmo número do prontuário. Um atendimento da equipe de saúde bucal **entre a DUM e a DPP** (ou até o parto, se ele veio antes) conta a gestante como atendida. Sem DUM e sem DPP, o atendimento do CELK não conta: complete a data (filtro "Dados incompletos"). A atividade educativa em grupo não conta.
 - Ao importar a produção (CSV ou PDF), o app guarda um **cadastro de pacientes** (código do CELK → nome). Com ele, o nome é preenchido automaticamente nas listas anonimizadas, como a do Monitora APS, e no cadastro manual de gestante ao digitar o prontuário. Esse cadastro vai no backup completo, mas não no analítico.
 - Os dados completados à mão ficam guardados pelo número da Usuária. Se ela aparecer depois no CSV do Metabase, migram para esse registro sem sobrescrever o que o Metabase traz.
+
+## Crianças
+
+- Crianças de **0 a 12 anos** da área: CSVs do **Metabase** de crianças até 2 anos (desenvolvimento infantil e vacinação, juntados pelo prontuário), crianças atendidas no **CELK** nos últimos 2 anos e os alunos marcados em "Meus alunos" no **PSE**. Atividades coletivas não puxam crianças.
+- Dos CSVs do Metabase o app guarda só o essencial: prontuário (Cd Usu Cadsus ou Cd Usu Cadsus Normalizado, com a vírgula de milhar corrigida), Dt Nascimento, Nm Usuario, Nm Mae (responsável), telefones, Ds Endereco e Bairro, Cd Equipe, Sg Sexo e Ts Atualizacao. Vacinas, puericultura e último atendimento na APS são ignorados.
+- Subabas por idade (0 a 2, 3 a 5, 6 a 12); fila e cor do card iguais às da Classificação de Risco; bebês de até 2 anos sem atendimento odontológico aparecem com "Bebê sem 1ª consulta odontológica". Quem sai da lista do Metabase por fazer 2 anos continua na aba até os 12 anos.
 
 ## Idosos
 

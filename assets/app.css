@@ -1026,3 +1026,4 @@ table.pr-table{min-width:0;width:100%;font-size:12.5px}table.pr-table tr.sel td{
 .id-imp small{display:block;color:var(--muted);font-size:11px;line-height:1.45}.id-imp>div>b{font-size:18px;font-variant-numeric:tabular-nums}
 @media(max-width:760px){.id-row{grid-template-columns:minmax(0,1fr) auto}.id-row .id-hide,.id-row .id-stg{display:none}.id-sug-r{grid-template-columns:1fr}.id-k{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .id-stg.violet{color:#5d5488;background:#f3f1f9}
+.cr-alert{color:#c9472b}
