@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## Versão 2.42
+
+- Nova página **Classificação de Risco**: a escala do Protocolo de Estratificação de Risco (v2.0) aplicada a todas as pessoas da área (cadastro do CELK, gestantes, meus alunos do PSE e inclusões à mão), para a busca ativa. Fila em cards na cor da faixa (Vermelho a Violeta), com abas A contatar, Em contato, Agendada, Em dia e Todos, filtros por faixa, equipe, origem e "só sem avaliação clínica".
+- Gaveta por pessoa com Classificação (alarmes, condição clínica, formulário, ciclo de vida e social, com a origem de cada critério e as regras de dupla contagem e teto), Histórico odontológico triangulado (CELK, atividades coletivas, PSE, gestação), Acompanhamento (WhatsApp, sem resposta, visita do ACS, agendar, notas) e Dados cadastrais.
+- Quem teve atendimento no CELK nos últimos 12 meses fica "Em dia" e volta para a busca ativa 12 meses depois da última consulta.
+- Subaba "Escala de risco": quadro dos 49 critérios com pontos, nível de evidência, fonte do dado, pergunta do formulário e como entra no app; ruas de alta vulnerabilidade do C10 (ou área inteira), comparadas com o endereço; distribuição × meta da pilotagem; regras de cálculo.
+- 8 testes internos novos (303 no total), incluindo os casos do item 8 do protocolo.
+
 ## Versão 2.41
 
 - CSV do Metabase de gestantes no formato novo (Cd Usu Cadsus, Cd Equipe, Ds Unidade, Dt Ult Menst, Ds Periodo, Fl Consulta Saude Bucal, Ts Atualizacao, Nm Usuario, Ds Endereco, Bairro e telefones): reconhecido e lido. DPP = DUM + 280 dias; Fl Consulta Saude Bucal 0 ou vazio = não atendida e qualquer número acima de 0 = atendida; celular é o telefone principal e os outros viram números extras; Período "Puerpério" vai para o Histórico. O formato antigo continua funcionando.
