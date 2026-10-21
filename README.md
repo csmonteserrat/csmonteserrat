@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.42
+# Acompanhamento Odontológico · versão 2.43
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -85,7 +85,7 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 
 ## Classificação de Risco (busca ativa)
 
-- Aplica o **Protocolo de Estratificação de Risco para o Acesso à Saúde Bucal** (CS Monte Serrat, v2.0) a todas as pessoas da área: cadastro de pacientes do CELK (quem aparece no Procedimentos Detalhado), gestantes, alunos marcados em "Meus alunos" no PSE e pessoas incluídas à mão. A mesma pessoa é juntada pelo prontuário.
+- Aplica o **Protocolo de Estratificação de Risco para o Acesso à Saúde Bucal** (CS Monte Serrat, v2.0) a todas as pessoas da área: cadastro de pacientes do CELK (quem aparece no Procedimentos Detalhado com atendimento nos últimos 2 anos), gestantes, alunos marcados em "Meus alunos" no PSE e pessoas incluídas à mão. A mesma pessoa é juntada pelo prontuário.
 - Total = condição clínica mais grave (0 a 40) + formulário (0 a 12) + ciclo de vida e vulnerabilidade social (teto de 40). Sinal de alarme = Vermelho; dor aguda, abscesso e trauma recente ficam no mínimo em Laranja; outras agudas, lesão suspeita e consequência da cárie sem dor, no mínimo em Amarelo. Verde: 35 pontos ou mais; Azul: 15 a 34; Violeta: menos de 15.
 - Automáticos: idade (pelo nascimento ou, sem ele, pela idade no atendimento do CELK), gestante ativa, nunca consultou (C18) e mais de 2 anos sem consulta (C11) pela produção do CELK, e C10 pelo endereço. A avaliação do PSE sugere a condição clínica (3 ou mais lesões cavitadas ou exodontia = A09a; 1 a 2 = A09b), que o dentista confirma ou troca. Os demais critérios são marcados à mão na gaveta, até haver importação do cadastro e o formulário de pedido de atendimento.
 - **C10**: em Florianópolis não há microárea. Na subaba "Escala de risco" você escreve as ruas de alta vulnerabilidade (ou marca a área inteira); a comparação com o endereço ignora acento, número e o tipo do logradouro.

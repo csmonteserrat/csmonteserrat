@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## Versão 2.43
+
+- Classificação de Risco: quem vem só do cadastro de pacientes do CELK entra na lista apenas se teve atendimento nos últimos 2 anos (pela data do último atendimento no Procedimentos Detalhado). Gestantes, alunos do PSE e pessoas incluídas à mão continuam entrando sempre, com ou sem atendimento.
+
 ## Versão 2.42
 
 - Nova página **Classificação de Risco**: a escala do Protocolo de Estratificação de Risco (v2.0) aplicada a todas as pessoas da área (cadastro do CELK, gestantes, meus alunos do PSE e inclusões à mão), para a busca ativa. Fila em cards na cor da faixa (Vermelho a Violeta), com abas A contatar, Em contato, Agendada, Em dia e Todos, filtros por faixa, equipe, origem e "só sem avaliação clínica".

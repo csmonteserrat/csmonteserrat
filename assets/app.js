@@ -21,8 +21,8 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.42';
-const SELF_TEST_COUNT = 303;
+const APP_VERSION = '2.43';
+const SELF_TEST_COUNT = 304;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -2881,6 +2881,7 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('301. Avaliação do PSE sugere a condição clínica (3 ou mais lesões cavitadas ou exodontia = A09a; 1 a 2 = A09b; zero = sem sugestão)',()=>{const c=(lesoes,exo)=>rkPseClin({pse:{rec:{status:'Preenchida',lesoes,exo,dataAval:'2026-09-15'}}})?.code||null;return c('3 a 4 dentes','Não necessita')==='A09a'&&c('Zero','Necessita')==='A09a'&&c('1 a 2 dentes','Não necessita')==='A09b'&&c('Zero','Não necessita')===null&&rkPseClin({pse:{rec:{status:'Pendente'}}})===null});
   await add('302. Página "Classificação de Risco" registrada, com a fila de busca ativa e a subaba "Escala de risco" (critérios, perguntas do formulário, ruas do C10, meta da pilotagem e regras)',()=>{const e=rkEscalaHTML([]);return VIEW_RENDERERS.risco&&VIEW_META.risco[0]==='Classificação de Risco'&&!!document.getElementById('view-risco')&&riscoHTML.toString().includes('Fila de busca ativa')&&e.includes('Pergunta no formulário')&&e.includes('Ruas de alta vulnerabilidade')&&e.includes('Distribuição × meta da pilotagem')&&e.includes('Regras de cálculo')&&RK_ESCALA.reduce((n,g)=>n+g.it.length,0)===49});
   await add('303. Backup analítico apaga os dados das pessoas da classificação de risco e mantém só a lista de ruas do C10',()=>rkWith(()=>{const b=backupState('analytic');return !b.risco.manual.length&&!Object.keys(b.risco.crit).length&&!Object.keys(b.risco.overrides).length&&!Object.keys(b.risco.followups).length&&b.risco.ruas[0]==='Rua X'},{...rkEmpty(),ruas:['Rua X'],manual:[{id:'m',nome:'Fulana'}],crit:{'p:1':{B06:{src:'manual'}}},overrides:{'p:1':{tel:'1'}},followups:{'p:1':{history:[{at:'x'}]}}}));
+  await add('304. Quem vem só do cadastro do CELK entra na lista se foi atendido nos últimos 2 anos; gestante, PSE e inclusão à mão entram sempre',()=>{const p=(orig,n)=>({orig,visits:n==null?[]:[{date:rkAgo(n)}]});return rkFromCelkOk(p(['CELK'],700))&&!rkFromCelkOk(p(['CELK'],800))&&!rkFromCelkOk(p(['CELK'],null))&&rkFromCelkOk(p(['CELK','Gestante'],null))&&rkFromCelkOk(p(['Manual'],null))&&rkFromCelkOk(p(['PSE'],3000))&&rkPeople.toString().includes('rkFromCelkOk(p)')});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -3739,9 +3740,14 @@ function rkPeople(){if(rkCache)return rkCache;const s=rkStore(),map=new Map(),id
     p.orig=[...p.orig];p.excluded=!!s.excluded[p.key];
     let vs=p.pront?(idx.get(pid(p.pront))||[]):[];if(p.pse)vs=vs.filter(v=>!pseIsSchoolFluor(v));p.visits=vs;
     p.col=p.pse?.L?.col||(p.nasc?col.get(`${norm(p.nome)}|${p.nasc}`)||null:null);
+    // Quem vem só do cadastro do CELK entra se foi atendido nos últimos 2 anos (v2.43, pedido do usuário).
+    // Gestantes, alunos do PSE e inclusões à mão entram sempre.
+    if(!rkFromCelkOk(p))continue;
     if(p.nasc){p.age=ageAt({dataNascimento:p.nasc});p.ageEst=false}else{const v=[...vs].reverse().find(x=>x.age!=null);p.age=v?v.age+Math.floor(daysAgo(v.date)/365.25):null;p.ageEst=p.age!=null}
     out.push(p)}
   rkCache=out;return out}
+const RK_CELK_DAYS=730;
+function rkFromCelkOk(p){if(p.orig.some(o=>o!=='CELK'))return true;const lv=p.visits.at(-1)?.date;return !!lv&&daysAgo(lv)<=RK_CELK_DAYS}
 function rkLastVisit(p){return p.visits.at(-1)?.date||''}
 function rkStage(p){const lv=rkLastVisit(p);if(lv&&daysAgo(lv)<=365)return 'emdia';const last=(rkStore().followups[p.key]?.history||[]).filter(h=>h.to&&(!lv||String(h.at).slice(0,10)>lv)).at(-1);return last?.to||'contatar'}
 function rkData(p){const s=rkStore();return {crit:s.crit[p.key]||{},clin:s.clin[p.key]||rkPseClin(p),alarm:s.alarm[p.key]||[],form:null}}
