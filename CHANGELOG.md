@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## Versão 2.53
+
+- **Uma pessoa só em todas as abas.** Cadastros com o mesmo prontuário, CPF ou CNS se juntam sozinhos. Os outros parecidos (nascimento igual ou quase e nome parecido) aparecem em **Configurações › Cadastros duplicados**, com a % de semelhança e o porquê, para unir ou marcar "Não são a mesma pessoa". Unir leva critérios, avaliação clínica, contatos, situação, condições e correções; dá para escolher os campos diferentes e desfazer depois.
+- **CPF e CNS** nos Dados cadastrais de todas as gavetas, conferidos pelo dígito verificador. Também vêm da Relação das Atividades em Grupo do CELK. Digitar um CPF ou CNS que já existe em outro cadastro une os dois (com Desfazer).
+- **Critérios automáticos podem ser removidos** (idade, gestante, listas do Metabase, condições, rua do C10, histórico do CELK), com motivo. Ficam riscados, não somam, valem em todas as abas e continuam removidos nas próximas importações. Restaurar volta ao automático.
+- **Gestantes:** a gaveta ganha a aba **Classificação de Risco** (o que você marca vale nas duas) e os contatos viram um histórico só: o registro mais recente, da aba Gestantes ou da Classificação de Risco, decide a etapa nas duas.
+- 7 testes internos novos (330 no total).
+
 ## Versão 2.52
 
 - Cabeçalho compacto em todas as páginas, no computador: título, filtros de período e os botões da aba (Importar CSV, Adicionar pessoa, Marcar condição…) ficam numa barra só, no alto. Saíram o subtítulo (aparece ao passar o mouse no título; continua na impressão), a linha "Indicadores / …" e a linha de fontes ("Metabase atualizado em…", contagens). O conteúdo começa logo abaixo da barra.

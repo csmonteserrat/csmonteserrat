@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.52
+# Acompanhamento Odontológico · versão 2.53
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -117,6 +117,10 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - Gaveta por pessoa: Classificação (conta aberta, critério por critério, com a origem), Histórico odontológico (atendimentos do CELK, atividades coletivas, avaliações do PSE, gestação e registros), Acompanhamento e Dados cadastrais.
 - Subaba "Escala de risco": todos os critérios com pontos, nível de evidência, fonte do dado, pergunta do formulário e quantas pessoas têm cada um; ruas do C10; distribuição × meta da pilotagem; regras de cálculo.
 - O backup analítico não leva os dados das pessoas da classificação (só a lista de ruas do C10).
+- **Uma pessoa só:** cadastros com o mesmo prontuário, CPF ou CNS se juntam sozinhos; os parecidos (nascimento igual ou quase e nome parecido, com a % de semelhança) ficam em **Configurações › Cadastros duplicados** para unir ou marcar como pessoas diferentes. Uniões podem ser desfeitas.
+- **CPF e CNS** nos Dados cadastrais de todas as gavetas (com dígito verificador); também vêm da Relação das Atividades em Grupo.
+- **Critérios automáticos podem ser removidos** com motivo: ficam riscados, não somam e continuam removidos nas próximas importações.
+- Gestantes: a gaveta tem a aba Classificação de Risco, e os contatos da aba Gestantes e da Classificação de Risco formam um histórico só.
 
 ## Publicar no Render
 
