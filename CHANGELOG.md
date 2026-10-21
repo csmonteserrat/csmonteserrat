@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## Versão 2.52
+
+- Cabeçalho mais compacto em todas as páginas, para telas menores: a data de atualização, os snapshots e o backup foram para a barra de cima; o subtítulo ocupa uma linha (o texto inteiro aparece ao passar o mouse); Backup e Imprimir viram só ícone abaixo de 1500 px; os filtros de período só aparecem nas páginas que usam período (somem em Gestantes, Crianças, Idosos, Condições de saúde, Classificação de Risco e Calculadora); nas páginas com "Importar CSV" próprio, o "Importar relatórios" de cima não se repete.
+
 ## Versão 2.51
 
 - Correção: marcar "acamado ou domiciliado" (C05) na Classificação de Risco não aparecia em Idosos. Agora a situação fica num lugar só por pessoa e vale na Classificação de Risco, em Idosos e em Condições de saúde. O que já estava marcado nas duas abas foi juntado (o C05 da Classificação de Risco entra como "acamado ou domiciliado"; dá para escolher qual dos dois na gaveta).

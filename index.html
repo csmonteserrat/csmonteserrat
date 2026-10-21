@@ -8,14 +8,14 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'self'; form-action 'self'">
   <title>Acompanhamento Odontológico</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./assets/app.css?v=2.51">
+  <link rel="stylesheet" href="./assets/app.css?v=2.52">
 </head>
 <body>
   <div class="app-shell" id="appShell">
     <aside class="sidebar" aria-label="Navegação principal">
       <div class="brand-row">
         <div class="brand" title="Acompanhamento Odontológico"><span data-icon="tooth"></span></div>
-        <div class="brand-text"><strong>Acompanhamento</strong><span>Saúde Bucal · v2.51</span></div>
+        <div class="brand-text"><strong>Acompanhamento</strong><span>Saúde Bucal · v2.52</span></div>
       </div>
       <nav class="side-nav" aria-label="Módulos da ferramenta">
         <button class="side-btn active" data-view="overview" aria-label="Visão geral" title="Visão geral"><span class="side-btn-icon" data-icon="grid"></span><span class="side-btn-label">Visão geral</span></button>
@@ -39,6 +39,11 @@
         <span data-icon="search"></span>
         <input id="globalSearch" type="search" autocomplete="off" placeholder="Buscar indicador, equipe ou importação...">
       </label>
+      <div class="source-meta top-meta" aria-label="Contexto da análise">
+        <span id="lastUpdate">Nenhum relatório importado</span><i></i>
+        <span id="snapshotCount">0 snapshots</span><i></i>
+        <span id="backupStatus">Backup ainda não exportado</span>
+      </div>
       <div class="top-spacer"></div>
       <div class="privacy-chip"><span class="privacy-dot"></span>Processamento local</div>
       <button class="icon-btn" id="saveBtn" title="Nada fica salvo no navegador. Exportar backup agora." aria-label="Exportar backup agora"><span data-icon="database"></span><i class="side-badge hidden" id="saveBadge">!</i></button>
@@ -54,19 +59,14 @@
             <p class="subtitle" id="pageSubtitle">Acompanhamento mensal e quadrimestral com leitura municipal, federal e painel operacional 2I.</p>
           </div>
           <div class="actions">
-            <button class="btn" id="backupBtn"><span data-icon="database"></span>Backup</button>
-            <button class="btn" id="printBtn"><span data-icon="print"></span>Imprimir</button>
+            <button class="btn" id="backupBtn" title="Backup" aria-label="Backup"><span data-icon="database"></span><span class="btn-label">Backup</span></button>
+            <button class="btn" id="printBtn" title="Imprimir" aria-label="Imprimir"><span data-icon="print"></span><span class="btn-label">Imprimir</span></button>
             <button class="btn primary" id="importBtn"><span data-icon="upload"></span>Importar relatórios</button>
           </div>
         </div>
 
         <div class="m-ctx m-only" id="mCtx"></div>
         <section class="source-strip" aria-label="Contexto da análise">
-          <div class="source-meta">
-            <span id="lastUpdate">Nenhum relatório importado</span><i></i>
-            <span id="snapshotCount">0 snapshots</span><i></i>
-            <span id="backupStatus">Backup ainda não exportado</span>
-          </div>
           <div class="filters">
             <select class="filter" id="yearFilter" aria-label="Ano"></select>
             <select class="filter" id="quarterFilter" aria-label="Quadrimestre">
@@ -124,6 +124,6 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="./assets/app.js?v=2.51"></script>
+  <script type="module" src="./assets/app.js?v=2.52"></script>
 </body>
 </html>
