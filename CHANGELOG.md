@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## Versão 2.47
+
+- Nova página **Idosos** (na barra lateral, abaixo do PSE), a partir do CSV de idosos do Metabase. Lê o formato atual (prontuário, equipe, idade, data de atualização, nome, sexo, endereço e telefones) e o formato antigo, que só completa a data de nascimento de quem já está na lista atual. Os arquivos se somam como os de gestantes.
+- Subabas Todos os idosos, ILPI e Acamados e restritos ao domicílio; painel com o percentual de idosos com consulta odontológica no CELK nos últimos 12 meses; fila A contatar, Em contato, Agendado e Atendido; cor do card pela faixa da Classificação de Risco.
+- ILPI: Asilo Irmão Joaquim reconhecido pela Av. Mauro Ramos, 901; sugestões de outras ILPIs pelo complemento do endereço; registrar visita à ILPI para todos os residentes.
+- Gaveta do idoso com Acompanhamento (situação, ILPI, telefones, registros), Histórico odontológico, Classificação de risco e Dados cadastrais.
+- Classificação de Risco: idosos entram sempre (origem "Idoso"), com a idade do Metabase; "Acamado" ou "Restrito ao domicílio" na aba Idosos vira o C05 automático.
+- 6 testes internos novos (311 no total).
+
 ## Versão 2.46
 
 - Barra lateral reorganizada: Visão geral, Gestantes, PSE, Classificação de Risco, Indicadores, Análise, Calculadora e Configurações.

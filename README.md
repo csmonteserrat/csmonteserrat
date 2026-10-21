@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.46
+# Acompanhamento Odontológico · versão 2.47
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -82,6 +82,16 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - O relatório de produção **Procedimentos Detalhado** do CELK traz o paciente como "( código ) NOME". Esse código é o mesmo número do prontuário. Um atendimento da equipe de saúde bucal **entre a DUM e a DPP** (ou até o parto, se ele veio antes) conta a gestante como atendida. Sem DUM e sem DPP, o atendimento do CELK não conta: complete a data (filtro "Dados incompletos"). A atividade educativa em grupo não conta.
 - Ao importar a produção (CSV ou PDF), o app guarda um **cadastro de pacientes** (código do CELK → nome). Com ele, o nome é preenchido automaticamente nas listas anonimizadas, como a do Monitora APS, e no cadastro manual de gestante ao digitar o prontuário. Esse cadastro vai no backup completo, mas não no analítico.
 - Os dados completados à mão ficam guardados pelo número da Usuária. Se ela aparecer depois no CSV do Metabase, migram para esse registro sem sobrescrever o que o Metabase traz.
+
+## Idosos
+
+- A lista vem do CSV de idosos do **Metabase** (formato atual): Cd Usu Cadsus (prontuário do CELK), Cd Equipe, Nr Idade Fim, Ts Atualizacao, Nm Usuario, Sg Sexo, Ds Endereco e os telefones (celular primeiro). As colunas de consulta médica, peso e vacina são ignoradas. Cada CSV se soma aos anteriores; o mais recente pelo Ts Atualizacao atualiza o que mudou, e quem não vier no último arquivo fica com o aviso "Não veio no último arquivo".
+- O CSV no **formato antigo** (com Data Nascimento) só completa a data de nascimento (e o nome, endereço ou telefone que faltar) de quem já está na lista atual. Ninguém entra na lista por ele. O prontuário com vírgula de milhar ("428,561") é corrigido.
+- Subabas: **Todos os idosos**, **ILPI** e **Acamados e restritos ao domicílio**. "Atendido" = consulta odontológica no CELK nos últimos 12 meses; volta para "A contatar" 12 meses depois. Fila: A contatar, Em contato, Agendado e Atendido (os registros valem também na Classificação de Risco).
+- Cor do card = faixa da Classificação de Risco; a etiqueta mostra a etapa.
+- ILPI: o **Asilo Irmão Joaquim** é reconhecido pela Av. Mauro Ramos, 901, com qualquer complemento. Endereços com ASILO, LAR, REPOUSO, ILPI ou CUIDADOS no complemento viram sugestão para confirmar (criar ILPI, juntar a uma existente ou "Não é"). Na gaveta dá para marcar ou tirar uma pessoa da ILPI.
+- Situação na gaveta (Nenhuma, Acamado, Restrito ao domicílio): leva a pessoa para a subaba e vale como C05 automático na Classificação de Risco.
+- Os idosos entram sempre na Classificação de Risco (origem "Idoso"), com a idade do Metabase quando não há data de nascimento.
 
 ## Classificação de Risco (busca ativa)
 

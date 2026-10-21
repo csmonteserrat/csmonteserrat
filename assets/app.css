@@ -1000,3 +1000,28 @@ table.pr-table{min-width:0;width:100%;font-size:12.5px}table.pr-table tr.sel td{
 
 /* Indicadores (v2.46): no celular a alternância Municipal/Federal já fica no topo (m-seg) */
 @media(max-width:760px){.ind-tabs{display:none}}
+/* Idosos (v2.47) */
+.id-stg.amber{color:#a96c16;background:#fff7e9}.id-stg.blue{color:#3a52c4;background:#eff1ff}.id-stg.teal{color:#1f7a80;background:#eaf8fa}.id-stg.green{color:#247a4b;background:#edf9f3}
+.id-ilpi{color:#1f7a80;border:1px solid #bfe8ee}.id-acam{color:#5d5488;border:1px solid #d9d4ec}
+.id-risk{display:inline-flex;gap:6px;align-items:center;font-size:11px;color:var(--muted)}
+.id-risk i{font-style:normal;font-weight:750;font-size:10.5px;border-radius:99px;padding:1px 8px;color:var(--ink);border:1px solid color-mix(in srgb,var(--edge) 45%,transparent);background:#fff;white-space:nowrap}
+.id-sw{width:14px;height:10px;border-radius:3px;background:var(--tint);border:1px solid color-mix(in srgb,var(--edge) 45%,transparent);display:inline-block}
+.id-ilpi-card{padding:0;margin-bottom:14px}
+.id-ilpi-h{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--inner)}
+.id-ilpi-h>div:first-child{flex:1 1 260px;min-width:0}.id-ilpi-h h3{margin:0;font-size:15px}.id-ilpi-h p{margin:3px 0 0;font-size:11.5px;color:var(--muted)}
+.id-k{grid-template-columns:repeat(3,minmax(0,1fr));flex:1 1 320px}
+.id-rows{display:grid;max-height:420px;overflow:auto}
+.id-row{display:grid;grid-template-columns:minmax(0,1.4fr) 110px auto auto;gap:12px;align-items:center;padding:9px 16px;border:0;border-top:1px solid var(--inner);background:none;text-align:left;cursor:pointer;width:100%}
+.id-row:first-child{border-top:0}.id-row:hover{background:var(--surface-2)}.id-row b{font-size:12.5px}.id-row small{display:block;color:var(--muted);font-size:10.5px}
+.id-ilpi-f{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--inner)}
+.id-sug{display:grid;gap:8px;padding:12px 16px 16px}
+.id-sug-r{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px dashed var(--border);border-radius:11px;padding:10px 12px}
+.id-sug-r b{font-size:12.5px}.id-sug-r small{display:block;color:var(--muted);font-size:11px;line-height:1.4}
+.id-seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--inner);border-radius:10px;padding:3px}
+.id-seg button{border:0;background:none;border-radius:8px;height:32px;font-size:12px;font-weight:650;color:var(--muted);cursor:pointer}.id-seg button.on{background:#fff;color:var(--text);box-shadow:var(--shadow)}
+.id-ilpi-set select{width:100%;height:34px;border:1px solid var(--border);border-radius:9px;padding:0 8px;background:#fff;font-size:12.5px}
+.id-phones{display:grid;gap:6px}.id-phones>div{display:flex;gap:10px;align-items:center;justify-content:space-between;border:1px solid var(--inner);border-radius:10px;padding:8px 10px}
+.id-phones b{font-variant-numeric:tabular-nums}.id-phones small{display:block;font-size:10.5px;color:var(--muted)}
+.id-imp{display:grid;gap:8px}.id-imp>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid var(--inner);border-radius:11px;padding:10px 12px;background:var(--surface-2)}
+.id-imp small{display:block;color:var(--muted);font-size:11px;line-height:1.45}.id-imp>div>b{font-size:18px;font-variant-numeric:tabular-nums}
+@media(max-width:760px){.id-row{grid-template-columns:minmax(0,1fr) auto}.id-row .id-hide,.id-row .id-stg{display:none}.id-sug-r{grid-template-columns:1fr}.id-k{grid-template-columns:repeat(3,minmax(0,1fr))}}
