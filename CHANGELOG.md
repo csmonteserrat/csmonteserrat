@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## Versão 2.54
+
+- Importa o **Boletim Diário dos Atendimentos** do CELK (CSV), reconhecido pelas colunas. Para quem já está no app (pelo prontuário ou pelo CNS), completa CNS, nascimento, sexo e telefone só onde estiver vazio. Quem não está no app não é guardado; dos atendimentos, só ficam os CIDs da lista.
+- **Critérios pelo CID:** B04 diabetes, B05 hipertensão, B06 HIV ou imunossupressão, B07 deficiência, B08 álcool ou drogas e B09 tabagismo, pela lista de CIDs por critério. Só marca quando o critério não está marcado de outro jeito (lista do Metabase, Condições de saúde ou à mão). Entra como automático ("CID F84.0 no CELK em 01/09/2026"), fica até você remover e tem Remover. Código de 3 caracteres da lista vale para a categoria inteira.
+- Quem tem esses CIDs aparece também nas subabas de Condições de saúde, com o nome do CID na etiqueta.
+- 2 testes internos novos (332 no total).
+
 ## Versão 2.53
 
 - **Uma pessoa só em todas as abas.** Cadastros com o mesmo prontuário, CPF ou CNS se juntam sozinhos. Os outros parecidos (nascimento igual ou quase e nome parecido) aparecem em **Configurações › Cadastros duplicados**, com a % de semelhança e o porquê, para unir ou marcar "Não são a mesma pessoa". Unir leva critérios, avaliação clínica, contatos, situação, condições e correções; dá para escolher os campos diferentes e desfazer depois.

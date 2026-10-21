@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.53
+# Acompanhamento Odontológico · versão 2.54
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -120,6 +120,7 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - **Uma pessoa só:** cadastros com o mesmo prontuário, CPF ou CNS se juntam sozinhos; os parecidos (nascimento igual ou quase e nome parecido, com a % de semelhança) ficam em **Configurações › Cadastros duplicados** para unir ou marcar como pessoas diferentes. Uniões podem ser desfeitas.
 - **CPF e CNS** nos Dados cadastrais de todas as gavetas (com dígito verificador); também vêm da Relação das Atividades em Grupo.
 - **Critérios automáticos podem ser removidos** com motivo: ficam riscados, não somam e continuam removidos nas próximas importações.
+- **Boletim Diário dos Atendimentos (CELK):** completa CNS, nascimento, sexo e telefone de quem já está no app e marca B04 a B09 pelos CIDs da lista, só quando o critério não está marcado. Quem não está no app não é guardado.
 - Gestantes: a gaveta tem a aba Classificação de Risco, e os contatos da aba Gestantes e da Classificação de Risco formam um histórico só.
 
 ## Publicar no Render
