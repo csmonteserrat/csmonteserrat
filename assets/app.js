@@ -21,7 +21,7 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.43';
+const APP_VERSION = '2.44';
 const SELF_TEST_COUNT = 304;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
@@ -3851,7 +3851,7 @@ function rkC10HTML(all){const s=rkStore(),ruas={};for(const {p} of all){const r=
       <p class="rk-note">Os endereços vêm das gestantes, do PSE e de quem foi incluído à mão. O cadastro do CELK não traz endereço. Quem está sem endereço ou em situação de rua não entra; situação de rua já pontua no C16.</p></div></div></section>`}
 function rkEscalaHTML(all){const lv=n=>`<span class="rk-lv l${n}" title="Nível ${n}">${n}</span>`;
   return `<section class="card rk-box"><div class="rk-sec-h"><span class="pq-sec-t">Como a soma funciona</span><small>Protocolo v2.0 · 19 e 20/10/2026</small></div>
-    <div class="rk-formula"><div><span>Condição clínica</span><b>0 a 40</b><small>vale só a mais grave</small></div><i>+</i><div><span>Formulário</span><b>0 a 12</b><small>autopercepção, impacto, dor nos últimos 6 meses</small></div><i>+</i><div><span>Ciclo de vida + social</span><b>0 a 40</b><small>soma limitada ao teto de 40</small></div><i>=</i><div class="tot"><span>Total</span><b>0 a 92</b><small>pontos inteiros; sinais de alarme ficam fora</small></div></div>
+    <div class="rk-formula"><div><span>Condição clínica</span><b>0 a 40</b><small>vale só a mais grave</small></div><i>+</i><div><span>Autopercepção de saúde bucal</span><b>0 a 12</b><small>autopercepção, impacto, dor nos últimos 6 meses</small></div><i>+</i><div><span>Ciclo de vida + social</span><b>0 a 40</b><small>soma limitada ao teto de 40</small></div><i>=</i><div class="tot"><span>Total</span><b>0 a 92</b><small>pontos inteiros; sinais de alarme ficam fora</small></div></div>
     <div class="rk-fx">${[['Vermelho','Sinal de alarme'],['Laranja','Dor aguda, abscesso, trauma recente, gestante com condição aguda'],['Amarelo','Outras agudas, lesão suspeita, consequência da cárie sem dor'],['Verde','35 pontos ou mais'],['Azul','15 a 34 pontos'],['Violeta','Menos de 15 pontos']].map(([f,t])=>`<div class="tone-${RK_TONE[f]}"><b>${f}</b><span>${RK_PRAZO[f]}</span><small>${t}</small></div>`).join('')}</div></section>
   ${rkMetaHTML(all)}
   <section class="card rk-box"><div class="rk-toc">${RK_ESCALA.map(g=>`<button type="button" data-rk-jump="rk-${g.k}">${g.t} · ${g.it.length}</button>`).join('')}<button type="button" data-rk-jump="rk-c10">Ruas do C10</button><button type="button" data-rk-jump="rk-regras">Regras</button></div>

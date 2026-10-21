@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## Versão 2.44
+
+- Classificação de Risco → Escala de risco: em "Como a soma funciona", o bloco "Formulário" passou a se chamar "Autopercepção de saúde bucal".
+
 ## Versão 2.43
 
 - Classificação de Risco: quem vem só do cadastro de pacientes do CELK entra na lista apenas se teve atendimento nos últimos 2 anos (pela data do último atendimento no Procedimentos Detalhado). Gestantes, alunos do PSE e pessoas incluídas à mão continuam entrando sempre, com ou sem atendimento.
