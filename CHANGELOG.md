@@ -2,7 +2,9 @@
 
 ## Versão 2.52
 
-- Cabeçalho mais compacto em todas as páginas, para telas menores: a data de atualização, os snapshots e o backup foram para a barra de cima; o subtítulo ocupa uma linha (o texto inteiro aparece ao passar o mouse); Backup e Imprimir viram só ícone abaixo de 1500 px; os filtros de período só aparecem nas páginas que usam período (somem em Gestantes, Crianças, Idosos, Condições de saúde, Classificação de Risco e Calculadora); nas páginas com "Importar CSV" próprio, o "Importar relatórios" de cima não se repete.
+- Cabeçalho compacto em todas as páginas, no computador: título, filtros de período e os botões da aba (Importar CSV, Adicionar pessoa, Marcar condição…) ficam numa barra só, no alto. Saíram o subtítulo (aparece ao passar o mouse no título; continua na impressão), a linha "Indicadores / …" e a linha de fontes ("Metabase atualizado em…", contagens). O conteúdo começa logo abaixo da barra.
+- Busca, Imprimir, Backup e Salvar viram ícones; em telas menores a busca abre ao clicar. Os filtros de período só aparecem onde são usados; abaixo de 1100 px vão para uma segunda linha.
+- Celular sem mudanças. 1 teste interno novo (323 no total).
 
 ## Versão 2.51
 

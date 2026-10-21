@@ -35,6 +35,19 @@
     </aside>
 
     <header class="topbar">
+      <div class="top-title" id="topTitle" aria-hidden="true">Acompanhamento Odontológico</div>
+      <div class="filters top-filters">
+        <select class="filter" id="yearFilter" aria-label="Ano"></select>
+        <select class="filter" id="quarterFilter" aria-label="Quadrimestre">
+          <option value="1">Q1 · jan–abr</option>
+          <option value="2">Q2 · mai–ago</option>
+          <option value="3">Q3 · set–dez</option>
+        </select>
+        <select class="filter" id="monthFilter" aria-label="Competência"></select>
+        <select class="filter" id="unitFilter" aria-label="Unidade"><option value="">Todas as unidades</option></select>
+      </div>
+      <div class="top-spacer"></div>
+      <div class="top-actions" id="topActions"></div>
       <label class="search-box" for="globalSearch">
         <span data-icon="search"></span>
         <input id="globalSearch" type="search" autocomplete="off" placeholder="Buscar indicador, equipe ou importação...">
@@ -44,9 +57,11 @@
         <span id="snapshotCount">0 snapshots</span><i></i>
         <span id="backupStatus">Backup ainda não exportado</span>
       </div>
-      <div class="top-spacer"></div>
       <div class="privacy-chip"><span class="privacy-dot"></span>Processamento local</div>
+      <button class="icon-btn" id="printBtn" title="Imprimir" aria-label="Imprimir"><span data-icon="print"></span></button>
+      <button class="icon-btn" id="backupBtn" title="Backup: exportar ou restaurar" aria-label="Backup"><span data-icon="download"></span></button>
       <button class="icon-btn" id="saveBtn" title="Nada fica salvo no navegador. Exportar backup agora." aria-label="Exportar backup agora"><span data-icon="database"></span><i class="side-badge hidden" id="saveBadge">!</i></button>
+      <button class="btn primary" id="importBtn" title="Importar relatórios (PDF ou CSV)"><span data-icon="upload"></span>Importar</button>
     </header>
 
     <main class="workspace">
@@ -58,26 +73,9 @@
             <button class="icon-btn m-only m-menu-btn" type="button" data-m-sheet="menu" aria-label="Mais opções"><span data-icon="more"></span></button>
             <p class="subtitle" id="pageSubtitle">Acompanhamento mensal e quadrimestral com leitura municipal, federal e painel operacional 2I.</p>
           </div>
-          <div class="actions">
-            <button class="btn" id="backupBtn" title="Backup" aria-label="Backup"><span data-icon="database"></span><span class="btn-label">Backup</span></button>
-            <button class="btn" id="printBtn" title="Imprimir" aria-label="Imprimir"><span data-icon="print"></span><span class="btn-label">Imprimir</span></button>
-            <button class="btn primary" id="importBtn"><span data-icon="upload"></span>Importar relatórios</button>
-          </div>
         </div>
 
         <div class="m-ctx m-only" id="mCtx"></div>
-        <section class="source-strip" aria-label="Contexto da análise">
-          <div class="filters">
-            <select class="filter" id="yearFilter" aria-label="Ano"></select>
-            <select class="filter" id="quarterFilter" aria-label="Quadrimestre">
-              <option value="1">Q1 · jan–abr</option>
-              <option value="2">Q2 · mai–ago</option>
-              <option value="3">Q3 · set–dez</option>
-            </select>
-            <select class="filter" id="monthFilter" aria-label="Competência"></select>
-            <select class="filter" id="unitFilter" aria-label="Unidade"><option value="">Todas as unidades</option></select>
-          </div>
-        </section>
 
         <section class="view" id="view-overview"></section>
         <section class="view hidden" id="view-municipal"></section>
