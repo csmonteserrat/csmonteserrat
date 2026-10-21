@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Versão 2.46
+
+- Barra lateral reorganizada: Visão geral, Gestantes, PSE, Classificação de Risco, Indicadores, Análise, Calculadora e Configurações.
+- Municipal e Federal viraram um item só, **Indicadores**, com as subabas "Municipal · M1–M5" e "Federal · B1–B6" no topo da página (o conteúdo de cada uma não mudou). O item abre a última aba usada e fica marcado nas duas.
+- "Procedimentos" passou a se chamar **Análise** (barra lateral, título da página e menu "Mais" do celular).
+
 ## Versão 2.45
 
 - Escala de risco: o grupo "Modificadores do formulário" do quadro de critérios (e a regra correspondente) passou a se chamar "Autopercepção de saúde bucal".
