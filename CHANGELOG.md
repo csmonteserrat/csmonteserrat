@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## Versão 2.45
+
+- Escala de risco: o grupo "Modificadores do formulário" do quadro de critérios (e a regra correspondente) passou a se chamar "Autopercepção de saúde bucal".
+
 ## Versão 2.44
 
 - Classificação de Risco → Escala de risco: em "Como a soma funciona", o bloco "Formulário" passou a se chamar "Autopercepção de saúde bucal".
