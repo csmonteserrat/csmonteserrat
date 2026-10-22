@@ -21,8 +21,8 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.56';
-const SELF_TEST_COUNT = 336;
+const APP_VERSION = '2.57';
+const SELF_TEST_COUNT = 337;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -273,9 +273,11 @@ function readAutosavePref(){try{return localStorage.getItem(AUTOSAVE_PREF)!=='of
 function writeAutosavePref(on){try{localStorage.setItem(AUTOSAVE_PREF,on?'on':'off')}catch{}}
 function openLocalDB(){return new Promise((resolve,reject)=>{if(typeof indexedDB==='undefined')return reject(new Error('Este navegador não oferece IndexedDB.'));const req=indexedDB.open(LOCAL_DB,1);req.onupgradeneeded=()=>req.result.createObjectStore(LOCAL_STORE);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
 async function localDB(mode,fn){const db=await openLocalDB();try{return await new Promise((resolve,reject)=>{const tx=db.transaction(LOCAL_STORE,mode),req=fn(tx.objectStore(LOCAL_STORE));tx.oncomplete=()=>resolve(req?.result);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}finally{db.close()}}
-async function saveToBrowserNow(){clearTimeout(localSave.timer);localSave.timer=null;if(!localSave.enabled)return;try{const at=nowISO();await localDB('readwrite',st=>st.put({savedAt:at,appVersion:APP_VERSION,state:JSON.parse(JSON.stringify(state))},LOCAL_KEY));localSave.lastSavedAt=at;localSave.error=''}catch(e){localSave.error=e?.message||String(e)}refreshSaveStatus()}
-function scheduleBrowserSave(){if(!localSave.enabled)return;clearTimeout(localSave.timer);localSave.timer=setTimeout(saveToBrowserNow,600)}
-async function loadFromBrowser(){try{return await localDB('readonly',st=>st.get(LOCAL_KEY))||null}catch(e){localSave.error=e?.message||String(e);return null}}
+async function saveToBrowserNow(){clearTimeout(localSave.timer);localSave.timer=null;if(!localSave.enabled)return;try{const at=nowISO();// Desempenho (v2.57): grava o JSON em texto (uma passada só, em vez de stringify + parse).
+    const json=JSON.stringify(state);await localDB('readwrite',st=>st.put({savedAt:at,appVersion:APP_VERSION,json},LOCAL_KEY));localSave.lastSavedAt=at;localSave.error=''}catch(e){localSave.error=e?.message||String(e)}refreshSaveStatus()}
+// Espera a pessoa parar de clicar e o navegador ficar livre; ao sair da aba, grava na hora o que estiver pendente.
+function scheduleBrowserSave(){if(!localSave.enabled)return;clearTimeout(localSave.timer);localSave.timer=setTimeout(()=>window.requestIdleCallback?requestIdleCallback(()=>saveToBrowserNow(),{timeout:2000}):saveToBrowserNow(),1200)}
+async function loadFromBrowser(){try{const r=await localDB('readonly',st=>st.get(LOCAL_KEY))||null;if(r&&r.json&&!r.state)r.state=JSON.parse(r.json);return r}catch(e){localSave.error=e?.message||String(e);return null}}
 async function deleteBrowserCopy(){clearTimeout(localSave.timer);localSave.timer=null;try{await localDB('readwrite',st=>st.delete(LOCAL_KEY))}catch(e){localSave.error=e?.message||String(e)}localSave.lastSavedAt=null}
 async function clearBrowserData(){await deleteBrowserCopy();state=defaultState();sessionRaw=new Map();pregDrawer={id:null,tab:'acomp',edit:false,sched:false};prodIndexCache={key:'',map:new Map()};closeModal();closeDrawer();activeView='overview';refreshAll();toast('Dados apagados deste navegador. A tela voltou ao início.')}
 async function setAutosave(on){localSave.enabled=on;writeAutosavePref(on);if(on){await saveToBrowserNow();toast('Salvamento automático ligado: os dados ficam guardados neste navegador.')}else{await deleteBrowserCopy();toast('Salvamento automático desligado. A cópia guardada neste navegador foi apagada; os dados continuam abertos nesta aba até você fechá-la.')}refreshAll()}
@@ -284,7 +286,13 @@ async function deriveKey(password,salt,usage=['encrypt','decrypt']){const base=a
 async function encryptJSON(payload,password){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),key=await deriveKey(password,salt);const plain=new TextEncoder().encode(JSON.stringify(payload));const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,plain);return {encrypted:true,kdf:'PBKDF2-SHA256',iterations:250000,cipher:'AES-GCM',salt:bytesToBase64(salt),iv:bytesToBase64(iv),ciphertext:bytesToBase64(new Uint8Array(cipher))}}
 async function decryptJSON(wrapper,password){const salt=base64ToBytes(wrapper.salt),iv=base64ToBytes(wrapper.iv),key=await deriveKey(password,salt);const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv},key,base64ToBytes(wrapper.ciphertext));return JSON.parse(new TextDecoder().decode(plain))}
 async function persistState(){state.updatedAt=nowISO();refreshSaveStatus();scheduleBrowserSave()}
-const queueSave=()=>{state.dirty=true;state.updatedAt=nowISO();refreshSaveStatus();scheduleBrowserSave()};
+let dataGen=0;
+// Assinatura dos dados que mudam as contas por pessoa (não inclui preferências de tela). Só é refeita quando algo foi salvo;
+// trocar de aba ou de filtro salva as preferências, mas a assinatura fica igual e o que já foi calculado continua valendo.
+let sigGen=-1,sigState=null,sigVal='';
+function dataSig(){if(sigGen===dataGen&&sigState===state)return sigVal;sigGen=dataGen;sigState=state;const g=state.gestantes||{};
+  sigVal=JSON.stringify([state.snapshots.map(x=>x.id+(x.supersededBy||'')),dirVersion,Object.keys(state.patientDirectory||{}).length,state.risco,state.condicoes,state.pse,state.idosos,g.followups,g.overrides,g.manual,g.excluded]);return sigVal}
+const queueSave=()=>{dataGen++;state.dirty=true;state.updatedAt=nowISO();refreshSaveStatus();scheduleBrowserSave()};
 function audit(action,details={}){state.audit.push({id:uuid(),at:nowISO(),action,details});if(state.audit.length>1000)state.audit=state.audit.slice(-1000);queueSave()}
 
 async function loadPdfJs(){
@@ -667,7 +675,8 @@ async function parseMonitoraCSV(file,hash,text){
 // Serve para completar automaticamente o nome em listas anonimizadas (Monitora APS e futuras) e no
 // cadastro manual de gestante. A última importação vence (corrige grafias).
 function patientNameFor(code){const k=pid(code);return k?state.patientDirectory?.[k]?.nome||'':''}
-function rememberPatientNames(names,fonte){if(!names)return {total:0,changed:0};state.patientDirectory=state.patientDirectory||{};let changed=0,total=0;for(const [k,nome] of Object.entries(names)){if(!k||!nome)continue;total++;if(state.patientDirectory[k]?.nome!==nome)changed++;state.patientDirectory[k]={nome,fonte,atualizadoEm:nowISO()}}if(changed)audit('patient_directory_updated',{total,changed,fonte});return {total,changed}}
+let dirVersion=0;
+function rememberPatientNames(names,fonte){if(!names)return {total:0,changed:0};dirVersion++;state.patientDirectory=state.patientDirectory||{};let changed=0,total=0;for(const [k,nome] of Object.entries(names)){if(!k||!nome)continue;total++;if(state.patientDirectory[k]?.nome!==nome)changed++;state.patientDirectory[k]={nome,fonte,atualizadoEm:nowISO()}}if(changed)audit('patient_directory_updated',{total,changed,fonte});return {total,changed}}
 // ---- Listas de gestantes somadas (v2.15): nenhum arquivo apaga o outro ----
 // Cada novo CSV do Metabase (gestantes) ou do Monitora APS é SOMADO aos anteriores: a mesma gestante não
 // duplica (Metabase: mesmo episódio = prontuário + DUM/DPP; Monitora: mesmo número de Usuária), o dado mais
@@ -2335,7 +2344,7 @@ function pregPhonesField(e,edit){const extras=(e.telefonesExtras||[]).filter(Boo
   if(!edit)return `<div class="pq-f full"><span>Celular</span><b>${esc(e.telefone||'—')}</b>${extras.map(x=>`<b>${esc(x)}</b>`).join('')}</div>`;
   return `<div class="pq-f full" id="efPhones"><span>Celular</span>${pregPhoneRow(e.telefone,false)}<div id="efPhonesExtra">${extras.map(x=>pregPhoneRow(x,true)).join('')}</div><button type="button" class="pq-link pq-add-phone" data-preg-add-phone>+ Adicionar outro número</button></div>`}
 function pregPhoneClick(ev){const add=ev.target.closest('[data-preg-add-phone]'),rm=ev.target.closest('[data-preg-rm-phone]');if(add){const box=document.getElementById('efPhonesExtra');if(!box)return;box.insertAdjacentHTML('beforeend',pregPhoneRow('',true));box.lastElementChild.querySelector('input')?.focus();return}if(rm)rm.closest('.pq-phone-row')?.remove()}
-function pregRiscoHTML(e){rkCache=null;const k=pregPersonKey(e),p=rkPeople().find(x=>x.key===k);if(!p)return '<p class="pq-empty-s">Esta gestante não está na Classificação de Risco (foi tirada da lista ou o cadastro foi removido).</p>';
+function pregRiscoHTML(e){rkFresh();const k=pregPersonKey(e),p=rkPeople().find(x=>x.key===k);if(!p)return '<p class="pq-empty-s">Esta gestante não está na Classificação de Risco (foi tirada da lista ou o cadastro foi removido).</p>';
   return `<p class="pq-d-hint">Mesma pontuação da aba Classificação de Risco: o que você marcar aqui vale lá também. <button type="button" class="pq-link" data-rk-open="${esc(p.key)}">Abrir na Classificação de Risco</button></p>${rkClassHTML(p,rkScore(p))}`}
 function openEpisode(id,tab,opts={}){
   const e=mergedEpisodes().find(x=>x.id===id||x.manualId===id);if(!e)return;drawerReopen=()=>openEpisode(e.id);
@@ -3040,6 +3049,10 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('335. Análise estatística tem a base Pessoas (prontuário) com as variáveis do mapa; "Tem o critério…" e "Está na lista de…" saem no CSV com o nome do item escolhido',()=>{const prev=sxSt;try{const ks=SX_BASES.pes.vars.map(v=>v.k),V=k=>ks.indexOf(k);sxSt={...sxSt,base:'pes',test:'chi',a:V('atendido_periodo'),b:V('criterio'),proc:{b:'B05 · Hipertensão'},merge:{},fv:null,fval:null};
       return ['sexo','ciclo_vida','faixa_risco','atendido_periodo','concluiu','entrou_urgencia','possivel_abandono','odonto_gestacao','atendida_apos_pse','canal_1o_contato','atendida_apos_contato','dias_contato_atendimento'].every(k=>ks.includes(k))&&SX_BASES.pes.vars.every((v,i)=>v.i===i)&&sxColFor(V('criterio'),'b')==='criterio_b05_hipertensao'&&sxVname(SX_BASES.pes.vars[V('lista')],'x')==='Na lista: —'&&SX_SUGG.pes.every(([t,a,b])=>SX_TESTS[t]&&SX_BASES.pes.vars[a]&&(b==null||SX_BASES.pes.vars[b]))&&SX_DEFX.pes.every(i=>SX_BASES.pes.vars[i])}finally{sxSt=prev}});
   await add('336. Imunossupressão e deficiência pelo CID entram com o tipo da aba (HIV/aids, TEA, visual, auditiva, intelectual), para a etiqueta curta e a contagem por tipo',()=>cidTipo('B06','Z21')==='HIV/aids'&&cidTipo('B07','F840')==='TEA (autismo)'&&cidTipo('B07','H542')==='Visual'&&cidTipo('B07','H903')==='Auditiva'&&cidTipo('B07','F70')==='Intelectual'&&cdOf({key:'p:1',cid:{B06:{c:'B24',n:'x',at:''}}}).imuno[0]==='HIV/aids');
+  await add('337. Desempenho: o cruzamento do PSE usa índices e fica guardado até algum dado mudar; trocar de aba não refaz as contas, e uma decisão salva refaz',()=>{const keep={snaps:state.snapshots,dir:state.patientDirectory,pse:state.pse};try{const kid={nome:'ANA TESTE',nasc:'2016-01-01',cpf:'',escola:'E',turma:'T',status:'Preenchida',risco:'Alto',aFazer:[],feitos:[],dataAval:'2026-09-20'};
+    state.snapshots=[{id:'p337',profile:PSE_PROFILE,createdAt:nowISO(),pse:{escolas:['E'],kids:[kid]}},{id:'g337',profile:'celk_atividades_grupo',createdAt:nowISO(),dataByMonth:{},participants:[{nome:'ANA TESTE',nasc:'2016-01-02',cpf:'',cns:'',sexo:'F',date:'2026-09-01',subject:'X'}]}];state.patientDirectory={};state.pse={mine:{},dec:{},overrides:{},followups:{}};queueSave();
+    const r=pseChildren()[0].last,a=pseLinks(r),b=pseLinks(r);state.preferences.pseTab='mine';queueSave();const c=pseLinks(r);state.pse.dec[r.key]={col:'no'};queueSave();const d=pseLinks(r);
+    return a===b&&a===c&&a.pendCol&&!d.pendCol&&pseTriangulate.toString().includes('pseColIndex')&&!pseProdByName.toString().includes('Object.keys')}finally{state.snapshots=keep.snaps;state.patientDirectory=keep.dir;state.pse=keep.pse;queueSave()}});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -3373,23 +3386,30 @@ function pseRecords({ignoreTurma=false}={}){const p=psePrefs(),camp=p.pseCamp||'
 let pseColCache={key:'',value:[]};
 function pseColParticipants(){const snaps=state.snapshots.filter(s=>s.profile==='celk_atividades_grupo'&&!s.supersededBy&&s.participants),key=snaps.map(s=>s.id).join('|');if(pseColCache.key===key)return pseColCache.value;
   const seen=new Map();for(const s of snaps)for(const p of s.participants){const k=p.cpf||pseNN(p.nome,p.nasc);const prev=seen.get(k);if(!prev)seen.set(k,{...p,dates:[{date:p.date,subject:p.subject,alt:p.alt}]});else{prev.dates.push({date:p.date,subject:p.subject,alt:p.alt});prev.cns=prev.cns||p.cns;prev.sexo=prev.sexo||p.sexo}}
-  for(const p of seen.values())p.dates.sort((a,b)=>String(a.date).localeCompare(String(b.date)));pseColCache={key,value:[...seen.values()]};return pseColCache.value}
+  for(const p of seen.values())p.dates.sort((a,b)=>String(a.date).localeCompare(String(b.date)));pseColCache={key,value:[...seen.values()],idx:null};return pseColCache.value}
+// Índices dos participantes (CPF, nome + nascimento, nome, nascimento), na mesma ordem da lista: a busca dá o mesmo resultado do find(), sem varrer tudo.
+function pseColIndex(){const list=pseColParticipants();if(pseColCache.idx)return pseColCache.idx;const add=(m,k,p)=>{if(!k)return;const a=m.get(k);if(a)a.push(p);else m.set(k,[p])};const ix={cpf:new Map(),nn:new Map(),nome:new Map(),nasc:new Map()};
+  for(const p of list){const n=norm(p.nome);if(p.cpf&&!ix.cpf.has(p.cpf))ix.cpf.set(p.cpf,p);add(ix.nn,`${n}|${p.nasc}`,p);add(ix.nome,n,p);add(ix.nasc,p.nasc,p)}pseColCache.idx=ix;return ix}
 let pseProdCache={key:'',value:null};
-function pseProdByName(){const dir=state.patientDirectory||{},key=`${Object.keys(dir).length}|${state.snapshots.length}`;if(pseProdCache.key===key)return pseProdCache.value;const m=new Map();for(const [code,v] of Object.entries(dir)){const n=norm(v?.nome);if(!n)continue;(m.get(n)||m.set(n,[]).get(n)).push(code)}pseProdCache={key,value:m};return m}
+// Desempenho (v2.57): a chave não percorre mais o cadastro inteiro a cada criança (15 mil nomes × cada aluno travava o PSE).
+function pseProdByName(){const dir=state.patientDirectory||{},key=`${dirVersion}|${state.snapshots.length}`;if(pseProdCache.key===key&&pseProdCache.dir===dir)return pseProdCache.value;const m=new Map();for(const [code,v] of Object.entries(dir)){const n=norm(v?.nome);if(!n)continue;(m.get(n)||m.set(n,[]).get(n)).push(code)}pseProdCache={key,dir,value:m};return m}
 function pseProdPatient(code){const visits=productionVisitsIndex().get(pid(code))||[];return {code:pid(code),nome:patientNameFor(code),visits}}
 const pseTokensSimilar=(a,b)=>{a=norm(a).split(' ');b=norm(b).split(' ');return a.filter(x=>b.includes(x)).length/Math.max(a.length,b.length)>=0.6};
 function pseTriangulate(r){
-  const ov=pseStore().overrides[r.key]||{},nome=ov.nome||r.nome,nasc=ov.nasc||r.nasc,cpf=(ov.cpf||r.cpf||'').replace(/\D/g,''),out={col:null,colState:'none',colWhy:'',prod:[],prodState:'none',prodWhy:''},col=pseColParticipants();
-  let c=cpf&&col.find(p=>p.cpf===cpf);if(c)Object.assign(out,{col:c,colState:'ok',colWhy:'CPF igual'});
-  else{c=col.find(p=>norm(p.nome)===norm(nome)&&p.nasc===nasc);if(c)Object.assign(out,{col:c,colState:'ok',colWhy:'nome e nascimento iguais'});
-    else{c=col.find(p=>norm(p.nome)===norm(nome)&&p.nasc!==nasc)||col.find(p=>p.nasc===nasc&&pseTokensSimilar(p.nome,nome));if(c)Object.assign(out,{col:c,colState:'def',colWhy:norm(c.nome)===norm(nome)?'nascimento diferente':'nome diferente'})}}
+  const ov=pseStore().overrides[r.key]||{},nome=ov.nome||r.nome,nasc=ov.nasc||r.nasc,cpf=(ov.cpf||r.cpf||'').replace(/\D/g,''),out={col:null,colState:'none',colWhy:'',prod:[],prodState:'none',prodWhy:''};
+  const ix=pseColIndex(),nn=norm(nome);let c=cpf&&ix.cpf.get(cpf);if(c)Object.assign(out,{col:c,colState:'ok',colWhy:'CPF igual'});
+  else{c=ix.nn.get(`${nn}|${nasc}`)?.[0];if(c)Object.assign(out,{col:c,colState:'ok',colWhy:'nome e nascimento iguais'});
+    else{c=(ix.nome.get(nn)||[]).find(p=>p.nasc!==nasc)||(ix.nasc.get(nasc)||[]).find(p=>pseTokensSimilar(p.nome,nome));if(c)Object.assign(out,{col:c,colState:'def',colWhy:norm(c.nome)===norm(nome)?'nascimento diferente':'nome diferente'})}}
   if(ov.pront){const p=pseProdPatient(ov.pront);return {...out,prod:[p],prodState:'ok',prodWhy:'prontuário informado por você'}}
   const codes=pseProdByName().get(norm(nome))||[];
   if(codes.length>1)Object.assign(out,{prod:codes.map(pseProdPatient),prodState:'def',prodWhy:`${codes.length} prontuários com o mesmo nome`});
   else if(codes.length===1){const p=pseProdPatient(codes[0]),v=p.visits.find(x=>x.age!=null);out.prod=[p];if(!v||!nasc)Object.assign(out,{prodState:'def',prodWhy:'sem idade no relatório para conferir'});else{const exp=ageAt({dataNascimento:nasc},parseDate(v.date));if(exp===v.age)Object.assign(out,{prodState:'ok',prodWhy:'nome igual e idade confere'});else Object.assign(out,{prodState:'def',prodWhy:`idade no atendimento ${v.age} anos, pelo nascimento seria ${exp}`})}}
   return out}
 const pseColKey=p=>p?(p.cpf||pseNN(p.nome,p.nasc)):'';
-function pseLinks(r){const t=pseTriangulate(r),d=pseStore().dec[r.key]||{};
+// Guardado por geração de dados: a mesma criança é consultada várias vezes na mesma tela (panorama, abas, contador).
+let pseLinksMemo=new WeakMap(),pseLinksGen=-1;
+function pseLinks(r){const sig=dataSig();if(pseLinksMemo.st!==state||pseLinksMemo.ps!==state.pse||pseLinksMemo.dir!==state.patientDirectory||pseLinksMemo.sig!==sig){pseLinksMemo=new WeakMap();Object.assign(pseLinksMemo,{st:state,ps:state.pse,dir:state.patientDirectory,sig});pseLinksGen=dataGen}const hit=pseLinksMemo.get(r);if(hit)return hit;const out=pseLinksCalc(r);pseLinksMemo.set(r,out);return out}
+function pseLinksCalc(r){const t=pseTriangulate(r),d=pseStore().dec[r.key]||{};
   const col=d.col==='no'?null:d.col?pseColParticipants().find(p=>pseColKey(p)===d.col)||null:t.colState==='ok'?t.col:null;
   const prod=d.prod==='no'?null:d.prod?pseProdPatient(d.prod):t.prodState==='ok'?t.prod[0]:null;
   const pendCol=t.colState==='def'&&!d.col,pendProd=t.prodState==='def'&&!d.prod;
@@ -3451,9 +3471,11 @@ function psePanoramaArtHTML(AO){const turmas=[...new Set(AO.map(r=>r.turma))].so
     <div class="pq-d-facts"><div><span>Preenchidas</span><b>${st('Preenchida')}</b></div><div><span>Ausentes / recusas</span><b>${st('Ausente')+st('Recusou')}</b></div><div><span>Com dentes a fazer</span><b>${withTodo}</b></div><div><span>Dentes a fazer · feitos</span><b>${todo} · ${done}</b></div></div>
     <div class="pq-d-facts"><div><span>TCLE assinado</span><b>${AO.filter(r=>r.tcle).length}</b></div><div><span>Encaminhadas à UBS</span><b>${AO.filter(r=>r.encArt).length}</b></div><div><span>Sem necessidade</span><b>${AO.filter(r=>r.semNec).length}</b></div><div><span>Turmas</span><b>${turmas.length}</b></div></div>
     <div class="table-scroll"><table class="ps-table"><thead><tr><th>Turma</th><th>Crianças</th><th>Com dentes a fazer</th><th>Dentes a fazer</th><th>Dentes feitos</th><th>TCLE</th></tr></thead><tbody>${turmas.map(t=>{const g=AO.filter(r=>r.turma===t);return `<tr><td><b>${esc(t||'Sem turma')}</b></td><td>${g.length}</td><td>${g.filter(r=>r.aFazer.length).length}</td><td>${sum(g.map(r=>r.aFazer.length))}</td><td>${sum(g.map(r=>r.feitos.length))}</td><td>${g.filter(r=>r.tcle).length}</td></tr>`}).join('')}</tbody></table></div></article>`}
+// Desempenho (v2.57): listas longas do PSE aparecem em blocos (desenhar 1.500 linhas de uma vez travava computadores simples).
+const PSE_PAGE=100;const psLim=k=>psePrefs()[`pseLim_${k}`]||(k==='def'?30:PSE_PAGE);
 function pseMineHTML(){const p=psePrefs(),q=norm(p.pseSearch||''),A=pseRecords().filter(r=>!q||norm(r.nome).includes(q)).sort((a,b)=>String(a.turma).localeCompare(String(b.turma),'pt-BR',{numeric:true})||a.nome.localeCompare(b.nome,'pt-BR')),sug=A.filter(r=>!pseIsMine(r)&&pseLinks(r).state==='ok').length;pseNav=A.map(r=>r.key);
   return `<article class="card ps-box"><div class="ps-sel-h"><div><h2>Quem é da sua área adscrita?</h2><p class="ps-hint">Marque as crianças que você vai acompanhar. As outras continuam no Panorama e na análise, fora da fila.</p></div><div class="ps-acts"><input class="ps-search" id="pseSearch" type="search" placeholder="Buscar pelo nome" value="${esc(p.pseSearch||'')}" aria-label="Buscar pelo nome">${sug?`<button class="btn small" type="button" data-ps-mine-sug>Marcar os ${sug} confirmados no CELK</button>`:''}</div></div>
-  <div class="table-scroll"><table class="ps-table"><thead><tr><th class="cb"><span class="sr-only">Meu aluno</span></th><th>Criança</th><th>Avaliação</th><th>Fontes</th><th>Cruzamento</th><th>Equipe · prontuário</th></tr></thead><tbody>${A.map(r=>{const L=pseLinks(r),c=pseCad(r);return `<tr><td class="cb"><input class="ps-cb" type="checkbox" data-ps-mine-cb="${esc(r.key)}" ${pseIsMine(r)?'checked':''} aria-label="Meu aluno: ${esc(pseTitle(r.nome))}"></td><td><button class="ps-name" type="button" data-ps-open="${esc(r.key)}">${esc(pseTitle(c.nome))}</button><small>${ageAt({dataNascimento:r.nasc},parseDate(r.dataAval))??'—'} anos · ${esc(r.turma)}</small></td><td>${pseEvalChip(r)}${r.dor?' <span class="ps-chip red">Dor</span>':''}</td><td>${pseSrcs(L)}</td><td>${pseTriChip(L.state)}</td><td>${c.equipe?`Equipe ${esc(c.equipe)}`:'<span class="muted">—</span>'}${c.pront?`<small class="mono">${esc(c.pront)}</small>`:''}</td></tr>`}).join('')}</tbody></table></div>
+  <div class="table-scroll"><table class="ps-table"><thead><tr><th class="cb"><span class="sr-only">Meu aluno</span></th><th>Criança</th><th>Avaliação</th><th>Fontes</th><th>Cruzamento</th><th>Equipe · prontuário</th></tr></thead><tbody>${A.slice(0,psLim('mine')).map(r=>{const L=pseLinks(r),c=pseCad(r);return `<tr><td class="cb"><input class="ps-cb" type="checkbox" data-ps-mine-cb="${esc(r.key)}" ${pseIsMine(r)?'checked':''} aria-label="Meu aluno: ${esc(pseTitle(r.nome))}"></td><td><button class="ps-name" type="button" data-ps-open="${esc(r.key)}">${esc(pseTitle(c.nome))}</button><small>${ageAt({dataNascimento:r.nasc},parseDate(r.dataAval))??'—'} anos · ${esc(r.turma)}</small></td><td>${pseEvalChip(r)}${r.dor?' <span class="ps-chip red">Dor</span>':''}</td><td>${pseSrcs(L)}</td><td>${pseTriChip(L.state)}</td><td>${c.equipe?`Equipe ${esc(c.equipe)}`:'<span class="muted">—</span>'}${c.pront?`<small class="mono">${esc(c.pront)}</small>`:''}</td></tr>`}).join('')}</tbody></table></div>${A.length>psLim('mine')?`<div class="ps-acts"><button class="btn small" type="button" data-ps-more="mine">Mostrar mais ${Math.min(PSE_PAGE,A.length-psLim('mine'))} de ${fmtNum(A.length-psLim('mine'))}</button></div>`:''}
   ${p.pseTurma?`<div class="ps-acts"><span class="ps-hint">Turma ${esc(p.pseTurma)} inteira:</span><button class="btn small" type="button" data-ps-turma-mine="1">Marcar todas</button><button class="btn small" type="button" data-ps-turma-mine="0">Desmarcar todas</button></div>`:''}</article>`}
 function pseRow(r){const c=pseCad(r),L=pseLinks(r),age=ageAt({dataNascimento:r.nasc},parseDate(r.dataAval));return `<tr class="ps-row" data-ps-open="${esc(r.key)}"><td><b>${esc(pseTitle(c.nome))}</b><small>${age??'—'} anos · ${esc(r.turma)}${c.pront?` · <span class="mono">${esc(c.pront)}</span>`:''}</small></td><td>${pseEvalChip(r)}${r.dor?' <span class="ps-chip red">Dor</span>':''}</td><td>${pseStageChip(pseStage(r))}</td><td>${c.tel?esc(c.tel):'<span class="ps-chip amber">Sem telefone</span>'}</td><td>${pseSrcs(L)}</td></tr>`}
 function pseTeamOf(r){return String(pseCad(r).equipe||'').trim()}
@@ -3469,9 +3491,9 @@ function pseTriHTML(r,{actions=false}={}){const L=pseLinks(r),t=L.t,c=pseCad(r),
   const prods=L.prod?[L.prod]:t.prod,prodS=prods.length?prods.map(p=>{const v=p.visits.find(x=>x.age!=null),exp=v&&c.nasc?ageAt({dataNascimento:c.nasc},parseDate(v.date)):null;return `<div class="ps-side"><span class="ps-src">Produção · prontuário ${esc(p.code)}</span>${pseKV([['Nome',pseTitle(p.nome),eqN(p.nome)],['Idade',v?`${v.age} anos em ${fmtDate(v.date)}`:'',v&&exp!=null?exp===v.age:null],['Atendimentos',p.visits.length?`${p.visits.length} (último ${fmtDate(p.visits.at(-1).date)})`:'']])}${actions&&prods.length>1&&!L.prod?`<button class="btn small" type="button" data-ps-prod="${esc(r.key)}|${esc(p.code)}">É este prontuário</button>`:''}</div>`}).join(''):'<div class="ps-side none">Não aparece na produção</div>';
   return `<div class="ps-tri">${pse}${colS}${prodS}</div>`}
 function pseDefHTML(){const D=pseChildren().map(c=>c.last).filter(r=>pseLinks(r).state==='def');pseNav=D.map(r=>r.key);
-  const cards=D.map(r=>{const L=pseLinks(r),t=L.t;return `<article class="card ps-box"><div class="ps-h"><h2><button class="ps-name" type="button" data-ps-open="${esc(r.key)}">${esc(pseTitle(pseCad(r).nome))}</button></h2><span class="ps-acts">${L.pendCol?`<span class="ps-chip amber wrap">Atividade coletiva: ${esc(t.colWhy)}</span>`:''}${L.pendProd?`<span class="ps-chip amber wrap">Produção: ${esc(t.prodWhy)}</span>`:''}</span></div>${pseTriHTML(r,{actions:true})}
+  const cards=D.slice(0,psLim('def')).map(r=>{const L=pseLinks(r),t=L.t;return `<article class="card ps-box"><div class="ps-h"><h2><button class="ps-name" type="button" data-ps-open="${esc(r.key)}">${esc(pseTitle(pseCad(r).nome))}</button></h2><span class="ps-acts">${L.pendCol?`<span class="ps-chip amber wrap">Atividade coletiva: ${esc(t.colWhy)}</span>`:''}${L.pendProd?`<span class="ps-chip amber wrap">Produção: ${esc(t.prodWhy)}</span>`:''}</span></div>${pseTriHTML(r,{actions:true})}
     <div class="ps-acts">${L.pendCol?`<button class="btn small ps-good" type="button" data-ps-col-yes="${esc(r.key)}">Atividade coletiva: é a mesma</button><button class="btn small" type="button" data-ps-col-no="${esc(r.key)}">Não é</button>`:''}${L.pendProd&&t.prod.length===1?`<button class="btn small ps-good" type="button" data-ps-prod="${esc(r.key)}|${esc(t.prod[0].code)}">Prontuário: é a mesma</button>`:''}${L.pendProd?`<button class="btn small" type="button" data-ps-prod-no="${esc(r.key)}">${t.prod.length>1?'Nenhum deles':'Não é'}</button>`:''}</div></article>`}).join('');
-  return `<div class="ps-stackv">${cards||'<article class="card ps-box"><p class="ps-hint"><b>Nada a definir.</b> Todos os cruzamentos foram resolvidos.</p></article>'}
+  return `<div class="ps-stackv">${cards?cards+`${D.length>psLim('def')?`<div class="ps-acts"><button class="btn small" type="button" data-ps-more="def">Mostrar mais ${Math.min(PSE_PAGE,D.length-psLim('def'))} de ${fmtNum(D.length-psLim('def'))}</button></div>`:''}`:'' }${cards||'<article class="card ps-box"><p class="ps-hint"><b>Nada a definir.</b> Todos os cruzamentos foram resolvidos.</p></article>'}
   <article class="card ps-box"><div class="ps-h"><h2>Regras do cruzamento</h2></div><ol class="ps-rules">
     <li><b>PSE ↔ atividade coletiva</b> (Relação das Atividades em Grupo, que tem CPF e CNS): liga sozinho com CPF igual, ou com nome e nascimento iguais. Traz CPF, CNS e sexo.</li>
     <li><b>PSE ↔ produção</b> (Procedimentos Detalhado, que tem nome, idade e prontuário): liga sozinho com nome igual e idade no dia do atendimento igual à calculada pelo nascimento. Traz o prontuário e todos os atendimentos.</li>
@@ -3542,8 +3564,9 @@ function pseSaveCad(key){const v=id=>document.getElementById(id)?.value??'',s=ps
   if(vals.nome===norm(base.nome))delete vals.nome;if(vals.nasc===base.nasc)delete vals.nasc;s.overrides[key]={...(s.overrides[key]||{}),...vals};pseDrawer.edit=false;audit('pse_child_edited',{});queueSave();toast('Cadastro salvo.');pseRefresh()}
 // A chave da criança tem "|" (nome|nascimento): separa só no último "|".
 function psSplitKey(v){const i=String(v).lastIndexOf('|');return [v.slice(0,i),v.slice(i+1)]}
-function pseClick(ev){const el=ev.target.closest('[data-ps-tab],[data-ps-open],[data-ps-nav],[data-ps-dtab],[data-ps-edit],[data-ps-save],[data-ps-mine-set],[data-ps-mine-sug],[data-ps-turma-mine],[data-ps-col-yes],[data-ps-col-no],[data-ps-prod],[data-ps-prod-no],[data-ps-undo],[data-ps-del],[data-ps-team],[data-ps-team-clear],[data-ps-reg],[data-ps-sched],[data-ps-sched-save],[data-ps-note],[data-ps-wa]');if(!el)return;const d=el.dataset,s=pseStore();
-  if(d.psTab){state.preferences.pseTab=d.psTab;queueSave();if(el.closest('#drawer'))closeDrawer();return renderView('pse')}
+function pseClick(ev){const el=ev.target.closest('[data-ps-more],[data-ps-tab],[data-ps-open],[data-ps-nav],[data-ps-dtab],[data-ps-edit],[data-ps-save],[data-ps-mine-set],[data-ps-mine-sug],[data-ps-turma-mine],[data-ps-col-yes],[data-ps-col-no],[data-ps-prod],[data-ps-prod-no],[data-ps-undo],[data-ps-del],[data-ps-team],[data-ps-team-clear],[data-ps-reg],[data-ps-sched],[data-ps-sched-save],[data-ps-note],[data-ps-wa]');if(!el)return;const d=el.dataset,s=pseStore();
+  if(d.psMore){const k=`pseLim_${d.psMore}`;state.preferences[k]=psLim(d.psMore)+PSE_PAGE;return renderView('pse')}
+  if(d.psTab){state.preferences.pseLim_mine=0;state.preferences.pseLim_def=0;state.preferences.pseTab=d.psTab;queueSave();if(el.closest('#drawer'))closeDrawer();return renderView('pse')}
   if(d.psOpen)return openPseChild(d.psOpen,'acomp');
   if(d.psNav){const i=pseNav.indexOf(pseDrawer.key)+Number(d.psNav);if(pseNav[i])openPseChild(pseNav[i],pseDrawer.tab);return}
   if(d.psDtab){pseDrawer.tab=d.psDtab;pseDrawer.edit=!!d.psEditgo;return openPseChild(pseDrawer.key)}
@@ -3568,7 +3591,7 @@ function pseClick(ev){const el=ev.target.closest('[data-ps-tab],[data-ps-open],[
 }
 function pseChange(ev){const t=ev.target;if(t.dataset?.psPref){state.preferences[t.dataset.psPref]=t.value;if(t.dataset.psPref!=='pseTurma')state.preferences.pseTurma='';queueSave();return renderView('pse')}
   if(t.dataset?.psMineCb){pseStore().mine[t.dataset.psMineCb]=t.checked;queueSave();const tabs=document.querySelector('#view-pse .sx-tabs');if(tabs){const n=pseChildren().filter(c=>pseIsMine(c.last)).length,b=tabs.querySelector('[data-ps-tab="mine"]');if(b)b.innerHTML=`Meus alunos${n?`<span class="ps-count v">${n}</span>`:''}`}}}
-function pseInput(ev){if(ev.target.id==='pseSearch'){state.preferences.pseSearch=ev.target.value;const pos=ev.target.selectionStart;renderView('pse');const q=document.getElementById('pseSearch');if(q){q.focus();q.setSelectionRange(pos,pos)}}}
+function pseInput(ev){if(ev.target.id==='pseSearch'){state.preferences.pseSearch=ev.target.value;state.preferences.pseLim_mine=0;const pos=ev.target.selectionStart;renderView('pse');const q=document.getElementById('pseSearch');if(q){q.focus();q.setSelectionRange(pos,pos)}}}
 // ---- base da análise estatística ----
 function pseStatRows(months){const set=new Set(months),out=[];
   for(const c of pseChildren()||[])for(const r of c.evals){if(!set.has(String(r.dataAval).slice(0,7)))continue;const L=pseLinks(r),cad=pseCad(r),ev=r.status==='Preenchida',y=b=>ev?sxYN(b):null,age=ageAt({dataNascimento:cad.nasc},parseDate(r.dataAval)),vis=L.prod?.visits||[],after=vis.filter(v=>v.date>=r.dataAval&&!pseIsSchoolFluor(v)),before=vis.filter(v=>v.date<r.dataAval),alt=L.col?.dates?.some(d=>d.alt),hist=(pseStore().followups[r.key]?.history||[]).filter(h=>h.at>=r.dataAval&&h.type!=='note');
@@ -3966,6 +3989,10 @@ const rkRuaDe=p=>p.end&&!/^sem endere/i.test(p.end)?String(p.end).split(',')[0].
 function rkC10(p,crit){if(crit.C16)return null;const s=rkStore();if(s.areaInteira)return {on:true,why:'toda a área do CS conta'};const r=rkRuaDe(p);if(!r)return {on:false,why:'sem endereço'};const hit=s.ruas.find(v=>rkNormRua(v)===rkNormRua(r));return hit?{on:true,why:`${r} está na lista`}:{on:false,why:`${r} fora da lista`}}
 function rkAddYear(iso,n=1){const d=parseDate(iso);if(!d)return '';d.setFullYear(d.getFullYear()+n);return isoDate(d)}
 // ---- pessoas ----
+// Desempenho (v2.57): a lista de pessoas e as contas por pessoa ficam guardadas até algum dado mudar (queueSave),
+// em vez de serem refeitas a cada tela aberta.
+const rkFresh=()=>{if(rkCache&&(rkCache.__sig!==dataSig()||rkCache.__st!==state))rkCache=null};
+let rkMemo={sig:null};const rkM=()=>{const sg=dataSig();if(rkMemo.sig!==sg||rkMemo.st!==state)rkMemo={sig:sg,st:state,score:new WeakMap(),stage:new WeakMap(),care:new WeakMap()};return rkMemo};
 let rkCache=null,rkNav=[],rkDrawer={key:null,tab:'class',edit:false,sched:false};
 function rkPseClin(p){const r=p.pse?.rec;if(!r||r.status!=='Preenchida')return null;const l=norm(r.lesoes),ex=norm(r.exo);let code=null;
   if(/^(3 A 4|5 OU MAIS)/.test(l)||(ex&&!/^NAO NECESSITA/.test(ex)))code='A09a';else if(/^1 A 2/.test(l))code='A09b';
@@ -4073,7 +4100,7 @@ function rkPeople(){if(rkCache)return rkCache;const s=rkStore(),map=new Map(),id
     out.push(p)}
   // Mesmo prontuário, CPF ou CNS em dois cadastros: une e lê de novo (uma união por vez, até não sobrar nenhuma).
   const made=rkAutoMerge(out);if(made.length){rkLastAuto.push(...made);rkCache=null;return rkPeople()}
-  out.old=old;rkCache=out;return out}
+  out.old=old;Object.assign(out,{__sig:dataSig(),__st:state});rkCache=out;return out}
 // Todas as pessoas, inclusive quem só tem atendimento no CELK há mais de 2 anos (análise estatística).
 function rkPeopleAll(){const o=rkPeople();return o.concat(o.old||[])}
 const RK_CELK_DAYS=730;
@@ -4087,18 +4114,21 @@ function rkLastVisit(p){return p.visits.at(-1)?.date||''}
 // - Sem nenhum dos dois: busca ativa (A contatar, Em contato, Agendada), pelos registros de contato.
 const rkIsTC=v=>(v.items||[]).some(x=>String(x[3]||'').includes('c'))||(v.procs||[]).some(n=>/^TRATAMENTO CONCLUIDO/.test(norm(n)));
 const rkDaysBetween=(a,b)=>Math.round((parseDate(b)-parseDate(a))/DAY_MS);
-function rkCare(p){const vs=p.visits||[],tcs=vs.filter(rkIsTC).map(v=>v.date),lastTC=tcs.at(-1)||'',lv=vs.at(-1)?.date||'';
+function rkCare(p){const m=rkM().care;let v=m.get(p);if(!v){v=rkCareCalc(p);m.set(p,v)}return v}
+function rkCareCalc(p){const vs=p.visits||[],tcs=vs.filter(rkIsTC).map(v=>v.date),lastTC=tcs.at(-1)||'',lv=vs.at(-1)?.date||'';
   const maint=v=>tcs.some(t=>v.date>t&&rkDaysBetween(t,v.date)<=365);
   const novos=vs.filter(v=>!rkIsTC(v)&&!maint(v)&&daysAgo(v.date)<=730&&(!lastTC||v.date>lastTC));
   if(novos.length)return {st:'tratamento',since:novos[0].date,lv,tc:lastTC,abandono:daysAgo(lv)>180};
   if(lastTC&&daysAgo(lastTC)<=730)return {st:'emdia',tc:lastTC,until:rkAddYear(lastTC,2),lv,manut:vs.filter(v=>v.date>lastTC).length};
   return {st:null,lv,tc:lastTC}}
-function rkStage(p){const c=rkCare(p);if(c.st)return c.st;const lv=c.lv;const last=rkContactHistory(p).filter(h=>h.to&&(!lv||String(h.at).slice(0,10)>lv)).at(-1);return last?.to||'contatar'}
+function rkStage(p){const m=rkM().stage;let v=m.get(p);if(!v){v=rkStageCalc(p);m.set(p,v)}return v}
+function rkStageCalc(p){const c=rkCare(p);if(c.st)return c.st;const lv=c.lv;const last=rkContactHistory(p).filter(h=>h.to&&(!lv||String(h.at).slice(0,10)>lv)).at(-1);return last?.to||'contatar'}
 // Registros da busca ativa + contatos da aba Gestantes (2I) da mesma pessoa, em ordem de data.
 function rkContactHistory(p){const own=rkStore().followups[p.key]?.history||[];if(!p.gestIds?.length)return own;const g=p.gestIds.flatMap(id=>(state.gestantes.followups[id]?.history||[]).map(h=>({at:h.at,type:h.type==='note'?'note':'preg',text:h.type==='note'?h.text:followupLabel(h.to),to:h.type==='note'?undefined:PREG_TO_RK[h.to],preg:true})));return [...own,...g].sort((a,b)=>String(a.at).localeCompare(String(b.at)))}
 function rkData(p){const s=rkStore();return {rm:s.rm[p.key]||{},crit:s.crit[p.key]||{},clin:s.clin[p.key]||rkPseClin(p),alarm:s.alarm[p.key]||[],form:null}}
 // Calcula a pontuação. "d" separado da pessoa para os testes reproduzirem os casos do item 8 do protocolo.
-function rkScore(p,d=rkData(p)){const a=p.age,rows=[],c=d.crit||{};
+function rkScore(p,d){if(d)return rkScoreCalc(p,d);const m=rkM().score;let v=m.get(p);if(!v){v=rkScoreCalc(p,rkData(p));m.set(p,v)}return v}
+function rkScoreCalc(p,d){const a=p.age,rows=[],c=d.crit||{};
   // Automático removido por você (v2.53): continua na lista, riscado, e não soma.
   const add=(g,id,label,pts,on,src,extra={})=>{const auto=extra.auto??['idade','idadeEst','idadeMeta','hist','gest','end','idoso','cronico','cond','cid'].includes(src),rm=auto&&on?d.rm?.[extra.key||id]:null;
     rows.push({g,id,label,pts,on:!!on&&!rm,src:on&&!rm?src:null,...extra,auto,removed:rm||null,autoSrc:rm?src:null})};
@@ -4155,7 +4185,7 @@ function rkRow({p,s,st}){
     <div class="rk-score"><div class="rk-score-top"><b>${s.alarm?'Alarme':s.total}</b><small>${s.alarm?'fora da soma':'pontos'}</small><span class="rk-pill">${s.faixa}</span></div>${rkComp(s)}</div>
     <div class="rk-hist">${hist}</div>
     <div class="pq-go"><div>${btn}</div><span class="pq-why${s.minBand||s.alarm||(st==='tratamento'&&care.abandono)?' alert':''}">${RK_PRAZO[s.faixa]} · ${esc(why)}</span></div></div>`}
-function riscoHTML(){rkCache=null;const P=rkPrefs(),view=P.rkView==='escala'?'escala':'fila',all=rkAll(),act=all.filter(x=>!x.p.excluded);
+function riscoHTML(){rkFresh();const P=rkPrefs(),view=P.rkView==='escala'?'escala':'fila',all=rkAll(),act=all.filter(x=>!x.p.excluded);
   const head=`<div class="pq-head"><div class="pq-src"><span>${fmtNum(act.length)} pessoa(s) na lista</span><span>Protocolo de Estratificação de Risco v2.0</span></div><div class="pq-actions"><button class="btn primary" data-rk-add>${icon('plus')}Adicionar pessoa</button></div></div>
     <nav class="sx-tabs" role="tablist" aria-label="Classificação de risco"><button type="button" role="tab" data-rk-view="fila" aria-selected="${view==='fila'}">Fila de busca ativa</button><button type="button" role="tab" data-rk-view="escala" aria-selected="${view==='escala'}">Escala de risco</button></nav>`;
   if(view==='escala')return head+rkEscalaHTML(act);
@@ -4275,7 +4305,7 @@ function rkDadosHTML(p){const e=rkDrawer.edit,f=(id,lab,v,{full=false,type='text
     ${e?'':`<label class="pq-f"><span>Rua vulnerável (C10)</span><b>${c10?.on?'Sim':'Não'}${c10?` · ${esc(c10.why)}`:''}</b></label><label class="pq-f"><span>Origem na lista</span><b>${esc(p.orig.join(', '))}</b></label>`}</div>
     ${e?`<div class="pq-d-edit-a"><button type="button" class="btn" data-rk-edit>Cancelar</button><button type="button" class="btn primary" data-rk-save="${esc(p.key)}">Salvar correções</button></div>`:''}</section>
   <section class="pq-d-card"><div class="pq-d-card-h"><div class="pq-sec-t">Na lista</div></div><p class="pq-d-hint">${p.excluded?'Esta pessoa está fora da lista (mudou, faleceu ou não é da área).':'Tire da lista quem mudou de endereço, faleceu ou não é da área do CS. Dá para trazer de volta depois.'}</p><div class="ps-acts">${p.excluded?`<button class="btn small" data-rk-exclude="${esc(p.key)}|0">Voltar para a lista</button>`:`<button class="btn small" data-rk-exclude="${esc(p.key)}|1">${icon('trash')}Tirar da lista</button>`}${p.manual?`<button class="btn small" data-rk-manual-del="${esc(p.manual.id)}">Apagar inclusão manual</button>`:''}</div></section>`}
-function openRisco(key,tab){rkCache=null;key=K(key);drawerReopen=()=>openRisco(key);const p=rkPeople().find(x=>x.key===key);if(!p)return closeDrawer();if(rkDrawer.key!==key)rkDrawer={key,tab:'class',edit:false,sched:false};if(tab)rkDrawer.tab=tab;
+function openRisco(key,tab){rkFresh();key=K(key);drawerReopen=()=>openRisco(key);const p=rkPeople().find(x=>x.key===key);if(!p)return closeDrawer();if(rkDrawer.key!==key)rkDrawer={key,tab:'class',edit:false,sched:false};if(tab)rkDrawer.tab=tab;
   const s=rkScore(p),idx=rkNav.indexOf(key),t=rkDrawer.tab;
   const head=`<header class="pq-d-h"><div class="pq-d-h-top"><div class="pq-d-nav"><button class="pq-icon" data-rk-nav="-1" ${idx<=0?'disabled':''} aria-label="Pessoa anterior"><span class="flip">${icon('chevron')}</span></button><span>${idx>=0?`${idx+1} de ${rkNav.length}`:'fora da fila'}</span><button class="pq-icon" data-rk-nav="1" ${idx<0||idx>=rkNav.length-1?'disabled':''} aria-label="Próxima pessoa">${icon('chevron')}</button></div><button class="pq-icon" data-close-drawer aria-label="Fechar">${icon('close')}</button></div>
     <h2>${esc(p.nome||'Sem nome')}</h2><p class="pq-d-sub">${rkAgeTxt(p)}${p.equipe?` · Equipe ${esc(p.equipe)}`:''}${p.pront?` · <span class="mono">${esc(p.pront)}</span>`:''} · <b class="rk-ink">${s.faixa} · ${s.alarm?'alarme':`${s.total} pontos`}</b></p>
@@ -4409,7 +4439,7 @@ function idIlpiSuggestions(rows){const s=idStore(),groups=new Map();
   return [...groups.values()].map(g=>{const txt=[...g.comps].join(' '),join=s.ilpis.find(i=>norm(i.nome).split(' ').filter(t=>t.length>3&&!ID_ILPI_GENERIC.has(t)).some(t=>txt.includes(t)));return {...g,comps:[...g.comps],join}}).sort((a,b)=>b.n-a.n)}
 // ---- tela ----
 let idNav=[],idDrawer={code:null,tab:'acomp',sched:false,edit:false},idRowsCache=null;
-function idRows(){if(idRowsCache)return idRowsCache;rkCache=null;const m=new Map(rkPeople().map(p=>[p.key,p]));idRowsCache=idRecords().map(r=>{const p=m.get(K(`p:${r.code}`));if(!p)return null;const s=rkScore(p),st=rkStage(p);return {r,p,s,st,ilpi:idIlpiOf(r.code,p.end),sit:sitOf(p.key)}}).filter(Boolean);return idRowsCache}
+function idRows(){if(idRowsCache)return idRowsCache;rkFresh();const m=new Map(rkPeople().map(p=>[p.key,p]));idRowsCache=idRecords().map(r=>{const p=m.get(K(`p:${r.code}`));if(!p)return null;const s=rkScore(p),st=rkStage(p);return {r,p,s,st,ilpi:idIlpiOf(r.code,p.end),sit:sitOf(p.key)}}).filter(Boolean);return idRowsCache}
 const idBand=a=>a==null?'':a>=80?'80+':a>=70?'70-79':'65-69';
 function idStageTag(st){const [l,c]=ID_STAGE[st]||ID_STAGE.contatar;return `<span class="pq-tag id-stg ${c}">${l}</span>`}
 function idRow(x){const {r,p,s,st,ilpi,sit}=x,lv=rkLastVisit(p),ph=normalizePhone(p.tel),sched=(rkStore().followups[p.key]?.history||[]).filter(h=>h.agendaAt).at(-1)?.agendaAt;
@@ -4549,7 +4579,7 @@ function crSummary(){const snaps=snapshotsAsc(CR_PROFILE),recs=crRecords(),n=k=>
 // ---- tela ----
 let crNav=[],crDrawer={key:null,tab:'acomp',sched:false,edit:false},crRowsCache=null;
 const crBand=a=>a==null?'':a<=2?'0-2':a<=5?'3-5':'6-12';
-function crRows(){if(crRowsCache)return crRowsCache;rkCache=null;const mb=new Map(crRecords().map(r=>[`p:${r.code}`,r]));
+function crRows(){if(crRowsCache)return crRowsCache;rkFresh();const mb=new Map(crRecords().map(r=>[`p:${r.code}`,r]));
   crRowsCache=rkPeople().filter(p=>!p.excluded&&p.age!=null&&p.age<=12).map(p=>({p,r:p.keys.map(k=>mb.get(k)).find(Boolean)||null,s:rkScore(p),st:rkStage(p),care:rkCare(p)}));return crRowsCache}
 const crBaby=x=>x.p.age<2&&!x.care.lv;
 const crOrigLabel=o=>({Criança:'Metabase',CELK:'CELK',PSE:'PSE · meu aluno',Manual:'Incluída à mão',Gestante:'Gestante'})[o]||o;
@@ -4676,7 +4706,7 @@ function cdOf(p){const s=cdStore(),c=rkStore().crit[p.key]||{},im=s.imuno[p.key]
 function cdTagsHTML(p){const c=cdOf(p);return Object.keys(CD_COND).filter(k=>Array.isArray(c[k])?c[k].length:c[k]).map(k=>`<span class="pq-tag cd-tag ${CD_COND[k][1]}">${k==='acam'?esc(SIT_LABEL[c.acam]||CD_COND.acam[0]):CD_COND[k][0]}${Array.isArray(c[k])?`: ${esc(c[k].join(', '))}`:''}</span>`).join('')}
 const cdHasAny=p=>{const c=cdOf(p);return c.has||c.dm||c.acam||c.imuno.length||c.pcd.length};
 let cdNav=[],cdDrawer={key:null,tab:'cond',sched:false},cdRowsCache=null;
-function cdRows(){if(cdRowsCache)return cdRowsCache;rkCache=null;cdRowsCache=rkPeople().filter(p=>!p.excluded&&cdHasAny(p)).map(p=>({p,c:cdOf(p),s:rkScore(p),st:rkStage(p),care:rkCare(p)}));return cdRowsCache}
+function cdRows(){if(cdRowsCache)return cdRowsCache;rkFresh();cdRowsCache=rkPeople().filter(p=>!p.excluded&&cdHasAny(p)).map(p=>({p,c:cdOf(p),s:rkScore(p),st:rkStage(p),care:rkCare(p)}));return cdRowsCache}
 function cdRow(x){const {p,s,st,care}=x,lv=care.lv,ph=normalizePhone(p.tel),k=esc(p.key),sched=(rkStore().followups[p.key]?.history||[]).filter(h=>h.agendaAt).at(-1)?.agendaAt;
   const tags=idStageTag(st)+cdTagsHTML(p)+(st==='tratamento'&&care.abandono?'<span class="pq-tag red">Possível abandono</span>':'')+(!p.tel?'<span class="pq-tag amber">Sem telefone</span>':'')+(p.age==null?'<span class="pq-tag amber">Sem data de nascimento</span>':'');
   const why=st==='emdia'?`Em dia até ${fmtDate(care.until)}`:st==='tratamento'?(care.abandono?`Possível abandono: sem atendimento há ${Math.floor(daysAgo(lv)/30.4)} meses`:`Em tratamento desde ${fmtDate(care.since)}`):st==='agendada'?`Consulta${sched?` em ${fmtDate(sched)}`:' agendada'}`:st==='contato'?'Aguardando resposta':ph?'Fazer o primeiro contato':'Sem telefone: pedir ao ACS';
@@ -4705,7 +4735,7 @@ function condicoesHTML(){cdRowsCache=null;const P=cdPrefs(),all=cdRows(),recs=cd
     <div class="pq-hint">Ordem: etapa, faixa e pontos da Classificação de Risco. A mesma pessoa aparece em mais de uma subaba quando tem mais de uma condição.</div>
     <div class="rk-legend"><span>Cor do card = faixa da Classificação de Risco:</span>${RK_FAIXAS.map(f=>`<span class="tone-${RK_TONE[f]}"><i class="id-sw"></i>${f}</span>`).join('')}<span>· etiquetas: etapa e condições</span></div>
     <div class="pq-list">${list.length?list.slice(0,lim).map(cdRow).join(''):'<p class="pq-empty">Ninguém nesta etapa com esses filtros.</p>'}</div>${list.length>lim?`<div class="rk-more"><button class="btn" data-cd-more>Mostrar mais (${fmtNum(list.length-lim)} restantes)</button></div>`:''}</article>`}
-function openCondicao(key,tab){cdRowsCache=null;rkCache=null;key=K(key);drawerReopen=()=>openCondicao(key);const p=rkPeople().find(x=>x.key===key);if(!p)return closeDrawer();if(cdDrawer.key!==key)cdDrawer={key,tab:'cond',sched:false,edit:false};if(tab)cdDrawer.tab=tab;
+function openCondicao(key,tab){cdRowsCache=null;rkFresh();key=K(key);drawerReopen=()=>openCondicao(key);const p=rkPeople().find(x=>x.key===key);if(!p)return closeDrawer();if(cdDrawer.key!==key)cdDrawer={key,tab:'cond',sched:false,edit:false};if(tab)cdDrawer.tab=tab;
   const c=cdOf(p),s=rkScore(p),st=rkStage(p),care=rkCare(p),i=cdNav.indexOf(key),t=cdDrawer.tab,k=esc(key),stor=cdStore();let body;
   if(t==='cond')body=`<section class="pq-d-card"><div class="pq-d-card-h"><div class="pq-sec-t">Hipertensão e diabetes</div><span class="pq-d-count">listas do Metabase · automático</span></div><div class="cd-rows">${['has','dm'].map(kk=>`<div><span><b>${CD_COND[kk][0]}</b><small>${c[kk]?'Está na lista do Metabase':'Não está na lista do Metabase'}</small></span>${c[kk]?`<span class="pq-tag cd-tag ${CD_COND[kk][1]}">${kk==='has'?'B05':'B04'} +3</span>`:'<span class="pq-tag gray">—</span>'}</div>`).join('')}</div>
       <p class="pq-d-hint">Se a pessoa tem a condição e não está na lista, marque na Classificação de Risco (B04 ou B05).</p></section>
@@ -4745,7 +4775,7 @@ function cdClick(ev){const el=ev.target.closest('[data-cd-sub],[data-cd-tab],[da
   if(d.cdTab){P.cdTab=d.cdTab;P.cdLimit=60;queueSave();return renderView('condicoes')}
   if(d.cdEq!=null){P.cdEquipe=d.cdEq;P.cdLimit=60;queueSave();return renderView('condicoes')}
   if(el.hasAttribute('data-cd-more')){P.cdLimit=(P.cdLimit||60)+60;return renderView('condicoes')}
-  if(d.cdWa){ev.stopPropagation();rkCache=null;const p=rkPeople().find(x=>x.key===d.cdWa),num=normalizePhone(p?.tel);if(num){window.open(`https://wa.me/${num}`,'_blank','noopener,noreferrer');rkRegister(d.cdWa,'whatsapp','WhatsApp aberto (Condições de saúde)','contato');cdRefresh({keep:true})}return}
+  if(d.cdWa){ev.stopPropagation();rkFresh();const p=rkPeople().find(x=>x.key===d.cdWa),num=normalizePhone(p?.tel);if(num){window.open(`https://wa.me/${num}`,'_blank','noopener,noreferrer');rkRegister(d.cdWa,'whatsapp','WhatsApp aberto (Condições de saúde)','contato');cdRefresh({keep:true})}return}
   if(d.cdOpen){ev.stopPropagation();return openCondicao(d.cdOpen,d.cdGo||'cond')}
   if(d.cdNav){const n=cdNav[cdNav.indexOf(cdDrawer.key)+Number(d.cdNav)];if(n)openCondicao(n,cdDrawer.tab);return}
   if(d.cdDtab){cdDrawer.tab=d.cdDtab;cdDrawer.edit=false;return openCondicao(cdDrawer.key)}
@@ -4770,7 +4800,7 @@ const isMobile=()=>window.matchMedia?.(M_QUERY).matches;
 const M_PERIOD_VIEWS=['overview','municipal','federal','procedures'];
 function mobileBadges(){let preg=0,pse=0;try{preg=visibleByExclusion(mergedEpisodes()).filter(isPriority2I).length}catch{}try{pse=pseChildren().filter(c=>pseLinks(c.last).state==='def').length}catch{}return {preg,pse}}
 function mobileChrome(){
-  const ctx=document.getElementById('mCtx');if(!ctx)return;const p=state.preferences,b=mobileBadges();
+  const ctx=document.getElementById('mCtx');if(!ctx)return;const p=state.preferences,b=isMobile()?mobileBadges():{preg:0,pse:0};
   const per=M_PERIOD_VIEWS.includes(activeView)?`<button class="m-chip" type="button" data-m-sheet="period">${icon('clock')}<span>${esc(activeView==='procedures'?({M:fmtMonth(p.month,true),Q:`Q${p.quarter} · ${p.year}`,Y:String(p.year)})[p.procPeriod]||`Q${p.quarter} · ${p.year}`:activeView==='overview'?fmtMonth(p.month,true):`Q${p.quarter} · ${p.year}`)}</span>${icon('chevron')}</button>${p.unit?`<span class="m-tag">${esc(p.unit)}</span>`:''}`:'';
   const seg=['municipal','federal'].includes(activeView)?`<div class="m-seg" role="group" aria-label="Indicadores"><button type="button" data-view="municipal" aria-pressed="${activeView==='municipal'}">Municipal</button><button type="button" data-view="federal" aria-pressed="${activeView==='federal'}">Federal</button></div>`:'';
   const att=activeView==='overview'&&(b.preg||b.pse)?`<div class="m-att"><span class="m-att-t">Precisa de atenção</span>${b.preg?`<button type="button" class="m-alert" data-go="pregnant"><i style="background:#e15f41"></i><span><b>${b.preg} gestante(s) no 3º trimestre</b><small>sem atendimento odontológico</small></span>${icon('chevron')}</button>`:''}${b.pse?`<button type="button" class="m-alert" data-go="pse"><i style="background:#e7a23b"></i><span><b>${b.pse} vínculo(s) a definir no PSE</b><small>nome ou nascimento diferente do CELK</small></span>${icon('chevron')}</button>`:''}</div>`:'';

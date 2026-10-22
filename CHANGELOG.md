@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Versão 2.57
+
+- **Desempenho com muitos pacientes** (medido com 15 mil pacientes, 1.500 alunos do PSE e 6 mil participantes de atividades coletivas, num processador simulado 4 vezes mais lento):
+  - **PSE:** abrir a página caiu de cerca de 2 minutos para menos de 1 segundo. O cruzamento de cada aluno com o cadastro do CELK e com as atividades coletivas usa índices, em vez de percorrer as listas inteiras a cada criança, e o resultado fica guardado.
+  - **Meus alunos** e **Vínculos a definir** aparecem em blocos (100 e 30 por vez, com "Mostrar mais").
+  - **Crianças, Condições de saúde e Classificação de Risco:** a lista de pessoas e as contas de cada uma (pontuação, etapa) ficam guardadas até algum dado mudar. Trocar de aba ou de filtro não refaz tudo.
+  - **Visão geral e as outras telas** não calculam mais o contador do menu do celular no computador.
+  - **Salvar no navegador** faz uma cópia só dos dados (antes eram duas) e espera você parar de clicar.
+- 1 teste interno novo (337 no total).
+
 ## Versão 2.56
 
 - Condições de saúde: imunossupressão e deficiência vindas do CID entram com o tipo da aba (HIV/aids, visual, auditiva, intelectual, TEA), em vez do nome inteiro do CID. A etiqueta fica curta e a contagem "Por tipo" passa a contar essas pessoas. O CID continua na gaveta, no critério da Classificação de Risco.
