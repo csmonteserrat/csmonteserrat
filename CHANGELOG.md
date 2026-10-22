@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## Versão 2.55
+
+- Condições de saúde: imunossupressão e deficiência vindas do CID entram com o tipo da aba (HIV/aids, visual, auditiva, intelectual, TEA), em vez do nome inteiro do CID. A etiqueta fica curta e a contagem "Por tipo" passa a contar essas pessoas. O CID continua na gaveta, no critério da Classificação de Risco.
+- Etiquetas longas quebram linha em vez de invadir a coluna ao lado; o número das contagens por tipo fica separado do nome.
+
 ## Versão 2.54
 
 - Importa o **Boletim Diário dos Atendimentos** do CELK (CSV), reconhecido pelas colunas. Para quem já está no app (pelo prontuário ou pelo CNS), completa CNS, nascimento, sexo e telefone só onde estiver vazio. Quem não está no app não é guardado; dos atendimentos, só ficam os CIDs da lista.

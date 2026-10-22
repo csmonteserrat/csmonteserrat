@@ -1105,3 +1105,6 @@ table.pr-table{min-width:0;width:100%;font-size:12.5px}table.pr-table tr.sel td{
 @media screen and (min-width:761px) and (max-width:800px){.app-shell{grid-template-columns:80px minmax(0,1fr)}.topbar{padding:8px 14px 6px}.workspace{padding:8px 18px 18px}}
 @media screen and (min-width:761px) and (max-width:1100px){.topbar{flex-wrap:wrap}.top-filters{order:10;flex:1 1 100%}.top-filters .filter{flex:1;max-width:none}}
 @media screen and (min-width:761px) and (max-width:1300px){.topbar #importBtn{font-size:0;gap:0;width:36px;padding:0}}
+/* 2.55: etiquetas de condição quebram linha em vez de invadir a coluna ao lado; número separado do tipo */
+.cd-tag{white-space:normal;max-width:100%;overflow-wrap:anywhere}
+.cd-chips .cd-tag{gap:6px}
