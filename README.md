@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.54
+# Acompanhamento Odontológico · versão 2.55
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -42,9 +42,11 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - **Atividades coletivas**: atividades, participantes, crianças que entram em M3/B4 e crianças com avaliação alterada; cada atividade mostra quantos ficaram fora da faixa de 6 a 11 anos e, na gaveta, a lista de quem teve avaliação alterada (o backup analítico não leva os nomes).
 - Período: mês, quadrimestre ou ano, a partir do filtro do topo. Filtros de dentista, idade e sexo.
 
-### Análise estatística (aba da página Procedimentos)
+### Análise estatística (aba da página Análise)
 
-- Três bases, sempre uma linha por pessoa e sem nome: **pacientes da produção** (Procedimentos Detalhado), **gestantes** (Monitora APS, lista mais recente; sem data, então o período não se aplica) e **crianças das escovações** (uma linha por participação; conta todos e avisa quantos estão fora da faixa de 6 a 11 anos de M3/B4).
+- **Pessoas (prontuário)**, a base principal desde a 2.55: uma linha por pessoa, juntando tudo o que o app sabe dela (CELK, gestantes, PSE, escovações, listas do Metabase, Condições de saúde, Classificação de Risco e contatos da busca ativa). Entra todo mundo que você importou, inclusive quem só foi atendido no CELK há mais de 2 anos. Cada variável usa a data do próprio acontecimento (atendimento, avaliação, escovação, contato). Vazio quer dizer "não sabemos", nunca "Não".
+- Período: Mês, Quadrimestre, Ano ou **Todos os anos** (do mês mais antigo importado até hoje).
+- Bases por acontecimento, como antes: **pacientes da produção** (Procedimentos Detalhado), **gestantes** (Monitora APS, lista mais recente; sem data, então o período não se aplica), **crianças das escovações** (uma linha por participação; conta todos e avisa quantos estão fora da faixa de 6 a 11 anos de M3/B4) e **crianças do PSE** (uma linha por avaliação).
 - Variáveis dos pacientes: sexo, faixa etária, idade, dentista principal, mais de um dentista, mês e quadrimestre de entrada, 1ª consulta, concluiu (só quem teve 1ª consulta), concluiu no mesmo dia (só quem concluiu), voltou, urgência, preventivo, restauração, exodontia, periodontia, ART, voltou no quadrimestre seguinte, dias de atendimento, nº de procedimentos, dias até a conclusão, nº de dentistas e "Teve o procedimento…" (qualquer procedimento vira Sim/Não).
 - Testes: qui-quadrado (ou Fisher), intervalo de confiança de Wilson, duas proporções (z ou Fisher), tendência de Cochran-Armitage, Mann-Whitney/Kruskal-Wallis, Spearman e **regressão logística** (razão de chances ajustada e "sozinho", IC de Wald, R² de McFadden, aviso de poucos casos por coeficiente e de categoria instável).
 - É possível juntar categorias e analisar só um subgrupo. Com menos de 20 pessoas (30 na regressão) o teste não roda.

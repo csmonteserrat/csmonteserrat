@@ -1,13 +1,14 @@
 # Análise estatística: de onde vem cada variável
 
-Este documento explica, variável por variável, **qual dado bruto dos relatórios** o app usa e **como ele vira o valor** que entra nos testes da aba *Procedimentos → Análise estatística*. Vale para a versão 2.33.
+Este documento explica, variável por variável, **qual dado bruto dos relatórios** o app usa e **como ele vira o valor** que entra nos testes da aba *Análise → Análise estatística*. Vale para a versão 2.55.
 
 ## Antes de tudo: as variáveis não mudam de teste para teste
 
-As variáveis pertencem à **base** escolhida em "Quem entra na análise", não ao teste. São quatro bases, e cada uma tem sua lista fixa de variáveis:
+As variáveis pertencem à **base** escolhida em "Quem entra na análise", não ao teste. São cinco bases, e cada uma tem sua lista fixa de variáveis:
 
 | Base | Uma linha por | Relatório de origem |
 |---|---|---|
+| Pessoas (prontuário) | pessoa (prontuário, CPF ou CNS) | todas as fontes abaixo, mais as marcações do app e a busca ativa |
 | Pacientes da produção | paciente (código do CELK) | CELK · Procedimentos Detalhado (CSV ou PDF) |
 | Gestantes (Monitora APS) | usuária do Monitora | Monitora APS · lista de gestantes e puérperas |
 | Crianças das escovações | participação em escovação supervisionada | CELK · Relação das Atividades em Grupo (CSV) |
@@ -32,7 +33,15 @@ O que muda de um teste para outro é **o tipo de variável que cada campo aceita
 | Dois números andam juntos? (Spearman) | Número | Número |
 | O que explica um resultado? (regressão logística) | Sim/Não (o resultado) | vários fatores de qualquer tipo |
 
+## Datas e período
+
+- **Cada variável usa a data do próprio acontecimento.** O atendimento tem a data do atendimento; a avaliação do PSE, a do "Editado por … em"; a escovação, a da atividade; o contato, a do registro. O período escolhe os acontecimentos pela data deles.
+- **Quando a variável liga dois acontecimentos**, o primeiro é o ponto de partida e o segundo precisa vir no mesmo dia ou depois (por exemplo, "Atendida depois do contato").
+- **Período "Todos os anos"**: do mês mais antigo de qualquer arquivo importado até o mês atual. Mês, Quadrimestre e Ano seguem o filtro do topo.
+
 ## Regras que valem para todas as bases
+
+- **Vazio não é "Não".** O que só se sabe por marcação à mão ou pelo formulário (ainda a construir) fica vazio para quem não tem a informação.
 
 - **"Só para…" (valor vazio).** Algumas variáveis só existem para parte das pessoas. Por exemplo, "Concluiu no mesmo dia" só existe para quem concluiu o tratamento. Para as demais o valor fica vazio e a pessoa sai **daquele teste**; o app mostra quantas saíram. No CSV exportado, essa célula fica em branco.
 - **Juntar categorias.** Quando você junta, por exemplo, "40–59" com "60+", o app troca o valor das duas por "40–59 + 60+" antes de rodar o teste. No CSV exportado, isso vira uma coluna extra terminada em `_juntas`.
@@ -40,6 +49,50 @@ O que muda de um teste para outro é **o tipo de variável que cada campo aceita
 - **Mínimo de dados.** Com menos de 20 linhas o teste não roda. Na regressão logística, o mínimo é 30.
 - **Regressão logística.** Em cada fator Sim/Não, a referência é "Não". Nos fatores com categorias, a referência é a primeira categoria da ordem. A idade entra "a cada 10 anos"; os outros números entram "a cada 1 a mais".
 - **Sem nome.** Nenhuma base tem nome, CPF, CNS ou telefone. O CSV exportado só tem um número sequencial em `id`.
+
+---
+
+## 0. Pessoas (prontuário)
+
+**Fontes:** todas. A pessoa é a mesma da Classificação de Risco: cadastros com o mesmo prontuário, CPF ou CNS viram uma pessoa só (Configurações › Cadastros duplicados).
+**Quem entra:** todas as pessoas da Classificação de Risco (menos as tiradas da lista) e também quem só foi atendido no CELK há mais de 2 anos. Quem vem só do CELK entra a partir do primeiro atendimento: se o período termina antes dele, a pessoa fica de fora.
+**Data de referência para idade:** o fim do período (ou hoje, se o período ainda não acabou).
+
+| Variável | Tipo | Como é calculada | Coluna no CSV |
+|---|---|---|---|
+| Sexo | Categoria | Cadastro da pessoa; sem ele, o `Sexo` do último atendimento no CELK | `sexo` |
+| Faixa etária / Ciclo de vida / Idade | Ordem / Ordem / Número | Idade no fim do período, pelo nascimento; sem nascimento, pela idade do Metabase ou do CELK. Ciclo de vida: 0–2, 3–5, 6–12, 13–17, 18–59, 60–69, 70+ | `faixa_etaria`, `ciclo_vida`, `idade` |
+| Equipe | Categoria | Equipe do cadastro (Metabase, Monitora ou correção sua) | `equipe` |
+| Mora em rua de alta vulnerabilidade (C10) | Sim/Não · **só quem tem endereço** | Endereço × ruas do C10 (ou área inteira) | `rua_vulneravel` |
+| Está na lista de… | Sim/Não | Você escolhe a lista: CELK, Gestante, PSE (meus alunos), Idoso, Criança, Condição de saúde, Manual | `lista_<nome>` |
+| Gestante no período | Sim/Não | Uma gestação (DUM a DPP) cruza o período | `gestante` |
+| Diabetes / Hipertensão | Sim/Não | Lista do Metabase, CID do Boletim do CELK ou marcação | `diabetes`, `hipertensao` |
+| Número de condições de saúde | Número | Diabetes + hipertensão + imunossupressão + deficiência + acamado/domiciliado | `n_condicoes` |
+| Condição clínica / Tem necessidade clínica / Pontos clínicos | Ordem / Sim/Não / Número · **só quem tem avaliação do dentista** | Avaliação do dentista na Classificação de Risco (ou a sugerida pelo PSE). Necessidade = 10 pontos ou mais | `condicao_clinica`, `necessidade_clinica`, `pontos_clinicos` |
+| Faixa de risco / Total de pontos / Pontos de ciclo de vida e social | Ordem / Número / Número | Classificação de Risco **atual** (Violeta < Azul < Verde < Amarelo < Laranja < Vermelho) | `faixa_risco`, `pontos_total`, `pontos_ciclo_social` |
+| Tem o critério… | Sim/Não | Você escolhe o critério (B01 a C20). Sim se está marcado. Critérios com fonte automática (idade, gestante, diabetes, hipertensão, C10, C11, C18) viram Não; os outros ficam vazios até o formulário | `criterio_<código>` |
+| Etapa da fila | Ordem | Etapa **atual** na Classificação de Risco | `etapa` |
+| Já era paciente antes do período | Sim/Não | Algum atendimento no CELK antes do início do período | `paciente_antes` |
+| Atendido no período | Sim/Não | Algum atendimento no CELK no período | `atendido_periodo` |
+| Teve primeira consulta | Sim/Não | "Primeira consulta odontológica programática" no período | `primeira_consulta` |
+| Concluiu tratamento / Dias da 1ª consulta à conclusão | Sim/Não / Número · **só quem teve 1ª consulta** | "Tratamento concluído" no dia da 1ª consulta ou depois, até o fim do período | `concluiu`, `dias_ate_conclusao` |
+| Teve urgência / Entrou pela urgência | Sim/Não | Urgência no período / o 1º atendimento do período foi urgência (só quem foi atendido) | `urgencia`, `entrou_urgencia` |
+| Dias de atendimento / Número de procedimentos | Número | Como na base Pacientes da produção, só com os atendimentos do período | `dias_atendimento`, `n_procedimentos` |
+| Ano do 1º atendimento | Ordem · **só quem já foi atendido** | Ano do primeiro atendimento de todos os arquivos | `ano_1o_atendimento` |
+| Meses desde a última consulta / Mais de 2 anos sem consulta | Número / Sim/Não · **só quem consultou antes do período** | Da última consulta antes do período até o início dele | `meses_ultima_consulta`, `mais_2_anos_sem_consulta` |
+| Nunca consultou | Sim/Não | Nenhum atendimento no CELK até o fim do período | `nunca_consultou` |
+| Possível abandono | Sim/Não · **só quem teve 1ª consulta há mais de 6 meses sem concluir** | Sem atendimento nos últimos 6 meses antes do fim do período | `possivel_abandono` |
+| Voltou para manutenção em 12 meses | Sim/Não · **só quem concluiu no período há pelo menos 12 meses** | Algum atendimento até 12 meses depois do tratamento concluído | `manutencao_12m` |
+| Consulta odontológica na gestação | Sim/Não · **só gestantes do período** | Atendimento no CELK entre a DUM e a DPP, Cons.Odonto do Monitora ou "Atende" do Metabase | `odonto_gestacao` |
+| Semanas de gestação no 1º atendimento odontológico | Número · **só gestantes atendidas no CELK** | Do DUM ao 1º atendimento na gestação | `semanas_1o_atendimento` |
+| Meu aluno (PSE) | Sim/Não | Marcada em "Meus alunos" | `meu_aluno` |
+| Risco no PSE / Lesão cavitada no PSE | Ordem / Sim/Não · **só quem foi avaliado no PSE no período** | Avaliação mais recente do período | `risco_pse`, `lesao_pse` |
+| Atendida depois da avaliação do PSE / Dias até o atendimento | Sim/Não / Número | Atendimento no dia da avaliação ou depois (sem o dia só de flúor da escola) | `atendida_apos_pse`, `dias_pse_atendimento` |
+| Número de escovações / Avaliação alterada na escovação | Número / Sim/Não | Escovações da pessoa no período (Relação das Atividades em Grupo) | `n_escovacoes`, `alterada_escovacao` |
+| Número de contatos / Canal do 1º contato / Foi agendada | Número / Categoria / Sim/Não | Registros da busca ativa (Classificação de Risco e aba Gestantes) no período; notas não contam | `n_contatos`, `canal_1o_contato`, `agendada` |
+| Atendida depois do contato / Dias do 1º contato ao atendimento | Sim/Não / Número · **só quem teve contato no período** | Atendimento no dia do 1º contato do período ou depois | `atendida_apos_contato`, `dias_contato_atendimento` |
+
+**Ainda não entram** (dependem do formulário de pedido de atendimento): raça/cor, renda, escolaridade, fumo, álcool, só SUS, autopercepção (A12, A13, A17), queixas relatadas e "atendida depois do formulário". Até lá, os critérios marcados à mão aparecem em "Tem o critério…".
 
 ---
 
