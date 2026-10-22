@@ -2,8 +2,8 @@
 
 ## Versão 2.57
 
-- **Desempenho com muitos pacientes** (medido com 15 mil pacientes, 1.500 alunos do PSE e 6 mil participantes de atividades coletivas, num processador simulado 4 vezes mais lento):
-  - **PSE:** abrir a página caiu de cerca de 2 minutos para menos de 1 segundo. O cruzamento de cada aluno com o cadastro do CELK e com as atividades coletivas usa índices, em vez de percorrer as listas inteiras a cada criança, e o resultado fica guardado.
+- **Desempenho com muitos pacientes** (medido com uma base de teste de 15 mil pacientes, 1.500 alunos do PSE e 6 mil participantes de atividades coletivas):
+  - **PSE:** abrir a página levava 38 segundos num computador comum; agora leva menos de 1 segundo mesmo num processador simulado 4 vezes mais lento. O cruzamento de cada aluno com o cadastro do CELK e com as atividades coletivas usa índices, em vez de percorrer as listas inteiras a cada criança, e o resultado fica guardado.
   - **Meus alunos** e **Vínculos a definir** aparecem em blocos (100 e 30 por vez, com "Mostrar mais").
   - **Crianças, Condições de saúde e Classificação de Risco:** a lista de pessoas e as contas de cada uma (pontuação, etapa) ficam guardadas até algum dado mudar. Trocar de aba ou de filtro não refaz tudo.
   - **Visão geral e as outras telas** não calculam mais o contador do menu do celular no computador.
