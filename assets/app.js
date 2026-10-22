@@ -21,8 +21,8 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.55';
-const SELF_TEST_COUNT = 333;
+const APP_VERSION = '2.56';
+const SELF_TEST_COUNT = 336;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
 const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
@@ -3026,7 +3026,20 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
   await add('332. CID do Boletim marca B04 a B09 só quando o critério não está marcado: lista do Metabase e marcação à mão continuam valendo, e a pessoa aparece em Condições de saúde',()=>{const base={key:'p:31',age:40,ageEst:false,end:'',gest:null,visits:[],sitIdoso:''},cid={B05:{c:'I10',n:'Hipertensão essencial (primária)',at:'2026-09-10'},B07:{c:'F840',n:'Autismo infantil',at:'2026-09-01'},B09:{c:'Z720',n:'Uso do tabaco',at:'2026-08-20'}};
     const a=rkScore({...base,cid},{crit:{},clin:null,alarm:[],rm:{}}),r=id=>a.rows.find(x=>x.id===id),b=rkScore({...base,cid,cronHas:true},{crit:{B09:{src:'manual'}},clin:null,alarm:[],rm:{}}),rb=id=>b.rows.find(x=>x.id===id),co=cdOf({...base,cid});
     return r('B05').on&&r('B05').src==='cid'&&r('B05').auto&&r('B07').on&&r('B07').src==='cid'&&r('B09').src==='cid'&&!r('B04').on&&rb('B05').src==='cronico'&&rb('B09').src==='manual'&&co.has&&co.pcd[0]==='TEA (autismo)'&&cdHasAny({...base,cid})});
-  await add('333. Imunossupressão e deficiência pelo CID entram com o tipo da aba (HIV/aids, TEA, visual, auditiva, intelectual), para a etiqueta curta e a contagem por tipo',()=>cidTipo('B06','Z21')==='HIV/aids'&&cidTipo('B07','F840')==='TEA (autismo)'&&cidTipo('B07','H542')==='Visual'&&cidTipo('B07','H903')==='Auditiva'&&cidTipo('B07','F70')==='Intelectual'&&cdOf({key:'p:1',cid:{B06:{c:'B24',n:'x',at:''}}}).imuno[0]==='HIV/aids');
+  await add('333. Pessoas (prontuário): uma linha por pessoa com as datas de cada atendimento; quem só tem CELK há mais de 2 anos entra na análise (não na fila); critério manual sem marca fica vazio e critério de lista vira Não',()=>{const sv={snaps:state.snapshots,dir:state.patientDirectory,risco:structuredClone(state.risco)},it=(n,f)=>[n,1,'Dra T',f];
+    const snap={id:'sx333',profile:'celk_procedimentos_detalhado',unit:'U333',createdAt:nowISO(),dataByMonth:{'2021-03':{patientVisits:[{id:'93331',date:'2021-03-10',sex:'Feminino',age:92,procs:[],items:[it('Primeira consulta odontológica programada','fn')]}]},'2021-05':{patientVisits:[{id:'93332',date:'2021-05-01',sex:'Masculino',age:93,procs:[],items:[it('Exodontia de dente permanente','')]}]},'2026-09':{patientVisits:[{id:'93331',date:'2026-09-02',sex:'Feminino',age:97,procs:[],items:[it('Primeira consulta odontológica programada','fn'),it('Restauração de dente permanente anterior','')]},{id:'93331',date:'2026-09-20',sex:'Feminino',age:97,procs:[],items:[it('Tratamento concluído','cn')]}]}}};
+    try{state.snapshots=[...state.snapshots,snap];state.patientDirectory={...(state.patientDirectory||{}),'93331':{nome:'TESTE SX A'},'93332':{nome:'TESTE SX B'}};state.risco=rkEmpty();rkCache=null;prodIndexCache={key:'',map:new Map()};
+      const inQ=rkPeople().some(p=>p.pront==='93332'),inAll=rkPeopleAll().some(p=>p.pront==='93332'),V=k=>SX_BASES.pes.vars.findIndex(v=>v.k===k),{rows}=sxPersonRows(['2026-09']);
+      const a=rows.find(r=>r[V('idade')]===97&&r[V('ano_1o_atendimento')]==='2021'),b=rows.find(r=>r[V('idade')]===98&&r[V('ano_1o_atendimento')]==='2021'),cr=a?.[V('criterio')]||{},c20=Object.keys(cr).find(k=>k.startsWith('C20 ')),b05=Object.keys(cr).find(k=>k.startsWith('B05 '));
+      return !inQ&&inAll&&!!a&&!!b&&a[V('atendido_periodo')]==='Sim'&&a[V('primeira_consulta')]==='Sim'&&a[V('concluiu')]==='Sim'&&a[V('dias_ate_conclusao')]===18&&a[V('paciente_antes')]==='Sim'&&a[V('mais_2_anos_sem_consulta')]==='Sim'&&a[V('sexo')]==='Feminino'&&a[V('rua_vulneravel')]===null&&a[V('lista')].includes('CELK')&&b[V('atendido_periodo')]==='Não'&&b[V('primeira_consulta')]==='Não'&&b[V('concluiu')]===null&&b[V('nunca_consultou')]==='Não'&&cr[c20]===null&&cr[b05]==='Não'&&sxPickVal(cr,b05)==='Não'&&sxPickVal(['CELK'],'CELK')==='Sim'}
+    finally{state.snapshots=sv.snaps;state.patientDirectory=sv.dir;state.risco=sv.risco;rkCache=null;prodIndexCache={key:'',map:new Map()}}});
+  await add('334. Período "Todos os anos": vai do mês mais antigo importado até o mês atual; Mês, Quadrimestre e Ano desligam a opção',()=>{const prev=state.preferences.sxAllYears,snap={id:'sx334',profile:'celk_procedimentos_detalhado',unit:'U334',createdAt:nowISO(),dataByMonth:{'2019-02':{patientVisits:[]}}};
+    try{state.snapshots.push(snap);state.preferences.sxAllYears=true;const p=sxPeriod(),now=new Date(),cur=monthKey(now.getFullYear(),now.getMonth()+1);state.preferences.sxAllYears=false;const q=sxPeriod();
+      return p.mode==='A'&&p.months[0]==='2019-02'&&p.months.at(-1)===cur&&p.months.includes('2020-12')&&/^Todos os anos · 2019 a /.test(p.label)&&q.mode!=='A'&&statsHTML.toString().includes("seg('A','Todos os anos')")&&setupEvents.toString().includes('sxAllYears=false')}
+    finally{state.snapshots=state.snapshots.filter(x=>x!==snap);state.preferences.sxAllYears=prev}});
+  await add('335. Análise estatística tem a base Pessoas (prontuário) com as variáveis do mapa; "Tem o critério…" e "Está na lista de…" saem no CSV com o nome do item escolhido',()=>{const prev=sxSt;try{const ks=SX_BASES.pes.vars.map(v=>v.k),V=k=>ks.indexOf(k);sxSt={...sxSt,base:'pes',test:'chi',a:V('atendido_periodo'),b:V('criterio'),proc:{b:'B05 · Hipertensão'},merge:{},fv:null,fval:null};
+      return ['sexo','ciclo_vida','faixa_risco','atendido_periodo','concluiu','entrou_urgencia','possivel_abandono','odonto_gestacao','atendida_apos_pse','canal_1o_contato','atendida_apos_contato','dias_contato_atendimento'].every(k=>ks.includes(k))&&SX_BASES.pes.vars.every((v,i)=>v.i===i)&&sxColFor(V('criterio'),'b')==='criterio_b05_hipertensao'&&sxVname(SX_BASES.pes.vars[V('lista')],'x')==='Na lista: —'&&SX_SUGG.pes.every(([t,a,b])=>SX_TESTS[t]&&SX_BASES.pes.vars[a]&&(b==null||SX_BASES.pes.vars[b]))&&SX_DEFX.pes.every(i=>SX_BASES.pes.vars[i])}finally{sxSt=prev}});
+  await add('336. Imunossupressão e deficiência pelo CID entram com o tipo da aba (HIV/aids, TEA, visual, auditiva, intelectual), para a etiqueta curta e a contagem por tipo',()=>cidTipo('B06','Z21')==='HIV/aids'&&cidTipo('B07','F840')==='TEA (autismo)'&&cidTipo('B07','H542')==='Visual'&&cidTipo('B07','H903')==='Auditiva'&&cidTipo('B07','F70')==='Intelectual'&&cdOf({key:'p:1',cid:{B06:{c:'B24',n:'x',at:''}}}).imuno[0]==='HIV/aids');
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -3558,7 +3571,7 @@ function pseChange(ev){const t=ev.target;if(t.dataset?.psPref){state.preferences
 function pseInput(ev){if(ev.target.id==='pseSearch'){state.preferences.pseSearch=ev.target.value;const pos=ev.target.selectionStart;renderView('pse');const q=document.getElementById('pseSearch');if(q){q.focus();q.setSelectionRange(pos,pos)}}}
 // ---- base da análise estatística ----
 function pseStatRows(months){const set=new Set(months),out=[];
-  for(const c of pseChildren())for(const r of c.evals){if(!set.has(String(r.dataAval).slice(0,7)))continue;const L=pseLinks(r),cad=pseCad(r),ev=r.status==='Preenchida',y=b=>ev?sxYN(b):null,age=ageAt({dataNascimento:cad.nasc},parseDate(r.dataAval)),vis=L.prod?.visits||[],after=vis.filter(v=>v.date>=r.dataAval&&!pseIsSchoolFluor(v)),before=vis.filter(v=>v.date<r.dataAval),alt=L.col?.dates?.some(d=>d.alt),hist=(pseStore().followups[r.key]?.history||[]).filter(h=>h.at>=r.dataAval&&h.type!=='note');
+  for(const c of pseChildren()||[])for(const r of c.evals){if(!set.has(String(r.dataAval).slice(0,7)))continue;const L=pseLinks(r),cad=pseCad(r),ev=r.status==='Preenchida',y=b=>ev?sxYN(b):null,age=ageAt({dataNascimento:cad.nasc},parseDate(r.dataAval)),vis=L.prod?.visits||[],after=vis.filter(v=>v.date>=r.dataAval&&!pseIsSchoolFluor(v)),before=vis.filter(v=>v.date<r.dataAval),alt=L.col?.dates?.some(d=>d.alt),hist=(pseStore().followups[r.key]?.history||[]).filter(h=>h.at>=r.dataAval&&h.type!=='note');
     out.push([cad.sexo==='F'?'Feminino':cad.sexo==='M'?'Masculino':null,r.escola||null,r.turma||null,r.ano||null,sxYN(pseIsMine(r)),pseOnlyArt(r)?'Só ART':r.status||null,ev&&r.risco?r.risco:null,ev&&r.risco?sxYN(r.risco==='Alto'):null,ev&&r.lesoes?r.lesoes:null,ev&&r.lesoes?sxYN(r.lesoes!=='Zero'):null,ev&&r.exo?r.exo:null,ev&&r.exo?sxYN(r.exo!=='Não necessita'):null,y(r.dor),y(r.perio),sxYN(r.pcd),y(r.art),y(r.encUbs),y(r.fluor),L.prod?sxYN(before.length>0):null,L.prod?sxYN(after.length>0):null,L.col?sxYN(!!alt):null,age,r.aFazer.length,r.feitos.length,after.length?Math.round((parseDate(after[0].date)-parseDate(r.dataAval))/864e5):null,pseIsMine(r)?hist.length:null,L.state==='ok'?'Confirmado':L.state==='def'?'A definir':'Sem registro'])}
   return {rows:out,legacy:0}}
 
@@ -3620,13 +3633,87 @@ function sxKidRows(months,unit=state.preferences.unit){const rows=[];let legacy=
     for(const [sx,age,alt] of a.kids)rows.push([sx==='F'?'Feminino':sx==='M'?'Masculino':null,age==null?null:`${age} anos`,turma,a.local||null,a.turno||null,sxYN(alt),age])}
   return {rows,legacy};
 }
+// ---- Pessoas (prontuário), v2.55: uma linha por pessoa da Classificação de Risco, juntando todas as fontes ----
+// Cada variável usa a data do próprio acontecimento: atendimento, avaliação do PSE, escovação, contato. O período
+// escolhe os acontecimentos pela data; quando a variável liga dois deles, o primeiro é o ponto de partida.
+// Vazio é "não sabemos", nunca "Não": critérios marcados à mão só viram Não quando houver o formulário.
+// Todos os anos importados (v2.55): do mês mais antigo de qualquer arquivo até o mês atual.
+function sxAllMonths(){let min='';const see=mk=>{if(/^\d{4}-\d{2}$/.test(mk)&&(!min||mk<min))min=mk};
+  for(const s of state.snapshots)if(!s.supersededBy)for(const mk of Object.keys(s.dataByMonth||{}))see(mk);
+  for(const c of pseChildren()||[])for(const r of c.evals||[])see(String(r.dataAval||'').slice(0,7));
+  const now=new Date(),cur=monthKey(now.getFullYear(),now.getMonth()+1);if(!min||min>cur)min=cur;
+  const out=[];let {year,month}=parseMonthKey(min);for(let mk=min;mk<=cur;){out.push(mk);month++;if(month>12){month=1;year++}mk=monthKey(year,month)}return out}
+function sxPeriod(){if(!state.preferences.sxAllYears)return procPeriod();const months=sxAllMonths(),a=months[0].slice(0,4),b=months.at(-1).slice(0,4);return {mode:'A',months,chart:months,label:a===b?`Todos os anos · ${a}`:`Todos os anos · ${a} a ${b}`}}
+const SX_CICLO=['0–2','3–5','6–12','13–17','18–59','60–69','70+'];
+const sxCiclo=a=>a==null?null:a<=2?'0–2':a<=5?'3–5':a<=12?'6–12':a<=17?'13–17':a<=59?'18–59':a<=69?'60–69':'70+';
+const SX_CANAL={whatsapp:'WhatsApp',semresp:'Sem resposta',acs:'Visita do ACS',agendada:'Agendamento',preg:'Contato pela aba Gestantes'};
+// Critérios que têm fonte automática: sem a marca, a resposta é "Não". Os outros ficam vazios até o formulário.
+const SX_CRIT_KNOWN=new Set(['B01','B01b','B02a','B02b','B03','B04','B05','C10','C11','C18']);
+const sxDays=(a,b)=>Math.round((parseDate(b)-parseDate(a))/DAY_MS);
+const sxFlag=(v,f)=>(v.items||[]).some(x=>String(x[3]||'').includes(f));
+function sxPersonRows(months){
+  const start=`${months[0]}-01`,{year,month}=parseMonthKey(months.at(-1)),endD=new Date(year,month,0),today=isoDate(new Date()),end0=isoDate(endD),end=end0<today?end0:today,refD=parseDate(end);
+  const eps=new Map(mergedEpisodes().map(e=>[e.id,e])),inP=d=>d>=start&&d<=end0,critL=RK_ESCALA.filter(g=>g.k==='ciclo'||g.k==='social').flatMap(g=>g.it.map(x=>[x[0],`${x[0]} · ${x[1]}`]));
+  const rows=[];
+  for(const p of rkPeopleAll()){if(p.excluded)continue;const vs=p.visits||[];
+    // Quem só vem do CELK entra a partir do primeiro atendimento.
+    if(!p.orig.some(o=>o!=='CELK')&&!(vs[0]&&vs[0].date<=end0))continue;
+    const age=p.nasc?ageAt({dataNascimento:p.nasc},refD):p.age!=null?Math.max(0,p.age-Math.floor(sxDays(end,today)/365.25)):null;
+    const sc=rkScore(p),on=new Set(sc.rows.filter(x=>x.on).map(x=>x.key||x.id)),d=rkData(p);
+    const crit={};for(const [id,l] of critL){const k=id==='C01i'?'C01':id==='C03i'?'C03':id;crit[l]=on.has(k)||on.has(id)?'Sim':SX_CRIT_KNOWN.has(id)&&(!id.startsWith('B0')||id>='B03'||age!=null)&&(id!=='C10'||rkStore().areaInteira||rkRuaDe(p))?'Não':null}
+    const c10=rkStore().areaInteira||rkRuaDe(p)?rkC10(p,d.crit||{}):null,sx=p.sexo||[...vs].reverse().find(v=>v.sex)?.sex||'',cs0=cdStore(),nCond=[on.has('B04'),on.has('B05'),(cs0.imuno[p.key]||[]).length>0,(cs0.pcd[p.key]||[]).length>0,!!p.sitIdoso].filter(Boolean).length;
+    // Atendimentos: antes do período, no período e depois do início.
+    const before=vs.filter(v=>v.date<start),inside=vs.filter(v=>inP(v.date)),lastBefore=before.at(-1)?.date||null;
+    const f1=inside.find(v=>sxFlag(v,'f'))?.date||null,c1=f1?vs.find(v=>v.date>=f1&&rkIsTC(v))?.date||null:null,cIn=c1&&c1<=end0?c1:null;
+    let np=0;for(const v of inside)for(const [,q,,fl] of v.items||[])if(!String(fl).includes('n'))np+=Number(q)||0;
+    const lastUpTo=vs.filter(v=>v.date<=end).at(-1)?.date||null;
+    const aband=f1&&!cIn&&sxDays(f1,end)>180?sxYN(!lastUpTo||sxDays(lastUpTo,end)>180):null;
+    const tcIn=inside.filter(rkIsTC).at(-1)?.date||null,manut=tcIn&&sxDays(tcIn,today)>=365?sxYN(vs.some(v=>v.date>tcIn&&sxDays(tcIn,v.date)<=365)):null;
+    // Gestação que cruza o período.
+    const ges=(p.gestIds||[]).map(id=>eps.get(id)).filter(Boolean).filter(e=>{const a=pregDum(e),b=pregDpp(e);return a&&b&&isoDate(a)<=end0&&isoDate(b)>=start});
+    const gv=ges.flatMap(e=>productionVisitsFor(e).map(v=>({v,e}))).sort((x,y)=>x.v.date.localeCompare(y.v.date))[0];
+    // PSE: avaliação mais recente do período.
+    const ev=(p.pse?.child?.evals||[]).filter(r=>inP(String(r.dataAval).slice(0,10))).sort((a,b)=>String(a.dataAval).localeCompare(String(b.dataAval))).at(-1)||null,evOk=ev?.status==='Preenchida';
+    const afterPse=ev?vs.filter(v=>v.date>=String(ev.dataAval).slice(0,10)):[];
+    // Escovações e contatos do período.
+    const esc=(p.col?.dates||[]).filter(x=>inP(String(x.date).slice(0,10)));
+    const cont=rkContactHistory(p).filter(h=>h.type!=='note'&&inP(String(h.at).slice(0,10))),c0=cont[0]?String(cont[0].at).slice(0,10):null,afterC=c0?vs.find(v=>v.date>=c0):null;
+    const o={sexo:/^F/i.test(sx)?'Feminino':/^M/i.test(sx)?'Masculino':null,faixa_etaria:sxAgeBand(age),ciclo_vida:sxCiclo(age),idade:age,equipe:p.equipe||null,
+      rua_vulneravel:c10?sxYN(c10.on):null,lista:p.orig.slice(),gestante:sxYN(ges.length),diabetes:sxYN(on.has('B04')),hipertensao:sxYN(on.has('B05')),n_condicoes:nCond,
+      condicao_clinica:sc.clin?sc.clin[1]:null,necessidade_clinica:sc.clin?sxYN(sc.clinPts>=10):null,pontos_clinicos:sc.clin?sc.clinPts:null,
+      faixa_risco:sc.faixa,pontos_total:sc.total,pontos_ciclo_social:sc.cs,criterio:crit,etapa:RK_STAGES.find(x=>x[0]===rkStage(p))?.[1]||null,
+      paciente_antes:sxYN(before.length),atendido_periodo:sxYN(inside.length),primeira_consulta:sxYN(f1),concluiu:f1?sxYN(cIn):null,dias_ate_conclusao:cIn?sxDays(f1,cIn):null,
+      urgencia:sxYN(inside.some(v=>sxFlag(v,'u'))),entrou_urgencia:inside.length?sxYN(sxFlag(inside[0],'u')):null,dias_atendimento:new Set(inside.map(v=>v.date)).size,n_procedimentos:Math.round(np),
+      ano_1o_atendimento:vs[0]?vs[0].date.slice(0,4):null,meses_ultima_consulta:lastBefore?Math.floor(sxDays(lastBefore,start)/30.44):null,mais_2_anos_sem_consulta:lastBefore?sxYN(sxDays(lastBefore,start)>730):null,
+      nunca_consultou:sxYN(!vs.some(v=>v.date<=end0)),possivel_abandono:aband,manutencao_12m:manut,
+      odonto_gestacao:ges.length?sxYN(ges.some(isAttended)):null,semanas_1o_atendimento:gv?Math.floor(sxDays(isoDate(pregDum(gv.e)),gv.v.date)/7):null,
+      meu_aluno:sxYN(p.orig.includes('PSE')),risco_pse:evOk&&ev.risco?ev.risco:null,lesao_pse:evOk&&ev.lesoes?sxYN(ev.lesoes!=='Zero'):null,
+      atendida_apos_pse:ev&&p.pront?sxYN(afterPse.length):null,dias_pse_atendimento:afterPse.length?sxDays(String(ev.dataAval).slice(0,10),afterPse[0].date):null,
+      n_escovacoes:esc.length,alterada_escovacao:esc.length?sxYN(esc.some(x=>x.alt)):null,
+      n_contatos:cont.length,canal_1o_contato:cont.length?SX_CANAL[cont[0].type]||'Outro':null,agendada:cont.length?sxYN(cont.some(h=>h.type==='agendada'||h.to==='agendada')):null,
+      atendida_apos_contato:cont.length?sxYN(afterC):null,dias_contato_atendimento:afterC?sxDays(c0,afterC.date):null};
+    rows.push(SX_BASES.pes.vars.map(v=>o[v.k]))}
+  return {rows,legacy:0}}
+
 const SX_BASES={
+  pes:{label:'Pessoas (prontuário)',unit:'pessoa',vars:[{l:'Sexo',k:'sexo',t:'cat'},{l:'Faixa etária',k:'faixa_etaria',t:'ord',o:SX_AGE_BANDS},{l:'Ciclo de vida',k:'ciclo_vida',t:'ord',o:SX_CICLO},{l:'Idade (anos)',k:'idade',t:'num',per10:true},{l:'Equipe',k:'equipe',t:'cat'},{l:'Mora em rua de alta vulnerabilidade (C10)',k:'rua_vulneravel',t:SX_BIN,only:'quem tem endereço'},{l:'Está na lista de…',k:'lista',t:SX_BIN,custom:true,pre:'Na lista'},
+    {l:'Gestante no período',k:'gestante',t:SX_BIN},{l:'Diabetes',k:'diabetes',t:SX_BIN},{l:'Hipertensão',k:'hipertensao',t:SX_BIN},{l:'Número de condições de saúde',k:'n_condicoes',t:'num'},
+    {l:'Condição clínica (dentista)',k:'condicao_clinica',t:'ord',only:'quem tem avaliação do dentista'},{l:'Tem necessidade clínica',k:'necessidade_clinica',t:SX_BIN,only:'quem tem avaliação do dentista'},{l:'Pontos clínicos',k:'pontos_clinicos',t:'num',only:'quem tem avaliação do dentista'},
+    {l:'Faixa de risco (atual)',k:'faixa_risco',t:'ord'},{l:'Total de pontos (atual)',k:'pontos_total',t:'num'},{l:'Pontos de ciclo de vida e social (atual)',k:'pontos_ciclo_social',t:'num'},{l:'Tem o critério…',k:'criterio',t:SX_BIN,custom:true,pre:'Critério'},{l:'Etapa da fila (atual)',k:'etapa',t:'ord'},
+    {l:'Já era paciente antes do período',k:'paciente_antes',t:SX_BIN},{l:'Atendido no período',k:'atendido_periodo',t:SX_BIN},{l:'Teve primeira consulta',k:'primeira_consulta',t:SX_BIN},{l:'Concluiu tratamento',k:'concluiu',t:SX_BIN,only:'quem teve primeira consulta'},{l:'Dias da 1ª consulta à conclusão',k:'dias_ate_conclusao',t:'num',only:'quem concluiu'},
+    {l:'Teve urgência',k:'urgencia',t:SX_BIN},{l:'Entrou pela urgência',k:'entrou_urgencia',t:SX_BIN,only:'quem foi atendido no período'},{l:'Dias de atendimento',k:'dias_atendimento',t:'num'},{l:'Número de procedimentos',k:'n_procedimentos',t:'num'},{l:'Ano do 1º atendimento',k:'ano_1o_atendimento',t:'ord',only:'quem já foi atendido'},
+    {l:'Meses desde a última consulta',k:'meses_ultima_consulta',t:'num',only:'quem consultou antes do período'},{l:'Mais de 2 anos sem consulta',k:'mais_2_anos_sem_consulta',t:SX_BIN,only:'quem consultou antes do período'},{l:'Nunca consultou',k:'nunca_consultou',t:SX_BIN},{l:'Possível abandono',k:'possivel_abandono',t:SX_BIN,only:'quem teve 1ª consulta há mais de 6 meses sem concluir'},{l:'Voltou para manutenção em 12 meses',k:'manutencao_12m',t:SX_BIN,only:'quem concluiu há pelo menos 12 meses'},
+    {l:'Consulta odontológica na gestação',k:'odonto_gestacao',t:SX_BIN,only:'gestantes do período'},{l:'Semanas de gestação no 1º atendimento odontológico',k:'semanas_1o_atendimento',t:'num',only:'gestantes atendidas no CELK'},
+    {l:'Meu aluno (PSE)',k:'meu_aluno',t:SX_BIN},{l:'Risco no PSE',k:'risco_pse',t:'ord',o:PSE_RISK,only:'quem foi avaliado no PSE no período'},{l:'Lesão cavitada no PSE',k:'lesao_pse',t:SX_BIN,only:'quem foi avaliado no PSE no período'},{l:'Atendida depois da avaliação do PSE',k:'atendida_apos_pse',t:SX_BIN,only:'quem foi avaliado no PSE no período e tem prontuário'},{l:'Dias da avaliação do PSE ao atendimento',k:'dias_pse_atendimento',t:'num',only:'quem foi atendida depois do PSE'},
+    {l:'Número de escovações',k:'n_escovacoes',t:'num'},{l:'Avaliação alterada na escovação',k:'alterada_escovacao',t:SX_BIN,only:'quem participou de escovação no período'},
+    {l:'Número de contatos da busca ativa',k:'n_contatos',t:'num'},{l:'Canal do 1º contato',k:'canal_1o_contato',t:'cat',only:'quem teve contato no período'},{l:'Foi agendada',k:'agendada',t:SX_BIN,only:'quem teve contato no período'},{l:'Atendida depois do contato',k:'atendida_apos_contato',t:SX_BIN,only:'quem teve contato no período'},{l:'Dias do 1º contato ao atendimento',k:'dias_contato_atendimento',t:'num',only:'quem foi atendida depois do contato'}]},
   pat:{label:'Pacientes da produção',unit:'paciente',vars:[{l:'Sexo',k:'sexo',i:0,t:'cat'},{l:'Faixa etária',k:'faixa_etaria',i:1,t:'ord',o:SX_AGE_BANDS},{l:'Dentista principal',k:'dentista',i:2,t:'cat'},{l:'Atendido por mais de um dentista',k:'mais_de_um_dentista',i:3,t:SX_BIN},{l:'Mês de entrada',k:'mes_entrada',i:4,t:'ord',o:MONTHS_SHORT},{l:'Quadrimestre de entrada',k:'quadrimestre_entrada',i:5,t:'ord',o:['Q1','Q2','Q3']},
     {l:'Teve primeira consulta',k:'primeira_consulta',i:6,t:SX_BIN},{l:'Concluiu tratamento',k:'concluiu',i:7,t:SX_BIN,only:'quem teve primeira consulta'},{l:'Concluiu no mesmo dia da 1ª consulta',k:'concluiu_mesmo_dia',i:8,t:SX_BIN,only:'quem concluiu tratamento'},{l:'Voltou mais de uma vez',k:'voltou',i:9,t:SX_BIN},{l:'Teve urgência',k:'urgencia',i:10,t:SX_BIN},{l:'Teve preventivo',k:'preventivo',i:11,t:SX_BIN},{l:'Teve restauração',k:'restauracao',i:12,t:SX_BIN},{l:'Teve exodontia',k:'exodontia',i:13,t:SX_BIN},{l:'Teve periodontia',k:'periodontia',i:14,t:SX_BIN},{l:'Teve ART',k:'art',i:15,t:SX_BIN},{l:'Voltou no quadrimestre seguinte',k:'voltou_quadrimestre_seguinte',i:16,t:SX_BIN,only:'quem entrou num quadrimestre cujo seguinte já foi importado (use o período Ano)'},
     {l:'Idade (anos)',k:'idade',i:17,t:'num',per10:true},{l:'Dias de atendimento',k:'dias_atendimento',i:18,t:'num'},{l:'Número de procedimentos',k:'n_procedimentos',i:19,t:'num'},{l:'Dias da 1ª consulta à conclusão',k:'dias_ate_conclusao',i:20,t:'num',only:'quem concluiu'},{l:'Número de dentistas',k:'n_dentistas',i:21,t:'num'},{l:'Teve o procedimento…',k:'teve',i:22,t:SX_BIN,custom:true}]},
   ges:{label:'Gestantes (Monitora APS)',unit:'gestante',noPeriod:true,vars:[{l:'Equipe',k:'equipe',i:0,t:'cat'},{l:'Período da gestação',k:'periodo_gestacao',i:1,t:'ord',o:['T1','T2','T3','Puerpério','Sem PN aberto'],trend:['T1','T2','T3']},{l:'1ª consulta até 12 semanas',k:'captacao_12s',i:2,t:SX_BIN},{l:'7 consultas de pré-natal',k:'sete_consultas',i:3,t:SX_BIN},{l:'7 aferições de pressão',k:'sete_pa',i:4,t:SX_BIN},{l:'7 registros de peso e altura',k:'sete_peso_altura',i:5,t:SX_BIN},{l:'Vacina DTPA',k:'dtpa',i:6,t:SX_BIN},{l:'Exames do 1º trimestre',k:'exames_t1',i:7,t:SX_BIN},{l:'Exames do 3º trimestre',k:'exames_t3',i:8,t:SX_BIN},{l:'Consulta de puerpério',k:'consulta_puerperio',i:9,t:SX_BIN},{l:'Consulta odontológica',k:'consulta_odonto',i:10,t:SX_BIN}]},
   kids:{label:'Crianças das escovações',unit:'participação',vars:[{l:'Sexo',k:'sexo',i:0,t:'cat'},{l:'Idade',k:'idade_faixa',i:1,t:'ord',o:Array.from({length:19},(_,i)=>`${i} anos`)},{l:'Turma',k:'turma',i:2,t:'cat'},{l:'Local',k:'local',i:3,t:'cat'},{l:'Turno',k:'turno',i:4,t:'cat'},{l:'Avaliação alterada',k:'avaliacao_alterada',i:5,t:SX_BIN},{l:'Idade (anos)',k:'idade',i:6,t:'num'}]},
   pse:{label:'Crianças do PSE',unit:'avaliação',vars:[{l:'Sexo (da atividade coletiva)',k:'sexo',i:0,t:'cat'},{l:'Escola',k:'escola',i:1,t:'cat'},{l:'Turma',k:'turma',i:2,t:'cat'},{l:'Ano escolar',k:'ano_escolar',i:3,t:'cat'},{l:'Meu aluno',k:'meu_aluno',i:4,t:SX_BIN},{l:'Status da avaliação',k:'status',i:5,t:'cat'},{l:'Risco',k:'risco',i:6,t:'ord',o:PSE_RISK,only:'quem foi avaliado'},{l:'Risco alto',k:'risco_alto',i:7,t:SX_BIN,only:'quem foi avaliado'},{l:'Lesões cariosas cavitadas',k:'lesoes_cavitadas',i:8,t:'ord',o:PSE_LESOES,only:'quem foi avaliado'},{l:'Tem lesão cavitada',k:'tem_lesao',i:9,t:SX_BIN,only:'quem foi avaliado'},{l:'Necessidade de exodontia',k:'necessidade_exodontia',i:10,t:'ord',o:PSE_EXO,only:'quem foi avaliado'},{l:'Precisa de exodontia',k:'precisa_exodontia',i:11,t:SX_BIN,only:'quem foi avaliado'},{l:'Dor',k:'dor',i:12,t:SX_BIN,only:'quem foi avaliado'},{l:'Problemas periodontais',k:'periodontal',i:13,t:SX_BIN,only:'quem foi avaliado'},{l:'PcD',k:'pcd',i:14,t:SX_BIN},{l:'Indicação de ART',k:'indicacao_art',i:15,t:SX_BIN,only:'quem foi avaliado'},{l:'Encaminhada à UBS',k:'encaminhada',i:16,t:SX_BIN,only:'quem foi avaliado'},{l:'Flúor aplicado',k:'fluor',i:17,t:SX_BIN,only:'quem foi avaliado'},{l:'Já era paciente antes da avaliação',k:'paciente_antes',i:18,t:SX_BIN,only:'quem tem prontuário ligado'},{l:'Atendida na UBS depois da avaliação',k:'atendida_depois',i:19,t:SX_BIN,only:'quem tem prontuário ligado'},{l:'Avaliação alterada na escovação',k:'alterada_escovacao',i:20,t:SX_BIN,only:'quem está ligado à atividade coletiva'},{l:'Idade (anos)',k:'idade',i:21,t:'num'},{l:'Dentes para ART',k:'dentes_art',i:22,t:'num'},{l:'Dentes de ART feitos',k:'dentes_art_feitos',i:23,t:'num'},{l:'Dias até o 1º atendimento na UBS',k:'dias_ate_atendimento',i:24,t:'num',only:'quem foi atendida depois'},{l:'Registros de contato',k:'contatos',i:25,t:'num',only:'meus alunos'},{l:'Cruzamento com o CELK',k:'cruzamento',i:26,t:'cat'}]}};
+SX_BASES.pes.vars.forEach((v,i)=>{v.i=i});
 const SX_TESTS={
   chi:{l:'Duas características estão relacionadas?',s:'Qui-quadrado (ou Fisher)',f:[['a','Característica 1',['cat','ord',SX_BIN]],['b','Característica 2',['cat','ord',SX_BIN]]]},
   ic:{l:'Qual a porcentagem, com margem de erro?',s:'Intervalo de confiança 95%',f:[['a','Porcentagem de',[SX_BIN]],['b','Separar por (opcional)',['cat','ord',SX_BIN],true]]},
@@ -3638,16 +3725,18 @@ const SX_TESTS={
 const SX_SUGG={pat:[['lr',7,null,'O que explica concluir o tratamento?'],['ic',8,null,'Quantos concluem no mesmo dia da 1ª consulta?'],['chi',8,1,'Concluiu no mesmo dia × faixa etária'],['p2',8,10,'Concluiu no mesmo dia: com e sem urgência'],['tr',13,1,'Exodontia sobe com a idade?'],['chi',10,7,'Urgência × concluiu tratamento'],['gr',20,2,'Dias até concluir, por dentista'],['ic',16,1,'Voltou no quadrimestre seguinte, por faixa etária'],['lr',13,null,'O que explica ter exodontia?']],
   ges:[['chi',3,10,'7 consultas × consulta odontológica'],['chi',2,10,'Captação precoce × consulta odontológica'],['ic',10,0,'Consulta odontológica por equipe'],['tr',10,1,'Odonto sobe com o período da gestação?'],['lr',10,null,'O que explica a consulta odontológica?']],
   kids:[['chi',0,5,'Sexo × avaliação alterada'],['ic',5,2,'Avaliação alterada por turma'],['tr',5,1,'Avaliação alterada sobe com a idade?']],
+  pes:[['ic',20,14,'Atendidos no período, por faixa de risco'],['tr',20,14,'A faixa de risco mais alta é mais atendida?'],['chi',21,2,'1ª consulta × ciclo de vida'],['lr',20,null,'O que explica ser atendido no período?'],['ic',46,44,'Atendida depois do contato, por canal'],['gr',47,44,'Dias do contato ao atendimento, por canal'],['ic',39,37,'Atendida depois do PSE, por risco'],['ic',34,4,'Consulta odontológica na gestação, por equipe'],['lr',22,null,'O que explica concluir o tratamento?']],
   pse:[['ic',9,2,'Lesão cavitada por turma'],['chi',9,12,'Lesão cavitada × dor'],['gr',21,8,'Idade por nº de lesões cavitadas'],['ic',7,1,'Risco alto por escola'],['lr',11,null,'O que explica precisar de exodontia?'],['p2',19,12,'Atendida depois: com e sem dor']]};
-const SX_DEFP={pat:{chi:[1,7],ic:[7,1],p2:[11,2],tr:[13,1],gr:[18,2],co:[17,18],lr:[7]},ges:{chi:[3,10],ic:[10,0],p2:[10,0],tr:[10,1],gr:[0,0],co:[0,0],lr:[10]},kids:{chi:[0,5],ic:[5,2],p2:[5,0],tr:[5,1],gr:[6,0],co:[6,6],lr:[5]},pse:{chi:[9,12],ic:[7,2],p2:[19,12],tr:[9,3],gr:[22,6],co:[21,22],lr:[11]}};
-const SX_DEFX={pat:[1,0,2,10],ges:[0,1,2,3],kids:[0,1,2],pse:[21,12,14]};
+const SX_DEFP={pat:{chi:[1,7],ic:[7,1],p2:[11,2],tr:[13,1],gr:[18,2],co:[17,18],lr:[7]},ges:{chi:[3,10],ic:[10,0],p2:[10,0],tr:[10,1],gr:[0,0],co:[0,0],lr:[10]},kids:{chi:[0,5],ic:[5,2],p2:[5,0],tr:[5,1],gr:[6,0],co:[6,6],lr:[5]},pse:{chi:[9,12],ic:[7,2],p2:[19,12],tr:[9,3],gr:[22,6],co:[21,22],lr:[11]},pes:{chi:[14,20],ic:[20,14],p2:[46,44],tr:[20,14],gr:[47,44],co:[3,15],lr:[20]}};
+const SX_DEFX={pat:[1,0,2,10],ges:[0,1,2,3],kids:[0,1,2],pse:[21,12,14],pes:[1,0,14]};
 let sxSt={base:'pat',test:'chi',a:1,b:7,g1:null,g2:null,proc:{},merge:{},mergeOpen:null,mergeSel:[],fv:null,fval:null,xs:SX_DEFX.pat.slice()};
-function sxBaseData(base,per=procPeriod()){if(base==='ges')return sxMonitoraRows();if(base==='pse')return pseStatRows(per.months);if(base==='kids')return sxKidRows(per.months);return sxPatientRows(per.months)}
-function sxProcList(rows){return [...new Set(rows.flatMap(r=>r[22]||[]))].sort((a,b)=>a.localeCompare(b,'pt-BR'))}
-function sxPickProc(key,rows){const list=sxProcList(rows);if(!list.includes(sxSt.proc[key]))sxSt.proc[key]=list.find(p=>/^EXODONTIA DE DENTE PERMANENTE/.test(norm(p)))||list[0]||'';return sxSt.proc[key]}
-function sxVname(v,key){return v.custom?`Teve: ${String(sxSt.proc[key]||'procedimento').toLowerCase()}`:v.l}
+function sxBaseData(base,per=sxPeriod()){if(base==='pes')return sxPersonRows(per.months);if(base==='ges')return sxMonitoraRows();if(base==='pse')return pseStatRows(per.months);if(base==='kids')return sxKidRows(per.months);return sxPatientRows(per.months)}
+function sxProcList(rows,key){const v=SX_BASES[sxSt.base].vars[sxSt[key]],i=v?.custom?v.i:22;return [...new Set(rows.flatMap(r=>{const x=r[i];return Array.isArray(x)?x:x?Object.keys(x):[]}))].sort((a,b)=>a.localeCompare(b,'pt-BR',{numeric:true}))}
+const sxPickVal=(x,sel)=>Array.isArray(x)?(x.includes(sel)?'Sim':'Não'):x?(x[sel]??null):'Não';
+function sxPickProc(key,rows){const list=sxProcList(rows,key);if(!list.includes(sxSt.proc[key]))sxSt.proc[key]=list.find(p=>/^EXODONTIA DE DENTE PERMANENTE/.test(norm(p)))||list[0]||'';return sxSt.proc[key]}
+function sxVname(v,key){return v.custom?(v.pre?`${v.pre}: ${sxSt.proc[key]||'—'}`:`Teve: ${String(sxSt.proc[key]||'procedimento').toLowerCase()}`):v.l}
 function sxMergeMap(vi){return sxSt.merge[`${sxSt.base}:${vi}`]||[]}
-function sxVal(r,vi,key){const v=SX_BASES[sxSt.base].vars[vi];let x=v.custom?((r[v.i]||[]).includes(sxSt.proc[key])?'Sim':'Não'):r[v.i];if(x==null||x==='')return null;if(v.t!=='num'){for(const g of sxMergeMap(vi))if(g.includes(x))return g.join(' + ')}return x}
+function sxVal(r,vi,key){const v=SX_BASES[sxSt.base].vars[vi];let x=v.custom?sxPickVal(r[v.i],sxSt.proc[key]):r[v.i];if(x==null||x==='')return null;if(v.t!=='num'){for(const g of sxMergeMap(vi))if(g.includes(x))return g.join(' + ')}return x}
 function sxLevels(vi,rows,key){const v=SX_BASES[sxSt.base].vars[vi],seen=[...new Set(rows.map(r=>sxVal(r,vi,key)))].filter(x=>x!=null);if(v.t===SX_BIN&&!sxMergeMap(vi).length)return ['Sim','Não'].filter(x=>seen.includes(x));const ord=v.o||[];const k2=x=>{const i=ord.indexOf(String(x).split(' + ')[0]);return i<0?999:i};return seen.sort((a,b)=>k2(a)-k2(b)||String(a).localeCompare(String(b),'pt-BR',{numeric:true}))}
 const sxStrength=v=>v<0.1?'desprezível':v<0.3?'fraca':v<0.5?'moderada':'forte';
 function sxRows(all){let rows=all;if(sxSt.fv!=null&&sxSt.fval!=null)rows=rows.filter(r=>String(sxVal(r,sxSt.fv,'f'))===sxSt.fval);return rows}
@@ -3742,16 +3831,16 @@ function sxRun(all,per){
 function sxSetTest(t){const st=sxSt;st.test=t;const d=SX_DEFP[st.base][t];st.a=d[0];st.b=SX_TESTS[t].f[1]?(d[1]??null):null;st.g1=st.g2=null;if(t==='lr')st.xs=SX_DEFX[st.base].filter(x=>x!==st.a)}
 function sxVarField(key,label,types,optional,rows){const st=sxSt,base=SX_BASES[st.base],cur=st[key],v=cur!=null?base.vars[cur]:null;
   const sel=`<select class="sx-sel" data-sx-var="${key}" aria-label="${esc(label)}">${optional?'<option value="-1">— ninguém, todos juntos —</option>':''}${base.vars.map((vv,i)=>types.includes(vv.t)?`<option value="${i}"${i===cur?' selected':''}>${esc(vv.l)}</option>`:'').join('')}</select>`;
-  const proc=v&&v.custom?`<select class="sx-sel" data-sx-proc="${key}" aria-label="Procedimento">${sxProcList(rows).map(p=>`<option value="${esc(p)}"${p===sxPickProc(key,rows)?' selected':''}>${esc(p)}</option>`).join('')}</select>`:'';
+  const proc=v&&v.custom?`<select class="sx-sel" data-sx-proc="${key}" aria-label="${esc(v.pre||'Procedimento')}">${sxProcList(rows,key).map(p=>`<option value="${esc(p)}"${p===sxPickProc(key,rows)?' selected':''}>${esc(p)}</option>`).join('')}</select>`:'';
   let merge='';if(v&&!v.custom&&(v.t==='cat'||v.t==='ord')){const lv=sxLevels(cur,rows,key),groups=sxMergeMap(cur);merge=st.mergeOpen===key?`<div class="sx-mergebox"><span class="sx-note">Escolha 2 ou mais para juntar:</span><div class="sx-chipset">${lv.map(l=>`<button type="button" data-sx-mchip="${esc(l)}" aria-pressed="${st.mergeSel.includes(l)}">${esc(l)}</button>`).join('')}</div><div class="sx-row"><button class="sx-mini" type="button" data-sx-mdo="${key}">Juntar selecionadas</button>${groups.length?`<button class="sx-mini" type="button" data-sx-mundo="${key}">Desfazer tudo</button>`:''}<button class="sx-mini" type="button" data-sx-mclose>Fechar</button></div></div>`:`<button class="sx-mini" type="button" data-sx-mopen="${key}">Juntar categorias${groups.length?` (${groups.length} junção${groups.length>1?'ões':''})`:''}</button>`}
   return `<div class="sx-field"><span>${esc(label)}${v&&v.only?` <small>· só ${esc(v.only)}</small>`:''}</span>${sel}${proc}${merge}</div>`}
 function statsHTML(){
-  const st=sxSt,per=procPeriod(),seg=(val,label)=>`<button class="pr-sb" data-proc-period="${val}" aria-pressed="${per.mode===val}">${label}</button>`;
+  const st=sxSt,per=sxPeriod(),seg=(val,label)=>`<button class="pr-sb" ${val==='A'?'data-sx-all':`data-proc-period="${val}"`} aria-pressed="${per.mode===val}">${label}</button>`;
   const data=Object.fromEntries(Object.keys(SX_BASES).map(k=>[k,sxBaseData(k,per)]));
   const base=SX_BASES[st.base],all=data[st.base].rows;if(st.fv!=null){const l=sxLevels(st.fv,all,'f');if(!l.includes(st.fval))st.fval=l[0]??null}
   const R=sxRun(all,per),T=SX_TESTS[st.test];
-  const subs={pse:`uma linha por criança avaliada no PSE · ${per.label}`,pat:`uma linha por paciente · ${per.label}`,ges:'lista mais recente do Monitora APS (sem data; o período não se aplica)',kids:`uma linha por participação em escovação · ${per.label}`};
-  const legacyTxt=Object.entries(data).filter(([,d])=>d.legacy).map(([k])=>({pat:'Procedimentos Detalhado',ges:'Monitora APS',kids:'Relação das Atividades em Grupo',pse:'avaliação do PSE'})[k]);
+  const subs={pes:`uma linha por pessoa, juntando todas as fontes · ${per.label}`,pse:`uma linha por criança avaliada no PSE · ${per.label}`,pat:`uma linha por paciente · ${per.label}`,ges:'lista mais recente do Monitora APS (sem data; o período não se aplica)',kids:`uma linha por participação em escovação · ${per.label}`};
+  const legacyTxt=Object.entries(data).filter(([,d])=>d.legacy).map(([k])=>({pes:'',pat:'Procedimentos Detalhado',ges:'Monitora APS',kids:'Relação das Atividades em Grupo',pse:'avaliação do PSE'})[k]);
   const bases=Object.entries(SX_BASES).map(([k,b])=>`<button class="sx-base" type="button" data-sx-base="${k}" aria-pressed="${st.base===k}"><i>${fmtNum(data[k].rows.length)}</i><b>${esc(b.label)}</b><small>${esc(subs[k])}</small></button>`).join('');
   const tests=Object.entries(SX_TESTS).map(([k,t])=>`<button class="sx-test" type="button" data-sx-test="${k}" aria-pressed="${st.test===k}"><b>${esc(t.l)}</b><small>${esc(t.s)}</small></button>`).join('');
   let fields=T.f.map(([key,label,types,optional])=>sxVarField(key,label,types,optional,all)).join('');
@@ -3767,9 +3856,9 @@ function statsHTML(){
     ${legacyTxt.length?`<div class="notice" style="margin-bottom:14px"><strong>Parte dos dados foi importada antes da análise estatística.</strong> Importe de novo os relatórios de ${esc(legacyTxt.join(', '))} para que todas as pessoas entrem aqui.</div>`:''}
     <div class="sx-cols">
     <section class="card sx-box" aria-label="Montar a análise"><div class="sx-h"><h2>Montar a análise</h2><button class="sx-mini" type="button" data-sx-notes aria-expanded="${!!st.notes}">Como funciona</button></div>
-      ${st.notes?`<ol class="sx-notes"><li><b>Uma linha por pessoa</b>, sem nome: paciente da produção, gestante do Monitora ou participação em escovação.</li><li><b>"Teve o procedimento…"</b> transforma qualquer procedimento em Sim/Não por paciente.</li><li><b>Juntar categorias</b> (ex.: 40–59 com 60+) e <b>analisar só um subgrupo</b> (ex.: só quem teve urgência).</li><li><b>Regressão logística</b>: efeito de cada fator considerando os outros ao mesmo tempo, comparado ao efeito "sozinho".</li><li>Variáveis que valem só para parte das pessoas deixam as outras de fora, e o app diz quantas.</li><li>Resultados mostram associação, não causa. Para conferir em outro programa, use "Baixar dados para análise".</li></ol>`:''}
+      ${st.notes?`<ol class="sx-notes"><li><b>Uma linha por pessoa</b>, sem nome. A base <b>Pessoas (prontuário)</b> junta todas as fontes da mesma pessoa; as outras são paciente da produção, gestante do Monitora, participação em escovação e avaliação do PSE.</li><li><b>Cada variável usa a data do próprio acontecimento</b> (atendimento, avaliação, escovação, contato). <b>Todos os anos</b> usa tudo o que foi importado.</li><li><b>Vazio não é Não</b>: o que só se sabe pelo formulário fica vazio e a pessoa sai daquele teste.</li><li><b>"Teve o procedimento…"</b> transforma qualquer procedimento em Sim/Não por paciente.</li><li><b>Juntar categorias</b> (ex.: 40–59 com 60+) e <b>analisar só um subgrupo</b> (ex.: só quem teve urgência).</li><li><b>Regressão logística</b>: efeito de cada fator considerando os outros ao mesmo tempo, comparado ao efeito "sozinho".</li><li>Variáveis que valem só para parte das pessoas deixam as outras de fora, e o app diz quantas.</li><li>Resultados mostram associação, não causa. Para conferir em outro programa, use "Baixar dados para análise".</li></ol>`:''}
       <div class="sx-field"><span>Quem entra na análise</span><div class="sx-bases">${bases}</div></div>
-      ${base.noPeriod?'':`<div class="sx-field"><span>Período</span><div class="sx-per"><div class="pr-seg">${seg('M','Mês')}${seg('Q','Quadrimestre')}${seg('Y','Ano')}</div><b class="pr-per">${esc(per.label)}</b></div></div>`}
+      ${base.noPeriod?'':`<div class="sx-field"><span>Período</span><div class="sx-per"><div class="pr-seg">${seg('M','Mês')}${seg('Q','Quadrimestre')}${seg('Y','Ano')}${seg('A','Todos os anos')}</div><b class="pr-per">${esc(per.label)}</b></div></div>`}
       <div class="sx-field"><span>O que você quer saber</span><div class="sx-tests">${tests}</div></div>
       ${fields}
       <div class="sx-field"><span>Analisar só um subgrupo (opcional)</span><select class="sx-sel" data-sx-fvar aria-label="Subgrupo"><option value="-1">Todos</option>${fOpts}</select>${fVal}</div>
@@ -3786,14 +3875,13 @@ function sxRefresh(){renderView('procedures')}
 function sxSlug(s){return norm(s).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40)}
 function sxExportColumns(){const st=sxSt,base=SX_BASES[st.base],cols=[];
   for(const [i,v] of base.vars.entries()){if(v.custom)continue;cols.push({vi:i,name:v.k,label:v.l,v});if(sxMergeMap(i).length)cols.push({vi:i,name:`${v.k}_juntas`,label:`${v.l} (categorias juntas)`,v,merged:true})}
-  const procs=[...new Set(['a','b'].filter(k=>st[k]!=null&&base.vars[st[k]].custom).map(k=>st.proc[k]))].filter(Boolean);
-  for(const p of procs)cols.push({proc:p,name:`teve_${sxSlug(p)}`,label:`Teve o procedimento: ${p}`});
+  const seen=new Set();for(const k of ['a','b']){const v=st[k]!=null?base.vars[st[k]]:null,p=v?.custom?st.proc[k]:null,name=p&&`${v.pre?v.k:'teve'}_${sxSlug(p)}`;if(!p||seen.has(name))continue;seen.add(name);cols.push({proc:p,pv:v,name,label:`${v.pre||'Teve o procedimento'}: ${p}`})}
   return cols}
-function sxColFor(vi,key){const st=sxSt,v=SX_BASES[st.base].vars[vi];if(v.custom)return `teve_${sxSlug(st.proc[key])}`;return sxMergeMap(vi).length?`${v.k}_juntas`:v.k}
-function sxExportData(anonDentists){const st=sxSt,per=procPeriod(),all=sxBaseData(st.base,per).rows,rows=sxRows(all),base=SX_BASES[st.base],cols=sxExportColumns();
+function sxColFor(vi,key){const st=sxSt,v=SX_BASES[st.base].vars[vi];if(v.custom)return `${v.pre?v.k:'teve'}_${sxSlug(st.proc[key])}`;return sxMergeMap(vi).length?`${v.k}_juntas`:v.k}
+function sxExportData(anonDentists){const st=sxSt,per=sxPeriod(),all=sxBaseData(st.base,per).rows,rows=sxRows(all),base=SX_BASES[st.base],cols=sxExportColumns();
   const dmap=new Map();const dent=x=>{if(!anonDentists||x==null)return x;if(!dmap.has(x))dmap.set(x,`Dentista ${String.fromCharCode(65+dmap.size%26)}${dmap.size>=26?Math.floor(dmap.size/26):''}`);return dmap.get(x)};
   const isDent=c=>st.base==='pat'&&c.v?.k==='dentista';
-  const cell=(r,c)=>{if(c.proc)return (r[22]||[]).includes(c.proc)?'Sim':'Não';const raw=r[c.v.i];if(raw==null||raw==='')return '';if(c.merged){const g=sxMergeMap(c.vi).find(g=>g.includes(raw));const x=g?g.join(' + '):raw;return isDent(c)?x.split(' + ').map(dent).join(' + '):x}return isDent(c)?dent(raw):raw};
+  const cell=(r,c)=>{if(c.proc)return sxPickVal(r[c.pv.i],c.proc)??'';const raw=r[c.v.i];if(raw==null||raw==='')return '';if(c.merged){const g=sxMergeMap(c.vi).find(g=>g.includes(raw));const x=g?g.join(' + '):raw;return isDent(c)?x.split(' + ').map(dent).join(' + '):x}return isDent(c)?dent(raw):raw};
     return {cols,head:['id',...cols.map(c=>c.name)],data:rows.map((r,i)=>[i+1,...cols.map(c=>cell(r,c))]),per,base,dmap}}
 function sxRScript(file,exp){const st=sxSt,base=SX_BASES[st.base],T=SX_TESTS[st.test],q0=s=>`"${String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"')}"`,q=s=>q0(exp.dmap.size?String(s).split(' + ').map(x=>exp.dmap.get(x)??x).join(' + '):s),c=(vi,key)=>sxColFor(vi,key),A=st.a!=null?c(st.a,'a'):null,B=st.b!=null?c(st.b,'b'):null;
   const lines=[`# Acompanhamento Odontológico · análise estatística · gerado em ${fmtDateTime(nowISO())}`,`# Base: ${base.label} · ${base.noPeriod?'lista atual do Monitora APS':exp.per.label}${sxSt.fv!=null&&sxSt.fval!=null?` · só ${base.vars[sxSt.fv].l.toLowerCase()}: ${sxSt.fval}`:''}`,`# Arquivo de dados: ${file} (uma linha por ${base.unit}, sem nome; separador ";" e UTF-8)`,'#','# Dicionário das variáveis',`#   id: número sequencial da linha (não identifica ninguém)`];
@@ -3817,12 +3905,13 @@ function sxOpenExport(){const st=sxSt,n=sxRows(sxBaseData(st.base).rows).length;
 function sxDoExport(){const st=sxSt,anon=st.base!=='pat'||!!document.getElementById('sxAnon')?.checked,exp=sxExportData(anon),stamp=isoDate(new Date()),file=`analise-${({pat:'pacientes',ges:'gestantes',kids:'escovacao',pse:'pse'})[st.base]}-${stamp}.csv`;
   downloadFile(file,csvString([exp.head,...exp.data]),'text/csv;charset=utf-8');setTimeout(()=>downloadFile(file.replace(/\.csv$/,'.R'),sxRScript(file,exp),'text/plain;charset=utf-8'),400);
   audit('stats_data_exported',{base:st.base,rows:exp.data.length,anonDentists:anon});closeModal();toast(`${fmtNum(exp.data.length)} linhas exportadas, com o script R.`)}
-function sxCurrentResult(){const per=procPeriod();return sxRun(sxBaseData(sxSt.base,per).rows,per)}
-function sxResultText(R){const base=SX_BASES[sxSt.base],per=procPeriod(),strip=h=>String(h||'').replace(/<br\s*\/?>/g,' ').replace(/<\/p>|<\/b>(?=<p>)/g,'. ').replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/\s+/g,' ').replace(/\.\s*\./g,'.').trim();
+function sxCurrentResult(){const per=sxPeriod();return sxRun(sxBaseData(sxSt.base,per).rows,per)}
+function sxResultText(R){const base=SX_BASES[sxSt.base],per=sxPeriod(),strip=h=>String(h||'').replace(/<br\s*\/?>/g,' ').replace(/<\/p>|<\/b>(?=<p>)/g,'. ').replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/\s+/g,' ').replace(/\.\s*\./g,'.').trim();
   return [R.title,`${base.label} · ${base.noPeriod?'lista atual':per.label}${sxSt.fv!=null&&sxSt.fval!=null?` · só ${base.vars[sxSt.fv].l.toLowerCase()}: ${sxSt.fval}`:''} · ${R.n} pessoas`,strip(R.verdict),R.stats.map(([v,l],i)=>i?`${l}: ${v}`:`${v} (${l})`).join(' · ')].join('\n')}
 async function sxCopy(){const R=sxCurrentResult();if(R.stop)return;try{await navigator.clipboard.writeText(sxResultText(R));toast('Resultado copiado.')}catch{toast('Não foi possível copiar neste navegador.')}}
 function sxTableCsv(){const R=sxCurrentResult();if(R.stop||!R.table)return;const head=[[R.title],[sxResultText(R).split('\n')[1]],...R.stats.map(([v,l],i)=>i?[l,v]:['Teste',`${v} (${l})`]),[]];downloadFile(`resultado-${sxSt.test}-${isoDate(new Date())}.csv`,csvString([...head,...R.table]),'text/csv;charset=utf-8')}
-function sxClick(ev){const el=ev.target.closest('[data-proc-view],[data-sx-base],[data-sx-test],[data-sx-sugg],[data-sx-mopen],[data-sx-mchip],[data-sx-mdo],[data-sx-mundo],[data-sx-mclose],[data-sx-notes],[data-sx-export],[data-sx-export-go],[data-sx-table],[data-sx-copy]');if(!el)return;const st=sxSt,d=el.dataset;
+function sxClick(ev){const el=ev.target.closest('[data-sx-all],[data-proc-view],[data-sx-base],[data-sx-test],[data-sx-sugg],[data-sx-mopen],[data-sx-mchip],[data-sx-mdo],[data-sx-mundo],[data-sx-mclose],[data-sx-notes],[data-sx-export],[data-sx-export-go],[data-sx-table],[data-sx-copy]');if(!el)return;const st=sxSt,d=el.dataset;
+  if(el.hasAttribute('data-sx-all')){state.preferences.sxAllYears=true;queueSave();return sxRefresh()}
   if(d.procView){state.preferences.procView=d.procView==='stats'?'stats':'overview';queueSave();return sxRefresh()}
   if(d.sxBase){st.base=d.sxBase;st.fv=st.fval=null;st.mergeOpen=null;st.xs=SX_DEFX[st.base].slice();sxSetTest(st.test);return sxRefresh()}
   if(d.sxTest){sxSetTest(d.sxTest);return sxRefresh()}
@@ -3864,6 +3953,8 @@ const RK_ALARMS=[['A01','Hemorragia bucal que não cessa com compressão'],['A02
 const RK_FORM=[['A12','Autopercepção da saúde bucal ruim ou muito ruim',3],['A13','Impacto na vida diária (comer, dormir, trabalhar, estudar)',6],['A17','Dor de dente nos últimos 6 meses, sem dor agora',3]];
 const RK_SRC={cid:['Automático · CID no CELK','auto'],sit:['Situação (vale em todas as abas)','man'],cronico:['Automático · Metabase','auto'],cond:['Aba Condições de saúde','auto'],idadeMeta:['Automático · idade do Metabase','auto'],idoso:['Automático · aba Idosos','auto'],idade:['Automático · idade','auto'],idadeEst:['Automático · idade pela produção','auto'],hist:['Automático · histórico CELK','auto'],gest:['Automático · gestantes','auto'],end:['Automático · endereço','auto'],pse:['Avaliação do PSE','dent'],dent:['Dentista','dent'],manual:['Marcado por você','man'],form:['Formulário','form']};
 const RK_STAGES=[['contatar','A contatar'],['contato','Em contato'],['agendada','Agendada'],['tratamento','Em tratamento'],['emdia','Em dia']];
+// Ordem das categorias da base Pessoas (prontuário) que vêm da Classificação de Risco (definidas aqui por ordem de carga).
+{const o={condicao_clinica:RK_CLIN.slice(1).map(x=>x[1]),faixa_risco:[...RK_FAIXAS].reverse(),etapa:RK_STAGES.map(x=>x[1])};for(const v of SX_BASES.pes.vars)if(o[v.k])v.o=o[v.k]}
 function rkEmpty(){return {manual:[],overrides:{},crit:{},clin:{},alarm:{},followups:{},excluded:{},rm:{},alias:{},merges:[],notSame:{},ruas:[],areaInteira:false}}
 function rkStore(){return state.risco||(state.risco=rkEmpty())}
 function rkMigrate(r){const d=rkEmpty(),o=r&&typeof r==='object'?r:{},obj=k=>o[k]&&typeof o[k]==='object'&&!Array.isArray(o[k])?{...o[k]}:{};return {...d,manual:Array.isArray(o.manual)?o.manual:[],ruas:Array.isArray(o.ruas)?o.ruas:[],areaInteira:!!o.areaInteira,overrides:obj('overrides'),crit:obj('crit'),clin:obj('clin'),alarm:obj('alarm'),followups:obj('followups'),excluded:obj('excluded'),rm:obj('rm'),alias:obj('alias'),merges:Array.isArray(o.merges)?o.merges:[],notSame:obj('notSame')}}
@@ -3966,7 +4057,7 @@ function rkPeople(){if(rkCache)return rkCache;const s=rkStore(),map=new Map(),id
   for(const r of crRecords()){const p=get(`p:${r.code}`);p.orig.add('Criança');fill(p,{nome:r.nome||patientNameFor(r.code),pront:r.code,nasc:r.nasc,sexo:r.sexo,tel:r.tels?.[0],end:r.end,equipe:r.equipe,resp:r.mae})}
   for(const m of s.manual){const k=pid(m.pront),p=get(k?`p:${k}`:`m:${m.id}`);p.orig.add('Manual');fill(p,{nome:m.nome,pront:k,nasc:m.nasc,sexo:m.sexo,tel:m.tel,end:m.end,equipe:m.equipe,resp:m.resp});p.manual=m}
   const col=new Map();for(const c of pseColParticipants())if(c.nasc)col.set(`${norm(c.nome)}|${c.nasc}`,c);
-  const out=[];for(const p of map.values()){const ov=s.overrides[p.key]||{};for(const [k,v] of Object.entries(ov))if(v!==''&&v!=null)p[k]=k==='pront'?pid(v):v;
+  const out=[],old=[];for(const p of map.values()){const ov=s.overrides[p.key]||{};for(const [k,v] of Object.entries(ov))if(v!==''&&v!=null)p[k]=k==='pront'?pid(v):v;
     p.orig=[...p.orig];p.keys=[...p.keys];p.excluded=!!s.excluded[p.key];p.sitIdoso=sitOf(p.key);
     let vs=[...new Set([pid(p.pront),...p.altPronts].filter(Boolean))].flatMap(c=>idx.get(c)||[]);if(p.altPronts.size)vs.sort((x,y)=>String(x.date).localeCompare(String(y.date)));if(p.pse)vs=vs.filter(v=>!pseIsSchoolFluor(v));p.visits=vs;
     p.col=p.pse?.L?.col||(p.nasc?col.get(`${norm(p.nome)}|${p.nasc}`)||null:null);
@@ -3976,12 +4067,15 @@ function rkPeople(){if(rkCache)return rkCache;const s=rkStore(),map=new Map(),id
     p.cpfSrc=ov.cpf?'você':'';p.cnsSrc=ov.cns?'você':'';if(!p.cpf&&cpfOk(p.col?.cpf)){p.cpf=onlyDigits(p.col.cpf);p.cpfSrc='atividade coletiva'}if(!p.cns&&cnsOk(p.col?.cns)){p.cns=onlyDigits(p.col.cns);p.cnsSrc='atividade coletiva'}if(!p.cns&&cnsOk(bo?.cns)){p.cns=bo.cns;p.cnsSrc='Boletim do CELK'}
     // Quem vem só do cadastro do CELK entra se foi atendido nos últimos 2 anos (v2.43, pedido do usuário).
     // Gestantes, alunos do PSE e inclusões à mão entram sempre.
-    if(!rkFromCelkOk(p))continue;
     if(p.nasc){p.age=ageAt({dataNascimento:p.nasc});p.ageEst=false}else if(p.idadeMeta!=null){p.age=p.idadeMeta;p.ageEst=false;p.ageSrc='idadeMeta'}else{const v=[...vs].reverse().find(x=>x.age!=null);p.age=v?v.age+Math.floor(daysAgo(v.date)/365.25):null;p.ageEst=p.age!=null}
+    // A análise estatística (v2.55) usa também quem ficou de fora pela regra dos 2 anos.
+    if(!rkFromCelkOk(p)){old.push(p);continue}
     out.push(p)}
   // Mesmo prontuário, CPF ou CNS em dois cadastros: une e lê de novo (uma união por vez, até não sobrar nenhuma).
   const made=rkAutoMerge(out);if(made.length){rkLastAuto.push(...made);rkCache=null;return rkPeople()}
-  rkCache=out;return out}
+  out.old=old;rkCache=out;return out}
+// Todas as pessoas, inclusive quem só tem atendimento no CELK há mais de 2 anos (análise estatística).
+function rkPeopleAll(){const o=rkPeople();return o.concat(o.old||[])}
 const RK_CELK_DAYS=730;
 function rkFromCelkOk(p){if(p.orig.some(o=>o!=='CELK'))return true;const lv=p.visits.at(-1)?.date;return !!lv&&daysAgo(lv)<=RK_CELK_DAYS}
 function rkLastVisit(p){return p.visits.at(-1)?.date||''}
@@ -4740,7 +4834,7 @@ function setupEvents(){
     if(el.hasAttribute('data-export-procedures'))return exportProcedures();if(el.hasAttribute('data-export-2i'))return export2IModal();if(el.dataset.export2iMode)return export2I(el.dataset.export2iMode);if(el.hasAttribute('data-run-tests')){showLoading(`Executando ${SELF_TEST_COUNT} testes`,'Fórmulas, faixas, privacidade e 2I');try{const r=await runSelfTests();toast(`${r.passed}/${r.total} testes passaram.`)}finally{hideLoading()}return}
     if(el.dataset.settingsTab){state.preferences.settingsTab=el.dataset.settingsTab;if(activeView!=='settings'){switchView('settings')}else{queueSave();refreshAll()}return}
     if(el.dataset.procSource){state.preferences.procSource=el.dataset.procSource;queueSave();return refreshAll()}
-    if(el.dataset.procPeriod){state.preferences.procPeriod=el.dataset.procPeriod;queueSave();return refreshAll()}
+    if(el.dataset.procPeriod){state.preferences.procPeriod=el.dataset.procPeriod;state.preferences.sxAllYears=false;queueSave();return refreshAll()}
     if(el.dataset.procMonth){const p=state.preferences;if(p.procPeriod==='M'&&p.month===el.dataset.procMonth){p.procPeriod='Q'}else{p.procPeriod='M';p.month=el.dataset.procMonth;const {year,month}=parseMonthKey(p.month);p.year=year;p.quarter=quarterOfMonth(month)}queueSave();return refreshAll()}
     if(el.dataset.procAge){state.preferences.procAge=state.preferences.procAge===el.dataset.procAge?'':el.dataset.procAge;queueSave();return refreshAll()}
     if(el.dataset.procSex){state.preferences.procSex=state.preferences.procSex===el.dataset.procSex?'':el.dataset.procSex;queueSave();return refreshAll()}

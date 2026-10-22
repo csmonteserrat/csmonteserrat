@@ -1,9 +1,21 @@
 # Histórico de versões
 
-## Versão 2.55
+## Versão 2.56
 
 - Condições de saúde: imunossupressão e deficiência vindas do CID entram com o tipo da aba (HIV/aids, visual, auditiva, intelectual, TEA), em vez do nome inteiro do CID. A etiqueta fica curta e a contagem "Por tipo" passa a contar essas pessoas. O CID continua na gaveta, no critério da Classificação de Risco.
 - Etiquetas longas quebram linha em vez de invadir a coluna ao lado; o número das contagens por tipo fica separado do nome.
+- Correção: depois de rodar os testes internos (Configurações), importar um arquivo sem a produção do CELK carregada podia falhar com "Cannot read properties of null".
+- 1 teste interno novo (336 no total).
+
+## Versão 2.55
+
+- **Análise estatística: nova base Pessoas (prontuário).** Uma linha por pessoa, juntando todas as fontes da mesma pessoa (prontuário, CPF ou CNS): CELK, gestantes, PSE, escovações, listas do Metabase, Condições de saúde, Classificação de Risco e contatos da busca ativa. São 48 variáveis, entre elas ciclo de vida, faixa de risco, "Tem o critério…", "Está na lista de…", atendido no período, já era paciente antes, entrou pela urgência, possível abandono, manutenção em 12 meses, consulta odontológica na gestação, atendida depois do PSE e atendida depois do contato (com os dias até o atendimento).
+- **Cada variável usa a data do próprio acontecimento.** Quando liga dois acontecimentos (avaliação do PSE e atendimento, contato e atendimento), o primeiro é o ponto de partida.
+- **Período "Todos os anos"** na análise: do mês mais antigo importado até hoje. Mês, Quadrimestre e Ano continuam iguais.
+- **Vazio não é "Não".** Critérios que só se sabem pela marcação à mão (renda, escolaridade, raça/cor, fumo…) ficam vazios para quem não tem a marca, até existir o formulário. Critérios com fonte automática (idade, gestante, listas de diabetes e hipertensão, rua do C10, histórico do CELK) viram "Não".
+- Quem só tem atendimento no CELK há mais de 2 anos entra na análise (continua fora da fila da Classificação de Risco).
+- Correção: a aba de análise não abria sem nenhum CSV do PSE importado.
+- Documento das variáveis atualizado (`docs/analise-estatistica-variaveis.md`). 3 testes internos novos (335 no total).
 
 ## Versão 2.54
 
