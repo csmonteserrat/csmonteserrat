@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Versão 2.61
+
+- **PSE: CSV novo da avaliação.** A coluna do TCLE do ART agora se chama "TCLE (ART)" e vem com Autorizou, Não autorizou ou Não devolvido. O app lê as três situações e as mostra no resumo do ART (TCLE autorizado, não autorizado e não devolvido), na tabela por turma e na gaveta da criança. O CSV antigo ("TCLE assinado (ART)" com Sim/Não) continua funcionando.
+- Correção: com o arquivo novo, o TCLE aparecia sempre como "não assinado", porque a coluna mudou de nome.
+- 1 teste interno novo (340 no total).
+
 ## Versão 2.60
 
 - **Ruas e famílias: juntar com outra família.** Quando o mesmo endereço vem escrito diferente e a plataforma separa em dois, a gaveta da família tem "Juntar com outra família". Ela sugere famílias com o mesmo número na rua, o mesmo número em rua de nome parecido ou o mesmo sobrenome, e busca em todas as equipes. As pessoas passam a contar no endereço da família escolhida, com Desfazer e, por pessoa, "Voltar ao endereço do cadastro". Fica salvo pela pessoa, vale nas próximas importações e vai no backup completo.
