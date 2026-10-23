@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## Versão 2.60
+
+- **Ruas e famílias: juntar com outra família.** Quando o mesmo endereço vem escrito diferente e a plataforma separa em dois, a gaveta da família tem "Juntar com outra família". Ela sugere famílias com o mesmo número na rua, o mesmo número em rua de nome parecido ou o mesmo sobrenome, e busca em todas as equipes. As pessoas passam a contar no endereço da família escolhida, com Desfazer e, por pessoa, "Voltar ao endereço do cadastro". Fica salvo pela pessoa, vale nas próximas importações e vai no backup completo.
+- Página da rua avisa "Mesmo número que…: confira" quando dois endereços da rua têm o mesmo número.
+- 1 teste interno novo (339 no total).
+
 ## Versão 2.59
 
 - **Classificação de Risco › Ruas e famílias** (nova subaba). As pessoas da lista são agrupadas pela rua do endereço. Cada rua tem uma cor tirada dos **20% mais graves**: contando da faixa mais grave, é a faixa em que a rua chega a 20% dos moradores.
