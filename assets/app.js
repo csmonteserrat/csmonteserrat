@@ -21,7 +21,7 @@ if(typeof ReadableStream!=='undefined'&&!ReadableStream.prototype[Symbol.asyncIt
   };
 }
 
-const APP_VERSION = '2.58';
+const APP_VERSION = '2.59';
 const SELF_TEST_COUNT = 337;
 const SCHEMA_VERSION = '1.1.0';
 const RULE_VERSION = '2026.05+M1.2026.08';
@@ -2441,7 +2441,7 @@ function recomputeSupersession(){
     for(const s of list)s.supersededBy=(s===newest)?undefined:newest.id;
   }
 }
-async function restoreBackup(env,mode){showLoading('Restaurando backup',mode==='replace'?'Substituindo o estado local':'Mesclando dados sem duplicação');try{preRestoreSnapshot={at:nowISO(),payload:state};const incoming=migrateState(env.data.state),incomingWasClean=!incoming.dirty;if(mode==='replace'){state=incoming}else{state.snapshots=mergeArraysBy(state.snapshots,incoming.snapshots,'hash');state.denominators=mergeArraysBy(state.denominators,incoming.denominators,'id');state.gestantes.manual=mergeArraysBy(state.gestantes.manual,incoming.gestantes.manual,'id');state.gestantes.followups={...state.gestantes.followups,...incoming.gestantes.followups};state.gestantes.merges={...state.gestantes.merges,...incoming.gestantes.merges};state.gestantes.excluded={...state.gestantes.excluded,...incoming.gestantes.excluded};state.gestantes.overrides={...state.gestantes.overrides,...incoming.gestantes.overrides};state.gestantes.puerperioIgnored={...(state.gestantes.puerperioIgnored||{}),...(incoming.gestantes.puerperioIgnored||{})};state.patientDirectory={...(state.patientDirectory||{}),...(incoming.patientDirectory||{})};{const a=rkStore(),b=incoming.risco||rkEmpty();state.risco={manual:mergeArraysBy(a.manual,b.manual,'id'),ruas:[...a.ruas,...b.ruas.filter(r=>!a.ruas.some(x=>rkNormRua(x)===rkNormRua(r)))],areaInteira:a.areaInteira||b.areaInteira,overrides:{...a.overrides,...b.overrides},crit:{...a.crit,...b.crit},clin:{...a.clin,...b.clin},alarm:{...a.alarm,...b.alarm},followups:{...a.followups,...b.followups},excluded:{...a.excluded,...b.excluded}}}{const a=cdStore(),b=cdMigrate(incoming.condicoes);state.condicoes={imuno:{...a.imuno,...b.imuno},pcd:{...a.pcd,...b.pcd},sit:{...(a.sit||{}),...(b.sit||{})}}}{const a=idStore(),b=idMigrate(incoming.idosos);state.idosos={sit:{...a.sit,...b.sit},ilpiManual:{...a.ilpiManual,...b.ilpiManual},sugNo:[...new Set([...a.sugNo,...b.sugNo])],ilpis:mergeArraysBy(a.ilpis,b.ilpis,'id')}}state.columnMappings.consulta2i={...state.columnMappings.consulta2i,...incoming.columnMappings.consulta2i};state.audit=mergeArraysBy(state.audit,incoming.audit,'id');recomputeSupersession()}audit('backup_restored',{mode,type:env.type});state.dirty=!(mode==='replace'&&incomingWasClean);await persistState();pendingBackupFile=null;closeModal();refreshAll();toast(mode==='replace'?(state.dirty?'Backup restaurado. Nada é salvo automaticamente — exporte um novo backup antes de fechar.':'Backup restaurado — corresponde exatamente ao arquivo que você acabou de abrir.'):'Backup mesclado. O resultado da mesclagem ainda não está salvo — exporte um novo backup antes de fechar.')}catch(e){showError(e)}finally{hideLoading()}}
+async function restoreBackup(env,mode){showLoading('Restaurando backup',mode==='replace'?'Substituindo o estado local':'Mesclando dados sem duplicação');try{preRestoreSnapshot={at:nowISO(),payload:state};const incoming=migrateState(env.data.state),incomingWasClean=!incoming.dirty;if(mode==='replace'){state=incoming}else{state.snapshots=mergeArraysBy(state.snapshots,incoming.snapshots,'hash');state.denominators=mergeArraysBy(state.denominators,incoming.denominators,'id');state.gestantes.manual=mergeArraysBy(state.gestantes.manual,incoming.gestantes.manual,'id');state.gestantes.followups={...state.gestantes.followups,...incoming.gestantes.followups};state.gestantes.merges={...state.gestantes.merges,...incoming.gestantes.merges};state.gestantes.excluded={...state.gestantes.excluded,...incoming.gestantes.excluded};state.gestantes.overrides={...state.gestantes.overrides,...incoming.gestantes.overrides};state.gestantes.puerperioIgnored={...(state.gestantes.puerperioIgnored||{}),...(incoming.gestantes.puerperioIgnored||{})};state.patientDirectory={...(state.patientDirectory||{}),...(incoming.patientDirectory||{})};{const a=rkStore(),b=incoming.risco||rkEmpty();state.risco={manual:mergeArraysBy(a.manual,b.manual,'id'),ruas:[...a.ruas,...b.ruas.filter(r=>!a.ruas.some(x=>rkNormRua(x)===rkNormRua(r)))],areaInteira:a.areaInteira||b.areaInteira,overrides:{...a.overrides,...b.overrides},crit:{...a.crit,...b.crit},clin:{...a.clin,...b.clin},alarm:{...a.alarm,...b.alarm},followups:{...a.followups,...b.followups},excluded:{...a.excluded,...b.excluded},fam:{...(a.fam||{}),...(b.fam||{})}}}{const a=cdStore(),b=cdMigrate(incoming.condicoes);state.condicoes={imuno:{...a.imuno,...b.imuno},pcd:{...a.pcd,...b.pcd},sit:{...(a.sit||{}),...(b.sit||{})}}}{const a=idStore(),b=idMigrate(incoming.idosos);state.idosos={sit:{...a.sit,...b.sit},ilpiManual:{...a.ilpiManual,...b.ilpiManual},sugNo:[...new Set([...a.sugNo,...b.sugNo])],ilpis:mergeArraysBy(a.ilpis,b.ilpis,'id')}}state.columnMappings.consulta2i={...state.columnMappings.consulta2i,...incoming.columnMappings.consulta2i};state.audit=mergeArraysBy(state.audit,incoming.audit,'id');recomputeSupersession()}audit('backup_restored',{mode,type:env.type});state.dirty=!(mode==='replace'&&incomingWasClean);await persistState();pendingBackupFile=null;closeModal();refreshAll();toast(mode==='replace'?(state.dirty?'Backup restaurado. Nada é salvo automaticamente — exporte um novo backup antes de fechar.':'Backup restaurado — corresponde exatamente ao arquivo que você acabou de abrir.'):'Backup mesclado. O resultado da mesclagem ainda não está salvo — exporte um novo backup antes de fechar.')}catch(e){showError(e)}finally{hideLoading()}}
 
 /* ---------- Testes internos da especificação ---------- */
 
@@ -3053,6 +3053,8 @@ async function runSelfTests(){const started=performance.now(),results=[];const e
     state.snapshots=[{id:'p337',profile:PSE_PROFILE,createdAt:nowISO(),pse:{escolas:['E'],kids:[kid]}},{id:'g337',profile:'celk_atividades_grupo',createdAt:nowISO(),dataByMonth:{},participants:[{nome:'ANA TESTE',nasc:'2016-01-02',cpf:'',cns:'',sexo:'F',date:'2026-09-01',subject:'X'}]}];state.patientDirectory={};state.pse={mine:{},dec:{},overrides:{},followups:{}};queueSave();
     const r=pseChildren()[0].last,a=pseLinks(r),b=pseLinks(r);state.preferences.pseTab='mine';queueSave();const c=pseLinks(r);state.pse.dec[r.key]={col:'no'};queueSave();const d=pseLinks(r);
     return a===b&&a===c&&a.pendCol&&!d.pendCol&&pseTriangulate.toString().includes('pseColIndex')&&!pseProdByName.toString().includes('Object.keys')}finally{state.snapshots=keep.snaps;state.patientDirectory=keep.dir;state.pse=keep.pse;queueSave()}});
+  await add('338. Ruas e famílias: cor da rua pelos 20% mais graves, família pelo endereço com separação salva, sobrenomes diferentes, etiquetas (Bolsa Família individual) e a subaba na Classificação de Risco',()=>{const x=(key,nome,age,faixa)=>({p:{key,nome,age},s:{faixa}});const fs=trFams([x('a','MARIA DA SILVA',40,'Azul'),x('b','JOAO SILVA',12,'Laranja'),x('c','PEDRO COSTA',30,'Violeta')],{c:2});const tg=trConds({key:'t338',age:83},{rows:[{key:'C01',on:true}]}),fam=trTagsFamilia([{tags:tg},{tags:{bf:'Bolsa Família',has:'Hipertensão'}},{tags:{has:'Hipertensão'}}]);
+    return trCor([0,0,0,1,1,8],10)==='Azul'&&trCor([2,0,0,0,0,8],10)==='Vermelho'&&trCor([1,0,0,0,0,9],10)==='Violeta'&&trCor([0,0,0,0,0,0],0)===null&&fs.length===2&&fs[0].ps.length===2&&fs[0].pior==='Laranja'&&fs[0].nome==='Família Silva'&&fs[1].id===2&&!fs[0].mista&&trMista([x('a','ANA COSTA',30,'Azul'),x('b','PEDRO LIMA',30,'Azul')])&&tg.bf==='Bolsa Família'&&trConds({key:'t338b',age:30},{rows:[{id:'B05',on:true}]}).has==='Hipertensão'&&tg.id80==='Idoso 80+'&&!tg.id60&&fam.includes('Bolsa Família<')&&fam.includes('Hipertensão · 2')&&fam.includes('Idoso 80+')&&rkMigrate({fam:{a:2}}).fam.a===2&&PERSON_STORES.some(([,f])=>f==='fam')&&riscoHTML.toString().includes('data-rk-view="ruas"')});
     const passed=results.filter(x=>x.pass).length;state.selfTests={at:nowISO(),durationMs:Math.round(performance.now()-started),total:results.length,passed,failed:results.length-passed,results};audit('selftests_run',{passed,total:results.length});refreshAll();return state.selfTests;
 }
 
@@ -3978,9 +3980,9 @@ const RK_SRC={cid:['Automático · CID no CELK','auto'],sit:['Situação (vale e
 const RK_STAGES=[['contatar','A contatar'],['contato','Em contato'],['agendada','Agendada'],['tratamento','Em tratamento'],['emdia','Em dia']];
 // Ordem das categorias da base Pessoas (prontuário) que vêm da Classificação de Risco (definidas aqui por ordem de carga).
 {const o={condicao_clinica:RK_CLIN.slice(1).map(x=>x[1]),faixa_risco:[...RK_FAIXAS].reverse(),etapa:RK_STAGES.map(x=>x[1])};for(const v of SX_BASES.pes.vars)if(o[v.k])v.o=o[v.k]}
-function rkEmpty(){return {manual:[],overrides:{},crit:{},clin:{},alarm:{},followups:{},excluded:{},rm:{},alias:{},merges:[],notSame:{},ruas:[],areaInteira:false}}
+function rkEmpty(){return {manual:[],overrides:{},crit:{},clin:{},alarm:{},followups:{},excluded:{},rm:{},alias:{},merges:[],notSame:{},ruas:[],areaInteira:false,fam:{}}}
 function rkStore(){return state.risco||(state.risco=rkEmpty())}
-function rkMigrate(r){const d=rkEmpty(),o=r&&typeof r==='object'?r:{},obj=k=>o[k]&&typeof o[k]==='object'&&!Array.isArray(o[k])?{...o[k]}:{};return {...d,manual:Array.isArray(o.manual)?o.manual:[],ruas:Array.isArray(o.ruas)?o.ruas:[],areaInteira:!!o.areaInteira,overrides:obj('overrides'),crit:obj('crit'),clin:obj('clin'),alarm:obj('alarm'),followups:obj('followups'),excluded:obj('excluded'),rm:obj('rm'),alias:obj('alias'),merges:Array.isArray(o.merges)?o.merges:[],notSame:obj('notSame')}}
+function rkMigrate(r){const d=rkEmpty(),o=r&&typeof r==='object'?r:{},obj=k=>o[k]&&typeof o[k]==='object'&&!Array.isArray(o[k])?{...o[k]}:{};return {...d,manual:Array.isArray(o.manual)?o.manual:[],ruas:Array.isArray(o.ruas)?o.ruas:[],areaInteira:!!o.areaInteira,overrides:obj('overrides'),crit:obj('crit'),clin:obj('clin'),alarm:obj('alarm'),followups:obj('followups'),excluded:obj('excluded'),rm:obj('rm'),alias:obj('alias'),merges:Array.isArray(o.merges)?o.merges:[],notSame:obj('notSame'),fam:obj('fam')}}
 const rkPrefs=()=>state.preferences;
 // C10 em Florianópolis: não há microárea. Conta a rua do endereço (lista definida pela equipe) ou a área inteira.
 // A comparação ignora acento, maiúscula, número da casa e o tipo do logradouro (Rua, R., Servidão, Serv.…).
@@ -4044,7 +4046,7 @@ const fmtCns=v=>{const d=onlyDigits(v);return d.length===15?`${d.slice(0,3)} ${d
 function K(key){const a=rkStore().alias||{};let k=key,n=0;while(a[k]&&n++<20)k=a[k];return k}
 const pairId=(a,b)=>[a,b].sort().join('~');
 // Dados guardados por pessoa: [loja, campo, como juntar].
-const PERSON_STORES=[[()=>rkStore(),'crit','obj'],[()=>rkStore(),'clin','keep'],[()=>rkStore(),'alarm','arr'],[()=>rkStore(),'followups','hist'],[()=>rkStore(),'overrides','obj'],[()=>rkStore(),'excluded','both'],[()=>rkStore(),'rm','obj'],[()=>cdStore(),'imuno','arr'],[()=>cdStore(),'pcd','arr'],[()=>cdStore(),'sit','keep']];
+const PERSON_STORES=[[()=>rkStore(),'crit','obj'],[()=>rkStore(),'clin','keep'],[()=>rkStore(),'alarm','arr'],[()=>rkStore(),'followups','hist'],[()=>rkStore(),'overrides','obj'],[()=>rkStore(),'excluded','both'],[()=>rkStore(),'rm','obj'],[()=>rkStore(),'fam','keep'],[()=>cdStore(),'imuno','arr'],[()=>cdStore(),'pcd','arr'],[()=>cdStore(),'sit','keep']];
 function personData(key){const out={};for(const [st,f] of PERSON_STORES){const v=st()[f]?.[key];if(v!==undefined)out[f]=structuredClone(v)}return out}
 function putPersonData(key,data){for(const [st,f] of PERSON_STORES){const o=st();o[f]=o[f]||{};if(data[f]===undefined)delete o[f][key];else o[f][key]=structuredClone(data[f])}}
 function joinPersonData(a,b){const out={};for(const [,f,how] of PERSON_STORES){const x=a[f],y=b[f];if(how==='both'){if(x!==undefined&&y!==undefined)out[f]=x;continue}if(x===undefined&&y===undefined)continue;if(x===undefined){out[f]=y;continue}if(y===undefined){out[f]=x;continue}
@@ -4185,10 +4187,11 @@ function rkRow({p,s,st}){
     <div class="rk-score"><div class="rk-score-top"><b>${s.alarm?'Alarme':s.total}</b><small>${s.alarm?'fora da soma':'pontos'}</small><span class="rk-pill">${s.faixa}</span></div>${rkComp(s)}</div>
     <div class="rk-hist">${hist}</div>
     <div class="pq-go"><div>${btn}</div><span class="pq-why${s.minBand||s.alarm||(st==='tratamento'&&care.abandono)?' alert':''}">${RK_PRAZO[s.faixa]} · ${esc(why)}</span></div></div>`}
-function riscoHTML(){rkFresh();const P=rkPrefs(),view=P.rkView==='escala'?'escala':'fila',all=rkAll(),act=all.filter(x=>!x.p.excluded);
+function riscoHTML(){rkFresh();const P=rkPrefs(),view=['escala','ruas'].includes(P.rkView)?P.rkView:'fila',all=rkAll(),act=all.filter(x=>!x.p.excluded);
   const head=`<div class="pq-head"><div class="pq-src"><span>${fmtNum(act.length)} pessoa(s) na lista</span><span>Protocolo de Estratificação de Risco v2.0</span></div><div class="pq-actions"><button class="btn primary" data-rk-add>${icon('plus')}Adicionar pessoa</button></div></div>
-    <nav class="sx-tabs" role="tablist" aria-label="Classificação de risco"><button type="button" role="tab" data-rk-view="fila" aria-selected="${view==='fila'}">Fila de busca ativa</button><button type="button" role="tab" data-rk-view="escala" aria-selected="${view==='escala'}">Escala de risco</button></nav>`;
+    <nav class="sx-tabs" role="tablist" aria-label="Classificação de risco"><button type="button" role="tab" data-rk-view="fila" aria-selected="${view==='fila'}">Fila de busca ativa</button><button type="button" role="tab" data-rk-view="ruas" aria-selected="${view==='ruas'}">Ruas e famílias</button><button type="button" role="tab" data-rk-view="escala" aria-selected="${view==='escala'}">Escala de risco</button></nav>`;
   if(view==='escala')return head+rkEscalaHTML(act);
+  if(view==='ruas')return head+trHTML();
   if(!act.length&&!all.length)return head+emptyState('Ninguém na lista ainda','A lista se forma com o cadastro de pacientes do CELK (importe o Procedimentos Detalhado), as gestantes e os seus alunos do PSE. Também dá para adicionar uma pessoa à mão.',false);
   const tab=P.rkTab||'contatar',cnt=k=>k==='todos'?act.length:k==='fora'?all.length-act.length:act.filter(x=>x.st===k).length,fx=P.rkFaixas||[];
   const bands=`<section class="card rk-bands-card"><div class="rk-sec-h"><span class="pq-sec-t">Pessoas por faixa</span><small>clique para filtrar</small></div><div class="rk-bands">${RK_FAIXAS.map(f=>`<button type="button" class="rk-band tone-${RK_TONE[f]}" data-rk-faixa="${f}" aria-pressed="${fx.includes(f)}"><b>${fmtNum(act.filter(x=>x.s.faixa===f).length)}</b><span>${f}</span><small>${RK_PRAZO[f]}</small></button>`).join('')}</div></section>`;
@@ -4346,7 +4349,7 @@ function rkClick(ev){const el=ev.target.closest('[data-rk-rm],[data-rk-restore],
   if(d.rkRm){const i=d.rkRm.lastIndexOf('|');return rkOpenRemove(d.rkRm.slice(0,i),d.rkRm.slice(i+1))}
   if(d.rkRmSave){const i=d.rkRmSave.lastIndexOf('|'),k=d.rkRmSave.slice(0,i),id=d.rkRmSave.slice(i+1);s.rm[k]={...(s.rm[k]||{}),[id]:{at:nowISO(),motivo:(document.getElementById('rkRmMotivo')?.value||'').trim()}};audit('risco_criterio_removido',{id});queueSave();closeModal();toast(`${id} removido da pontuação. Vale em todas as abas.`);return rkRefresh({keep:true})}
   if(d.rkRestore){const i=d.rkRestore.lastIndexOf('|'),k=d.rkRestore.slice(0,i),id=d.rkRestore.slice(i+1);if(s.rm[k]){delete s.rm[k][id];if(!Object.keys(s.rm[k]).length)delete s.rm[k]}audit('risco_criterio_restaurado',{id});queueSave();toast(`${id} voltou ao automático.`);return rkRefresh({keep:true})}
-  if(d.rkView){P.rkView=d.rkView;queueSave();return renderView('risco')}
+  if(d.rkView){P.rkView=d.rkView;if(d.rkView==='ruas')P.trRua='';queueSave();return renderView('risco')}
   if(d.rkTab){P.rkTab=d.rkTab;P.rkLimit=60;queueSave();return renderView('risco')}
   if(d.rkWa){ev.stopPropagation();const p=rkPeople().find(x=>x.key===d.rkWa),ph=normalizePhone(p?.tel);if(ph){window.open(`https://wa.me/${ph}`,'_blank','noopener,noreferrer');rkRegister(d.rkWa,'whatsapp','WhatsApp aberto para convidar','contato');rkRefresh({keep:true})}return}
   if(d.rkOpen){ev.stopPropagation();return openRisco(d.rkOpen,d.rkGo||'class')}
@@ -4383,6 +4386,120 @@ function rkChange(ev){const t=ev.target,d=t.dataset||{},s=rkStore();
 }
 function rkInput(ev){if(ev.target.id==='rkSearch'){state.preferences.rkSearch=ev.target.value;state.preferences.rkLimit=60;const pos=ev.target.selectionStart;renderView('risco');const q=document.getElementById('rkSearch');if(q){q.focus();q.setSelectionRange(pos,pos)}}}
 function rkKey(ev){if(ev.key==='Enter'&&ev.target.id==='rkRuaIn'){ev.preventDefault();rkAddRua(ev.target.value)}}
+
+/* ---------- Ruas e famílias (v2.59) ----------
+   Subaba da Classificação de Risco. Junta as pessoas pela rua do endereço ("RUA, NÚMERO - COMPLEMENTO"): família
+   automática = mesmo endereço (rua, número e complemento). A equipe pode separar alguém numa família nova ou mover
+   para outra família do endereço: rkStore().fam[pessoa] = número da família no endereço (vazio = 1, a do endereço).
+   Quem mora em ILPI não vira família: aparece no bloco da ILPI. A cor da rua sai dos 20% mais graves: contando da
+   faixa mais grave, é a faixa em que a rua chega a 20% dos moradores (ILPI fica fora da conta). */
+const TR_COND=[['gest','Gestante','pink'],['id60','Idoso 60+','slate'],['id70','Idoso 70+','slate'],['id80','Idoso 80+','slate'],['id90','Idoso 90+','slate'],['acam','Acamado ou domiciliado','violet'],['has','Hipertensão','red'],['dm','Diabetes','amber'],['imuno','Imunossupressão','violet'],['pcd','Pessoa com deficiência','teal'],['bf','Bolsa Família','blue'],['esc','Analfabetismo ou baixa escolaridade','gray']];
+const TR_SAUDE=['gest','acam','has','dm','imuno','pcd'],TR_PCT=0.2;
+const TR_PARTICULAS=new Set(['DE','DA','DO','DAS','DOS','JUNIOR','JR','FILHO','FILHA','NETO','NETA','SOBRINHO']);
+let trDrawer={end:null,fid:1};
+const trEqs=()=>{const v=rkPrefs().trEquipes;return Array.isArray(v)?v:[]};
+const trPl=(n,a,b)=>`${fmtNum(n)} ${n===1?a:b}`;
+const trNumSort=(a,b)=>String(a).localeCompare(String(b),'pt-BR',{numeric:true});
+// Etiquetas da pessoa: condições (as mesmas de Condições de saúde), idade e os critérios C01 e C03 marcados na pessoa.
+function trConds(p,s){const c=cdOf(p),on=id=>s.rows.some(x=>(x.key||x.id)===id&&x.on),a=p.age,o={};
+  if(p.gest||on('B03'))o.gest='Gestante';
+  if(a!=null&&a>=60){const b=a>=90?90:a>=80?80:a>=70?70:60;o[`id${b}`]=`Idoso ${b}+`}
+  if(c.acam)o.acam=SIT_LABEL[c.acam]||'Acamado ou domiciliado';else if(on('C05'))o.acam='Acamado ou domiciliado';
+  if(c.has||on('B05'))o.has='Hipertensão';if(c.dm||on('B04'))o.dm='Diabetes';
+  if(c.imuno.length)o.imuno=`Imunossupressão: ${c.imuno.join(', ')}`;else if(on('B06'))o.imuno='Imunossupressão';
+  if(c.pcd.length)o.pcd=`Pessoa com deficiência: ${c.pcd.join(', ')}`;else if(on('B07'))o.pcd='Pessoa com deficiência';
+  if(on('C01'))o.bf='Bolsa Família';if(on('C03'))o.esc='Analfabetismo ou baixa escolaridade';return o}
+const trTag=(cls,txt)=>`<span class="pq-tag cd-tag ${cls}">${esc(txt)}</span>`;
+const trTagsPessoa=t=>TR_COND.filter(([k])=>t[k]).map(([k,,cls])=>trTag(cls,t[k])).join('');
+// Na família: cada condição uma vez, com quantas pessoas têm (Bolsa Família vale para a família, sem contagem).
+function trTagsFamilia(ps){return TR_COND.map(([k,l,cls])=>{const n=ps.filter(x=>x.tags[k]).length;return n?trTag(cls,`${l}${n>1&&k!=='bf'?` · ${n}`:''}`):''}).join('')}
+function trCor(c,n){if(!n)return null;let a=0;for(let i=0;i<RK_FAIXAS.length;i++){a+=c[i];if(a>=TR_PCT*n)return RK_FAIXAS[i]}return RK_FAIXAS.at(-1)}
+function trSobrenomes(nome){return norm(nome).split(' ').filter(Boolean).slice(1).filter(t=>t.length>2&&!TR_PARTICULAS.has(t))}
+function trFamNome(ps){const c=new Map();for(const x of ps){const sb=trSobrenomes(x.p.nome).at(-1);if(sb)c.set(sb,(c.get(sb)||0)+1)}const best=[...c].sort((a,b)=>b[1]-a[1])[0];return best?`Família ${pseTitle(best[0])}`:'Família sem sobrenome'}
+// Sobrenomes diferentes: alguém da família não divide nenhum sobrenome com os outros.
+function trMista(ps){if(ps.length<2)return false;const t=ps.map(x=>new Set(trSobrenomes(x.p.nome)));return t.some((a,i)=>a.size&&!t.some((b,j)=>j!==i&&[...a].some(v=>b.has(v))))}
+function trFams(ps,sep){const m=new Map();for(const x of ps){const f=sep[x.p.key]||1;(m.get(f)||m.set(f,[]).get(f)).push(x)}
+  return [...m].sort((a,b)=>a[0]-b[0]).map(([id,list])=>{list.sort((a,b)=>(b.p.age??-1)-(a.p.age??-1));const pior=Math.min(...list.map(x=>RK_FAIXAS.indexOf(x.s.faixa)));return {id,ps:list,nome:trFamNome(list),pior:RK_FAIXAS[pior],mista:trMista(list)}})}
+const trComp=end=>pseTitle(String(end||'').split(' - ').slice(1).join(' - ').trim());
+const trEndTitulo=E=>`${E.num?`Nº ${E.num}`:'Sem número'}${E.comp?` · ${E.comp}`:''}`;
+function trModel(){rkFresh();const s=rkStore(),sep=s.fam||{},eqs=trEqs(),ruas=new Map(),teams=new Set();let sem=0;
+  const rua=k=>ruas.get(k)||ruas.set(k,{key:k,nomes:new Map(),ends:new Map(),ilpis:new Map(),times:new Set()}).get(k);
+  for(const p of rkPeople()){if(p.excluded)continue;const a=idAddr(p.end),il=idIlpiOf(p.pront||'',p.end),rk=il?.addrs?.[0]?.split('|')[0]||(/^sem endere/i.test(a.rua)?'':rkNormRua(a.rua));
+    if(p.equipe)teams.add(p.equipe);
+    if(!rk){if(!eqs.length||eqs.includes(p.equipe))sem++;continue}
+    const R=rua(rk);if(p.equipe)R.times.add(p.equipe);if(a.rua&&rkNormRua(a.rua)===rk)R.nomes.set(a.rua,(R.nomes.get(a.rua)||0)+1);
+    if(eqs.length&&!eqs.includes(p.equipe))continue;
+    const sc=rkScore(p),x={p,s:sc,tags:trConds(p,sc)};
+    if(il){(R.ilpis.get(il.id)||R.ilpis.set(il.id,{il,ps:[]}).get(il.id)).ps.push(x);continue}
+    const ek=`${a.num}|${a.comp}`;(R.ends.get(ek)||R.ends.set(ek,{key:ek,num:a.num,comp:trComp(p.end),ps:[]}).get(ek)).ps.push(x)}
+  const c10=new Set(s.areaInteira?[]:s.ruas.map(rkNormRua)),out=[];
+  for(const R of ruas.values()){const ends=[...R.ends.values()].map(E=>({...E,fams:trFams(E.ps,sep)})).sort((a,b)=>(Number(a.num)||1e9)-(Number(b.num)||1e9)||a.comp.localeCompare(b.comp,'pt-BR')),ilpis=[...R.ilpis.values()];
+    if(!ends.length&&!ilpis.length)continue;
+    const c=RK_FAIXAS.map(()=>0);let n=0,nf=0,mx=0,al=0,cf=0,bfc=0;
+    for(const E of ends){n+=E.ps.length;for(const x of E.ps)c[RK_FAIXAS.indexOf(x.s.faixa)]++;nf+=E.fams.length;
+      for(const f of E.fams){if(f.mista)mx++;if(RK_FAIXAS.indexOf(f.pior)<=2)al++;if(f.ps.some(x=>TR_SAUDE.some(k=>x.tags[k])))cf++;if(f.ps.some(x=>x.tags.bf))bfc++}}
+    const nome=[...R.nomes].sort((a,b)=>b[1]-a[1])[0]?.[0]||ilpis[0]?.il.end||R.key;
+    out.push({key:R.key,nome:pseTitle(String(nome).split(',')[0]),ends,ilpis,c,n,ne:ends.length,nf,mx,al,cf,bfc,nIlpi:ilpis.reduce((t,i)=>t+i.ps.length,0),times:[...R.times].sort(trNumSort),cor:trCor(c,n),c10:c10.has(R.key)})}
+  const ord=r=>r.cor?RK_FAIXAS.indexOf(r.cor):99;out.sort((a,b)=>ord(a)-ord(b)||b.n-a.n||a.nome.localeCompare(b.nome,'pt-BR'));
+  return {ruas:out,sem,teams:[...teams].sort(trNumSort),eqs}}
+const trTone=f=>f?`tone-${RK_TONE[f]}`:'tr-none';
+const trBar=(c,n)=>`<span class="tr-bar">${c.map((v,i)=>v?`<i class="${trTone(RK_FAIXAS[i])}" style="width:${(100*v/n).toFixed(1)}%"></i>`:'').join('')}</span>`;
+const trKpis=list=>`<div class="tr-kpis">${list.map(([l,v,d])=>`<div class="card tr-kpi"><span>${l}</span><b>${fmtNum(v)}</b><small>${d}</small></div>`).join('')}</div>`;
+const trRegra=`<b>Cor da rua pelos 20% mais graves:</b> contando da faixa mais grave, a rua fica com a cor da faixa em que chega a 20% dos moradores. Poucos casos graves já pintam a rua. Quem mora em ILPI fica fora da conta.`;
+function trHTML(){const P=rkPrefs(),M=trModel(),R=P.trRua&&M.ruas.find(r=>r.key===P.trRua);return R?trRuaHTML(M,R):trListaHTML(M)}
+function trListaHTML(M){const eqs=M.eqs,all=!eqs.length,ruas=M.ruas,sum=k=>ruas.reduce((t,r)=>t+r[k],0),nsep=Object.keys(rkStore().fam||{}).length;
+  if(!ruas.length&&!M.sem&&all)return emptyState('Ninguém com endereço ainda','As ruas se formam com o endereço das pessoas da Classificação de Risco (CSVs do Metabase, gestantes, PSE e inclusões à mão).',false);
+  const nRuas=t=>trModelRuasDaEquipe(t);
+  const filtro=`<div class="card tr-filter" role="group" aria-label="Filtrar por equipe"><span class="tr-filter-t">Equipes</span><button type="button" class="tr-chip all" data-tr-eq-all aria-pressed="${all}">Todas as equipes</button>${M.teams.map(t=>`<button type="button" class="tr-chip" data-tr-eq="${esc(t)}" aria-pressed="${eqs.includes(t)}"><i></i>Equipe ${esc(t)}<small>· ${trPl(nRuas(t),'rua','ruas')}</small></button>`).join('')}
+    <small class="tr-filter-note">${all?'Mostrando todas as equipes. Marque uma ou mais para juntar.':`Mostrando ${esc(eqs.map(t=>`Equipe ${t}`).join(' + '))}. Ruas divididas entre equipes contam só as pessoas dessas equipes.`}</small></div>`;
+  const regra=`<div class="card tr-rule"><span>${trRegra}</span><span class="tr-legend">${RK_FAIXAS.map(f=>`<span class="${trTone(f)}"><i></i>${f}</span>`).join('')}</span></div>`;
+  const kpis=trKpis([['Ruas',ruas.length,`${fmtNum(ruas.filter(r=>r.cor&&RK_FAIXAS.indexOf(r.cor)<=2).length)} em vermelho, laranja ou amarelo`],['Endereços',sum('ne'),'fora as ILPIs'],['Famílias',sum('nf'),nsep?trPl(nsep,'pessoa separada à mão','pessoas separadas à mão'):'automáticas pelo endereço'],['Moradores',sum('n'),M.sem?`${fmtNum(M.sem)} sem endereço ficam fora`:'com classificação de risco'],['Em ILPI',sum('nIlpi'),'contados à parte']]);
+  const head=`<div class="tr-grid tr-th"><span></span><span>Rua</span><span>Pessoas por faixa</span><span>Equipes</span><span>Endereços</span><span>Famílias</span><span>Pessoas</span><span>Cor da rua</span><span></span></div>`;
+  const rows=ruas.map(r=>{let g=0;while(g<RK_FAIXAS.length-1&&!r.c[g])g++;const sub=[r.nIlpi?`+ ${fmtNum(r.nIlpi)} em ILPI (fora da cor)`:'',r.n?`Mais grave: ${RK_FAIXAS[g]} (${fmtNum(r.c[g])})`:'',r.c10?'rua do C10':''].filter(Boolean).join(' · ');
+    return `<button type="button" class="tr-grid tr-row ${trTone(r.cor)}" data-tr-rua="${esc(r.key)}"><span class="tr-sw"></span><span class="tr-name"><b>${esc(r.nome)}</b><small>${esc(sub)}</small></span>${trBar(r.c,r.n)}<span class="tr-teams">${r.times.map(t=>`<span class="tr-team${all||eqs.includes(t)?'':' off'}">Eq. ${esc(t)}</span>`).join('')}</span><span class="tr-num">${fmtNum(r.ne)}</span><span class="tr-num">${fmtNum(r.nf)}</span><span class="tr-num">${fmtNum(r.n)}</span><span class="tr-pill">${r.cor||'Só ILPI'}</span><span class="tr-chev">${icon('chevron')}</span></button>`}).join('');
+  return filtro+regra+kpis+`<section class="card tr-table"><div class="tr-scroll">${head}${rows||'<p class="pq-empty">Nenhuma rua com pessoas dessas equipes.</p>'}</div></section>`}
+// Quantas ruas têm alguém da equipe (sem o filtro aplicado), para o rótulo do botão.
+function trModelRuasDaEquipe(t){const set=new Set();for(const p of rkPeople()){if(p.excluded||p.equipe!==t)continue;const a=idAddr(p.end),il=idIlpiOf(p.pront||'',p.end),rk=il?.addrs?.[0]?.split('|')[0]||(/^sem endere/i.test(a.rua)?'':rkNormRua(a.rua));if(rk)set.add(rk)}return set.size}
+function trRuaHTML(M,R){const eqs=M.eqs,cont=RK_FAIXAS.map((f,i)=>R.c[i]?`<span class="tr-cnt ${trTone(f)}"><i></i>${f} ${fmtNum(R.c[i])}</span>`:'').join('');
+  const top=`<div class="tr-top"><button type="button" class="btn" data-tr-voltar><span class="flip">${icon('chevron')}</span>Voltar às ruas</button><span class="tr-crumb">Ruas e famílias / <b>${esc(R.nome)}</b></span><span class="tr-flt">${eqs.length?esc(eqs.map(t=>`Equipe ${t}`).join(' + ')):'Todas as equipes'}</span></div>`;
+  const hero=`<section class="card tr-hero ${trTone(R.cor)}"><div class="tr-hero-h"><div><span class="tr-eyebrow">${R.cor?`Rua ${R.cor} · ${RK_PRAZO[R.cor].toLowerCase()} · 20% mais graves`:'Só ILPI'}${R.c10?' · rua do C10':''}</span><h2>${esc(R.nome)}</h2><span>${trPl(R.n,'morador','moradores')} · ${trPl(R.ne,'endereço','endereços')} · ${trPl(R.nf,'família','famílias')}${R.nIlpi?` · + ILPI com ${fmtNum(R.nIlpi)}`:''}</span></div><div class="tr-conts">${cont}</div></div>${R.n?trBar(R.c,R.n):''}</section>`;
+  const kpis=trKpis([['Endereços',R.ne,R.ilpis.length?`+ ${R.ilpis.length} ILPI`:'nesta rua'],['Famílias',R.nf,'automáticas pelo endereço'],['Moradores',R.n,'com classificação de risco'],['Famílias para conferir',R.mx,'sobrenomes diferentes'],['Famílias com prioridade',R.al,'alguém em vermelho, laranja ou amarelo'],['Com condição de saúde',R.cf,'gestante, acamado, hipertensão, diabetes, imuno ou PcD'],['No Bolsa Família',R.bfc,'alguém da família com C01']]);
+  const ilpis=R.ilpis.map(({il,ps})=>`<div class="tr-end"><div class="tr-end-a"><b>${esc(il.nome)}</b><small>${trPl(ps.length,'residente','residentes')}</small><span class="tr-team">ILPI</span></div><div class="tr-end-f"><div class="tr-ilpi"><p>Entra como ILPI pelo endereço. Os residentes não viram família: cada um segue com a própria classificação.</p><div class="tr-ilpi-ps">${ps.sort((a,b)=>RK_FAIXAS.indexOf(a.s.faixa)-RK_FAIXAS.indexOf(b.s.faixa)).map(x=>`<button type="button" class="tr-res ${trTone(x.s.faixa)}" data-rk-open="${esc(x.p.key)}"><i class="tr-dot"></i>${esc(x.p.nome||'Sem nome')}<small>${rkAgeTxt(x.p)}</small></button>`).join('')}</div></div></div></div>`).join('');
+  const ends=R.ends.map(E=>{const tm=[...new Set(E.ps.map(x=>x.p.equipe).filter(Boolean))].sort(trNumSort);
+    return `<div class="tr-end"><div class="tr-end-a"><b>${esc(trEndTitulo(E))}</b><small>${trPl(E.ps.length,'pessoa','pessoas')} · ${trPl(E.fams.length,'família','famílias')}</small>${tm.map(t=>`<span class="tr-team off">Equipe ${esc(t)}</span>`).join('')}</div><div class="tr-end-f">${E.fams.map((f,i)=>{const tags=trTagsFamilia(f.ps),nomes=f.ps.map(x=>`${String(x.p.nome||'Sem nome').split(' ')[0]} (${x.p.age??'?'})`);
+      return `<button type="button" class="tr-fam ${trTone(f.pior)}" data-tr-fam="${esc(E.key)}" data-tr-fid="${f.id}"><i class="tr-dot"></i><span class="tr-fam-m"><span class="tr-fam-t"><b>${esc(f.nome)}</b><small>${trPl(f.ps.length,'pessoa','pessoas')}</small>${f.mista?'<small class="warn">· sobrenomes diferentes, confira</small>':''}${i?'<small class="mine">· separada por você</small>':''}</span><small class="tr-fam-p">${esc(nomes.slice(0,5).join(', ')+(nomes.length>5?` +${nomes.length-5}`:''))}</small>${tags?`<span class="tr-tags">${tags}</span>`:''}</span><span class="tr-pill">${f.pior}</span><span class="tr-chev">${icon('chevron')}</span></button>`}).join('')}</div></div>`}).join('');
+  return top+hero+kpis+`<section class="card tr-ends"><div class="tr-ends-h"><b>Endereços e famílias</b><small>pelo número da casa · clique numa família para abrir</small></div>${ilpis}${ends||(ilpis?'':'<p class="pq-empty">Nenhum endereço com pessoas dessas equipes.</p>')}<p class="tr-foot">Família automática = mesmo endereço (rua, número e complemento). As separações ficam salvas e valem nas próximas importações.</p></section>`}
+function trEnd(key){const R=trModel().ruas.find(r=>r.key===rkPrefs().trRua);return R&&{R,E:R.ends.find(e=>e.key===key)}}
+function openTrFam(endKey,fid){const x=trEnd(endKey),E=x?.E,f=E?.fams.find(o=>o.id===fid);if(!f){trDrawer={end:null,fid:1};return closeDrawer()}
+  trDrawer={end:endKey,fid};drawerReopen=()=>openTrFam(trDrawer.end,trDrawer.fid);
+  const first=E.fams[0],others=E.fams.filter(o=>o!==f),tags=trTagsFamilia(f.ps),tm=[...new Set(f.ps.map(y=>y.p.equipe).filter(Boolean))].sort(trNumSort);
+  const head=`<header class="pq-d-h tr-dh"><div class="pq-d-h-top"><span class="pq-sec-t">Família · ${f===first?'automática pelo endereço':'separada por você'}</span><button class="pq-icon" data-close-drawer aria-label="Fechar">${icon('close')}</button></div>
+    <h2>${esc(f.nome)}</h2><p class="pq-d-sub">${esc(x.R.nome)}, ${esc(trEndTitulo(E))} · ${trPl(f.ps.length,'pessoa','pessoas')}${tm.length?` · ${esc(tm.map(t=>`Equipe ${t}`).join(', '))}`:''}</p>
+    <div class="tr-dchips"><span class="tr-pill">Mais grave: ${f.pior} · ${RK_PRAZO[f.pior].toLowerCase()}</span></div>${tags?`<div class="tr-dtags"><span class="pq-sec-t">Condições e vulnerabilidades na família</span><span class="tr-tags">${tags}</span></div>`:''}</header>`;
+  const pessoas=f.ps.map(y=>{const p=y.p,s=y.s,ph=normalizePhone(p.tel),k=esc(p.key);
+    return `<div class="tr-p ${trTone(s.faixa)}"><i class="tr-dot"></i><div class="tr-p-m"><div class="tr-p-n"><b>${esc(p.nome||'Sem nome')}</b><span class="tr-tags">${trTagsPessoa(y.tags)}</span></div><small>${rkAgeTxt(p)}${p.equipe?` · Equipe ${esc(p.equipe)}`:''}${p.pront?` · <span class="mono">${esc(p.pront)}</span>`:''}</small></div><span class="tr-pill">${s.faixa} · ${s.alarm?'alarme':`${s.total} pts`}</span>
+      <div class="tr-p-a">${f.ps.length>1?`<button type="button" class="pq-qa" data-tr-sep="${k}">Separar em família nova</button>`:''}${others.map(o=>`<button type="button" class="pq-qa" data-tr-mv="${k}" data-tr-to="${o.id}">Mover para ${esc(o.nome)}</button>`).join('')}${ph?`<button type="button" class="pq-qa" data-rk-wa="${k}">${icon('message')}WhatsApp</button>`:''}<button type="button" class="pq-link" data-rk-open="${k}">Abrir na Classificação de Risco</button></div></div>`}).join('');
+  const body=`${f.mista?'<div class="pq-alert amber">Sobrenomes diferentes no mesmo endereço. Se alguém mora à parte (outra casa no terreno, inquilino), separe.</div>':''}
+    <section class="pq-d-card"><div class="pq-d-card-h"><div class="pq-sec-t">Pessoas</div><span class="pq-d-count">cada uma segue com a própria classificação</span></div><div class="tr-ps">${pessoas}</div></section>
+    <div class="tr-dacts"><button type="button" class="btn" data-tr-acs>${icon('users')}Pedir visita do ACS para a família</button>${f!==first?`<button type="button" class="pq-link" data-tr-join="${f.id}" data-tr-to="${first.id}">Juntar de volta à ${esc(first.nome)}</button>`:''}</div>
+    ${others.length?`<section class="pq-d-card"><div class="pq-sec-t">Outras famílias neste endereço</div>${others.map(o=>`<button type="button" class="tr-fam ${trTone(o.pior)}" data-tr-fam="${esc(E.key)}" data-tr-fid="${o.id}"><i class="tr-dot"></i><span class="tr-fam-m"><span class="tr-fam-t"><b>${esc(o.nome)}</b><small>${trPl(o.ps.length,'pessoa','pessoas')}</small></span></span><span class="tr-pill">${o.pior}</span><span class="tr-chev">${icon('chevron')}</span></button>`).join('')}</section>`:''}
+    <p class="pq-empty-s">Separar cria uma família nova no mesmo endereço; mover junta a pessoa a outra família da casa. Tudo fica salvo e vale nas próximas importações.</p>`;
+  openDrawer(`<div class="pq-drawer ${trTone(f.pior)}">${head}<div class="pq-d-b">${body}</div></div>`);document.getElementById('drawer').classList.add('pq-drawer-host')}
+// Muda as famílias com Desfazer.
+function trSave(msg,fn){const s=rkStore(),before={...(s.fam||{})};s.fam={...before};fn(s.fam);audit('familia_alterada',{});queueSave();renderView('risco');if(trDrawer.end)openTrFam(trDrawer.end,trDrawer.fid);
+  toastAction(msg,'Desfazer',()=>{rkStore().fam=before;queueSave();renderView('risco');if(trDrawer.end&&document.getElementById('drawerBackdrop').classList.contains('open'))openTrFam(trDrawer.end,trDrawer.fid)})}
+function trClick(ev){const el=ev.target.closest('[data-tr-rua],[data-tr-voltar],[data-tr-eq],[data-tr-eq-all],[data-tr-fam],[data-tr-sep],[data-tr-mv],[data-tr-join],[data-tr-acs]');if(!el)return;const d=el.dataset,P=rkPrefs();
+  if(d.trRua!=null){P.trRua=d.trRua;queueSave();renderView('risco');document.querySelector('.workspace')?.scrollTo?.({top:0});return}
+  if(el.hasAttribute('data-tr-voltar')){P.trRua='';queueSave();return renderView('risco')}
+  if(el.hasAttribute('data-tr-eq-all')){P.trEquipes=[];queueSave();return renderView('risco')}
+  if(d.trEq){const cur=new Set(trEqs());cur.has(d.trEq)?cur.delete(d.trEq):cur.add(d.trEq);const teams=[...new Set(rkPeople().map(p=>p.equipe).filter(Boolean))];P.trEquipes=teams.every(t=>cur.has(t))?[]:[...cur].sort(trNumSort);queueSave();return renderView('risco')}
+  if(d.trFam!=null&&d.trFid)return openTrFam(d.trFam,Number(d.trFid));
+  const E=trEnd(trDrawer.end)?.E,f=E?.fams.find(o=>o.id===trDrawer.fid);if(!E)return;
+  if(d.trSep)return trSave('Separada numa família nova.',fam=>{fam[d.trSep]=Math.max(...E.ps.map(x=>fam[x.p.key]||1))+1});
+  if(d.trMv){const to=Number(d.trTo);if(f?.ps.length===1)trDrawer.fid=to;return trSave('Pessoa movida de família.',fam=>{if(to===1)delete fam[d.trMv];else fam[d.trMv]=to})}
+  if(d.trJoin){const from=Number(d.trJoin),to=Number(d.trTo);trDrawer.fid=to;return trSave('Famílias juntadas.',fam=>{for(const x of E.ps)if((fam[x.p.key]||1)===from){if(to===1)delete fam[x.p.key];else fam[x.p.key]=to}})}
+  if(el.hasAttribute('data-tr-acs')){for(const x of f?.ps||[])rkRegister(x.p.key,'acs','Pedido de visita para o ACS (família)','contato');toast(`Pedido ao ACS registrado para ${trPl(f?.ps.length||0,'pessoa','pessoas')}.`);return rkRefresh({keep:true})}
+}
 
 /* ---------- Idosos (v2.47) ----------
    Lista de idosos do Metabase (formato atual: Cd Usu Cadsus, Cd Equipe, Nr Idade Fim, Ts Atualizacao, Nm Usuario,
@@ -4886,7 +5003,7 @@ function setupEvents(){
     if(e.target.hasAttribute('data-proc-dentist-sel')){state.preferences.procDentist=e.target.value;queueSave();refreshAll()}
   });
   document.addEventListener('click',sxClick);document.addEventListener('change',sxChange);document.addEventListener('click',pseClick);document.addEventListener('click',pregPhoneClick);document.addEventListener('change',pseChange);document.addEventListener('input',debounce(pseInput,250));
-  document.addEventListener('click',cdClick);document.addEventListener('input',debounce(cdInput,200));document.addEventListener('click',crClick);document.addEventListener('change',crChange);document.addEventListener('input',debounce(crInput,250));document.addEventListener('click',idClick);document.addEventListener('change',idChange);document.addEventListener('input',debounce(idInput,250));document.addEventListener('click',rkClick);document.addEventListener('change',rkChange);document.addEventListener('input',debounce(rkInput,250));document.addEventListener('keydown',rkKey);
+  document.addEventListener('click',cdClick);document.addEventListener('input',debounce(cdInput,200));document.addEventListener('click',crClick);document.addEventListener('change',crChange);document.addEventListener('input',debounce(crInput,250));document.addEventListener('click',idClick);document.addEventListener('change',idChange);document.addEventListener('input',debounce(idInput,250));document.addEventListener('click',rkClick);document.addEventListener('click',trClick);document.addEventListener('change',rkChange);document.addEventListener('input',debounce(rkInput,250));document.addEventListener('keydown',rkKey);
   document.addEventListener('input',e=>{if(['ovPop','ovEsf','ovDent','ovDenManual'].includes(e.target.id))ovLivePreview(e.target)});
   document.addEventListener('input',e=>{if(e.target.dataset?.docCheck)docsLive(e.target)});
   document.addEventListener('click',dupClick);document.addEventListener('input',e=>{if(e.target.id==='dupMin'){state.preferences.dupMin=Number(e.target.value);state.preferences.dupLimit=40;queueSave();renderView('settings');const r=document.getElementById('dupMin');r?.focus()}});

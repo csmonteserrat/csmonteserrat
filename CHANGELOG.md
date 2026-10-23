@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## Versão 2.59
+
+- **Classificação de Risco › Ruas e famílias** (nova subaba). As pessoas da lista são agrupadas pela rua do endereço. Cada rua tem uma cor tirada dos **20% mais graves**: contando da faixa mais grave, é a faixa em que a rua chega a 20% dos moradores.
+- **Filtro de equipes** com escolha múltipla (uma equipe, várias juntas ou todas).
+- **Página da rua** com "Voltar às ruas", números da rua (famílias para conferir, com prioridade, com condição de saúde e no Bolsa Família) e os endereços pelo número da casa.
+- **Famílias automáticas pelo endereço** (rua, número e complemento), com **gaveta da família**: separar em família nova, mover para outra família da casa e juntar de volta (com Desfazer). As separações ficam salvas e vão no backup completo. Há aviso de sobrenomes diferentes e um botão para pedir a visita do ACS para a família toda.
+- **ILPI** entra como ILPI, com o nome, sem virar família.
+- **Etiquetas em pílula** na família e ao lado do nome: Gestante, Idoso 60+/70+/80+/90+, Acamado ou domiciliado, Hipertensão, Diabetes, Imunossupressão, Pessoa com deficiência, Bolsa Família (a família ganha a etiqueta se alguém tem; o C01 continua individual) e Analfabetismo ou baixa escolaridade.
+- 1 teste interno novo (338 no total).
+
 ## Versão 2.58
 
 - **Barra lateral reorganizada** para telas de computador de unidade (notebooks baixos): botões mais compactos, itens agrupados em **Acompanhamento**, **Gestão** e **Ferramentas** (para novas funções basta incluir o botão no grupo certo), item ativo em destaque suave, rolagem só no menu e rodapé escondido quando a tela é baixa.

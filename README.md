@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.57
+# Acompanhamento Odontológico · versão 2.59
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -124,6 +124,18 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - **Critérios automáticos podem ser removidos** com motivo: ficam riscados, não somam e continuam removidos nas próximas importações.
 - **Boletim Diário dos Atendimentos (CELK):** completa CNS, nascimento, sexo e telefone de quem já está no app e marca B04 a B09 pelos CIDs da lista, só quando o critério não está marcado. Quem não está no app não é guardado.
 - Gestantes: a gaveta tem a aba Classificação de Risco, e os contatos da aba Gestantes e da Classificação de Risco formam um histórico só.
+
+### Ruas e famílias
+
+- Subaba da Classificação de Risco. Junta as pessoas da lista pela rua do endereço ("RUA, NÚMERO - COMPLEMENTO"). A comparação da rua ignora acento, maiúscula e o tipo do logradouro, como no C10.
+- **Cor da rua pelos 20% mais graves:** contando da faixa mais grave (Vermelho → Violeta), a rua fica com a cor da faixa em que chega a 20% dos moradores. Quem mora em ILPI fica fora da conta.
+- **Filtro de equipes:** uma, várias juntas ou todas. Ruas divididas entre equipes contam só as pessoas das equipes escolhidas.
+- Clicar numa rua abre a **página da rua** (com "Voltar às ruas"): faixas, números da rua e os endereços pelo número da casa.
+- **Família automática** = mesmo endereço (rua, número e complemento). Clicar na família abre a **gaveta da família**, onde dá para **separar** alguém numa família nova, **mover** para outra família do endereço e **juntar de volta** (com Desfazer). As separações ficam salvas, valem nas próximas importações e vão no backup completo.
+- Aviso **"sobrenomes diferentes, confira"** quando alguém da família não divide nenhum sobrenome com os outros.
+- **ILPI** entra como ILPI, com o nome, pelo mesmo reconhecimento da aba Idosos. Os residentes não viram família.
+- **Etiquetas** na família (somadas) e ao lado do nome de cada pessoa: Gestante, Idoso 60+/70+/80+/90+, Acamado ou domiciliado, Hipertensão, Diabetes, Imunossupressão, Pessoa com deficiência, Bolsa Família (C01) e Analfabetismo ou baixa escolaridade (C03). Bolsa Família aparece na família quando qualquer pessoa da casa tem; na classificação, o C01 continua individual.
+- Quem não tem endereço fica fora das ruas (o número aparece no quadro "Moradores").
 
 ## Publicar no Render
 
