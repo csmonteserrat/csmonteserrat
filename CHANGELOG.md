@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## Versão 2.58
+
+- **Barra lateral reorganizada** para telas de computador de unidade (notebooks baixos): botões mais compactos, itens agrupados em **Acompanhamento**, **Gestão** e **Ferramentas** (para novas funções basta incluir o botão no grupo certo), item ativo em destaque suave, rolagem só no menu e rodapé escondido quando a tela é baixa.
+- **Gestantes: busca por nome** não trava mais após a primeira letra (o campo perdia o foco a cada tecla).
+
 ## Versão 2.57
 
 - **Desempenho com muitos pacientes** (medido com uma base de teste de 15 mil pacientes, 1.500 alunos do PSE e 6 mil participantes de atividades coletivas):
