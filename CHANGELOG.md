@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## Versão 2.62
+
+- Ruas e famílias: o aviso de endereços com o mesmo número virou uma etiqueta curta ("Nº 50 em mais 14 endereços · confira"), em vez da lista de todos os endereços, que deixava a coluna muito comprida. A lista aparece ao passar o mouse.
+
 ## Versão 2.61
 
 - **PSE: CSV novo da avaliação.** A coluna do TCLE do ART agora se chama "TCLE (ART)" e vem com Autorizou, Não autorizou ou Não devolvido. O app lê as três situações e as mostra no resumo do ART (TCLE autorizado, não autorizado e não devolvido), na tabela por turma e na gaveta da criança. O CSV antigo ("TCLE assinado (ART)" com Sim/Não) continua funcionando.
