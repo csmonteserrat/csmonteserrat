@@ -1177,7 +1177,7 @@ table.pr-table{min-width:0;width:100%;font-size:12.5px}table.pr-table tr.sel td{
 .tr-dacts{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 @media (max-width:760px){.tr-filter-note{text-align:left}.tr-end-a{flex:1 1 100%;padding-top:0}.tr-flt{margin-left:0}.tr-hero h2{font-size:20px}.tr-chip{min-height:40px}}
 /* Juntar famílias (v2.60) */
-.tr-twin{color:#8a5a10!important;font-weight:600;line-height:1.35;margin-top:2px}
+.tr-twin{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;max-width:100%;margin-top:3px;padding:2px 8px;border-radius:999px;background:#fff7e9;color:#8a5a10;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:help}.tr-twin svg{width:12px;height:12px;flex:0 0 auto;stroke:currentColor;stroke-width:2.2;fill:none}
 .tr-com{color:#5e46a8!important;font-weight:600}
 .tr-why{color:#5e46a8;font-weight:600}
 .tr-join{display:grid;gap:12px}.tr-join .search-box{width:100%;max-width:none}

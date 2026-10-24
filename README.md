@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.61
+# Acompanhamento Odontológico · versão 2.62
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -133,7 +133,7 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - **Filtro de equipes:** uma, várias juntas ou todas. Ruas divididas entre equipes contam só as pessoas das equipes escolhidas.
 - Clicar numa rua abre a **página da rua** (com "Voltar às ruas"): faixas, números da rua e os endereços pelo número da casa.
 - **Família automática** = mesmo endereço (rua, número e complemento). Clicar na família abre a **gaveta da família**, onde dá para **separar** alguém numa família nova, **mover** para outra família do endereço e **juntar de volta** (com Desfazer). As separações ficam salvas, valem nas próximas importações e vão no backup completo.
-- **Juntar com outra família** (gaveta da família): para quando o mesmo endereço vem escrito diferente ("RUA X, 300" e "RUA X, 300 - CASA", ou nomes de rua diferentes). Sugere famílias com o mesmo número na rua, o mesmo número em rua de nome parecido ou o mesmo sobrenome, e busca por sobrenome, nome, rua ou número em todas as equipes. As pessoas passam a contar no endereço da família escolhida, com "Desfazer" e, por pessoa, "Voltar ao endereço do cadastro". Fica salvo pela pessoa, então vale nas próximas importações. Na página da rua, endereços com o mesmo número aparecem com "Mesmo número que…: confira".
+- **Juntar com outra família** (gaveta da família): para quando o mesmo endereço vem escrito diferente ("RUA X, 300" e "RUA X, 300 - CASA", ou nomes de rua diferentes). Sugere famílias com o mesmo número na rua, o mesmo número em rua de nome parecido ou o mesmo sobrenome, e busca por sobrenome, nome, rua ou número em todas as equipes. As pessoas passam a contar no endereço da família escolhida, com "Desfazer" e, por pessoa, "Voltar ao endereço do cadastro". Fica salvo pela pessoa, então vale nas próximas importações. Na página da rua, endereços com o mesmo número ganham a etiqueta "Nº 50 em mais 3 endereços · confira" (a lista aparece ao passar o mouse).
 - Aviso **"sobrenomes diferentes, confira"** quando alguém da família não divide nenhum sobrenome com os outros.
 - **ILPI** entra como ILPI, com o nome, pelo mesmo reconhecimento da aba Idosos. Os residentes não viram família.
 - **Etiquetas** na família (somadas) e ao lado do nome de cada pessoa: Gestante, Idoso 60+/70+/80+/90+, Acamado ou domiciliado, Hipertensão, Diabetes, Imunossupressão, Pessoa com deficiência, Bolsa Família (C01) e Analfabetismo ou baixa escolaridade (C03). Bolsa Família aparece na família quando qualquer pessoa da casa tem; na classificação, o C01 continua individual.
