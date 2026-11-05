@@ -1,5 +1,18 @@
 # Histórico de versões
 
+## Versão 2.63
+
+- **Nova aba Bolsa Família** (menu Acompanhamento). Lê o Mapa de Acompanhamento do Programa Bolsa Família exportado do e-Gestor, em `.html` ou `.xls`: vigência, código familiar, endereço, telefone (com DDD 48), profissional, NIS, CNS, nome, nascimento e as marcas (O) acompanhamento obrigatório e (G) gestante. Só entra o CS Monte Serrat.
+  - **Pessoas:** porcentagem em tratamento ou em dia no CELK, avisos de gestantes sem atendimento (e fora da lista do 2I) e de bebês sem 1ª consulta, fila por etapa e filtros por público e equipe. A cor do cartão é a etapa; a faixa da Classificação de Risco vai como etiqueta.
+  - **Famílias** (por código familiar) e **Panorama do mapa** (perfil, idade, tamanho da família, equipes, ruas para confirmar e mapas importados).
+  - **Saíram do mapa:** quem não vem no mapa mais novo saiu do programa, perde o C01 automático e, se só estava no app por causa do mapa, sai da Classificação de Risco.
+  - Quem tem **C01 marcado à mão** em qualquer aba também aparece na aba.
+- **Classificação de Risco:** as pessoas do mapa entram com origem "Bolsa Família" e **C01 automático** (C01i até 5 anos). Quem tem o endereço do **Centro POP** ganha **C16 automático** e vai para a Equipe 123.
+- **Equipes pelo endereço em todas as abas:** a lista de ruas das equipes 120 a 123 do CS Monte Serrat define a equipe. Ordem: corrigida à mão, depois o endereço, depois o arquivo. A Verificação conta quem tem equipe do Metabase diferente da do endereço. Ruas parecidas ficam como sugestão para você confirmar.
+- **PSE:** criança com endereço numa das equipes, em qualquer lugar do app, já entra em Meus alunos ("pelo endereço"). Desmarcada, não volta sozinha.
+- Correção: no celular, o contador vermelho de Gestantes e PSE aparecia com "0".
+- 8 testes internos novos (348 no total).
+
 ## Versão 2.62
 
 - Ruas e famílias: o aviso de endereços com o mesmo número virou uma etiqueta curta ("Nº 50 em mais 14 endereços · confira"), em vez da lista de todos os endereços, que deixava a coluna muito comprida. A lista aparece ao passar o mouse.

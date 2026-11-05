@@ -8,14 +8,14 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'self'; form-action 'self'">
   <title>Acompanhamento Odontológico</title>
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
-  <link rel="stylesheet" href="./assets/app.css?v=2.62">
+  <link rel="stylesheet" href="./assets/app.css?v=2.63">
 </head>
 <body>
   <div class="app-shell" id="appShell">
     <aside class="sidebar" aria-label="Navegação principal">
       <div class="brand-row">
         <div class="brand" title="Acompanhamento Odontológico"><span data-icon="tooth"></span></div>
-        <div class="brand-text"><strong>Acompanhamento</strong><span>Saúde Bucal · v2.62</span></div>
+        <div class="brand-text"><strong>Acompanhamento</strong><span>Saúde Bucal · v2.63</span></div>
       </div>
       <nav class="side-nav" aria-label="Módulos da ferramenta">
         <div class="side-group" role="group">
@@ -26,6 +26,7 @@
           <button class="side-btn" data-view="pse" aria-label="PSE: avaliações nas escolas" title="PSE"><span class="side-btn-icon" data-icon="users"></span><span class="side-btn-label">PSE</span></button>
           <button class="side-btn" data-view="criancas" aria-label="Crianças de 0 a 12 anos" title="Crianças"><span class="side-btn-icon" data-icon="child"></span><span class="side-btn-label">Crianças</span></button>
           <button class="side-btn" data-view="idosos" aria-label="Idosos: consulta odontológica, ILPIs e acamados" title="Idosos"><span class="side-btn-icon" data-icon="person"></span><span class="side-btn-label">Idosos</span></button>
+          <button class="side-btn" data-view="bolsa" aria-label="Bolsa Família: mapa do e-Gestor e consulta odontológica" title="Bolsa Família"><span class="side-btn-icon" data-icon="home"></span><span class="side-btn-label">Bolsa Família</span></button>
           <button class="side-btn" data-view="condicoes" aria-label="Condições de saúde: hipertensão, diabetes, imunossupressão e deficiência" title="Condições de saúde"><span class="side-btn-icon" data-icon="pulse"></span><span class="side-btn-label">Condições de saúde</span></button>
           <button class="side-btn" data-view="risco" aria-label="Classificação de risco em saúde bucal" title="Classificação de Risco"><span class="side-btn-icon" data-icon="alert"></span><span class="side-btn-label">Classificação de Risco</span></button>
         </div>
@@ -93,6 +94,7 @@
         <section class="view hidden" id="view-pse"></section>
         <section class="view hidden" id="view-criancas"></section>
         <section class="view hidden" id="view-idosos"></section>
+        <section class="view hidden" id="view-bolsa"></section>
         <section class="view hidden" id="view-condicoes"></section>
         <section class="view hidden" id="view-risco"></section>
         <section class="view hidden" id="view-calculator"></section>
@@ -110,11 +112,11 @@
   </nav>
   <div class="m-sheet-backdrop" id="mSheetBackdrop" aria-hidden="true"><section class="m-sheet" id="mSheet" role="dialog" aria-modal="true" aria-label="Opções"></section></div>
 
-  <input id="fileInput" type="file" accept=".pdf,.csv,application/pdf,text/csv" multiple hidden>
+  <input id="fileInput" type="file" accept=".pdf,.csv,.html,.htm,.xls,application/pdf,text/csv,text/html,application/vnd.ms-excel" multiple hidden>
   <input id="backupInput" type="file" accept=".json,.saude-bucal-backup.json,application/json" hidden>
 
   <div class="drop-overlay" id="dropOverlay" aria-hidden="true">
-    <div><span data-icon="upload"></span><strong>Solte os relatórios aqui</strong><small>PDF do CELK ou CSV do Metabase</small></div>
+    <div><span data-icon="upload"></span><strong>Solte os relatórios aqui</strong><small>PDF do CELK, CSV do Metabase ou mapa do e-Gestor</small></div>
   </div>
 
   <div class="modal-backdrop" id="modalBackdrop" aria-hidden="true">
@@ -130,6 +132,6 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script type="module" src="./assets/app.js?v=2.62"></script>
+  <script type="module" src="./assets/app.js?v=2.63"></script>
 </body>
 </html>

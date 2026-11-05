@@ -1,4 +1,4 @@
-# Acompanhamento Odontológico · versão 2.62
+# Acompanhamento Odontológico · versão 2.63
 
 Ferramenta estática para leitura de relatórios do CELK e consolidados do Metabase, com organização mensal e quadrimestral dos indicadores municipais, federais e 2I de gestantes.
 
@@ -136,8 +136,34 @@ O projeto não possui backend, banco de dados remoto ou serviço de telemetria. 
 - **Juntar com outra família** (gaveta da família): para quando o mesmo endereço vem escrito diferente ("RUA X, 300" e "RUA X, 300 - CASA", ou nomes de rua diferentes). Sugere famílias com o mesmo número na rua, o mesmo número em rua de nome parecido ou o mesmo sobrenome, e busca por sobrenome, nome, rua ou número em todas as equipes. As pessoas passam a contar no endereço da família escolhida, com "Desfazer" e, por pessoa, "Voltar ao endereço do cadastro". Fica salvo pela pessoa, então vale nas próximas importações. Na página da rua, endereços com o mesmo número ganham a etiqueta "Nº 50 em mais 3 endereços · confira" (a lista aparece ao passar o mouse).
 - Aviso **"sobrenomes diferentes, confira"** quando alguém da família não divide nenhum sobrenome com os outros.
 - **ILPI** entra como ILPI, com o nome, pelo mesmo reconhecimento da aba Idosos. Os residentes não viram família.
-- **Etiquetas** na família (somadas) e ao lado do nome de cada pessoa: Gestante, Idoso 60+/70+/80+/90+, Acamado ou domiciliado, Hipertensão, Diabetes, Imunossupressão, Pessoa com deficiência, Bolsa Família (C01) e Analfabetismo ou baixa escolaridade (C03). Bolsa Família aparece na família quando qualquer pessoa da casa tem; na classificação, o C01 continua individual.
+- **Etiquetas** na família (somadas) e ao lado do nome de cada pessoa: Gestante, Idoso 60+/70+/80+/90+, Acamado ou domiciliado, Hipertensão, Diabetes, Imunossupressão, Pessoa com deficiência, Bolsa Família (C01, automático pelo mapa do e-Gestor) e Analfabetismo ou baixa escolaridade (C03). Bolsa Família aparece na família quando qualquer pessoa da casa tem; na classificação, o C01 continua individual.
 - Quem não tem endereço fica fora das ruas (o número aparece no quadro "Moradores").
+
+## Bolsa Família
+
+- Lê o **Mapa de Acompanhamento do Programa Bolsa Família** exportado do **e-Gestor** (Mapa de Famílias por Estabelecimento de Atenção à Saúde), em `.html` ou `.xls` (o e-Gestor salva a mesma tabela HTML com essa extensão). O botão Importar aceita esses arquivos.
+- Do mapa saem: vigência, código e data do mapa; por família, o código familiar, o endereço (rua, número, complemento, bairro, CEP e zona), o telefone (ganha o DDD 48) e o profissional de referência; por pessoa, NIS, CNS, nome, nascimento e as marcas **(O)** acompanhamento obrigatório e **(G)** gestante (a gestante vem com as duas, "(O)(G)"). As colunas de acompanhamento (peso, estatura, vacinação, pré-natal, DUM) vêm em branco no mapa de coleta; se vierem preenchidas, são guardadas.
+- **Só entra o CS Monte Serrat.** Família de outro estabelecimento fica de fora com aviso; mapa só de outra unidade não é importado.
+- **Cada vigência é um arquivo.** O mapa da vigência mais recente é o que vale. Importar de novo a mesma vigência substitui o mapa anterior dela. Quem estava num mapa anterior e não veio no mais recente **saiu do programa**: perde o C01 automático, sai da fila e vai para a aba "Saíram do mapa"; se só estava no app por causa do mapa, sai também da Classificação de Risco.
+- **Classificação de Risco:** todas as pessoas do mapa entram (origem "Bolsa Família") com **C01 automático** (C01i, de 6 pontos, até 5 anos). O C01 marcado à mão vale no lugar. Juntam com quem já está no app pelo CNS, pelo nome + nascimento iguais ou pelo prontuário do CELK com nome igual e idade no atendimento conferindo (regra do PSE).
+- **C01 marcado à mão** em qualquer aba também traz a pessoa para a aba Bolsa Família (o mapa só traz mulheres e crianças), com a etiqueta "C01 marcado à mão".
+- **Centro POP** (R. General Bittencourt, 239, em qualquer grafia, ou outro número da rua com o telefone do Centro POP): pessoa em situação de rua. Vai para a **Equipe 123** e ganha o **C16 automático** (situação de rua substitui renda, então o C01 fica riscado). Pode ser removido com motivo.
+- Subabas:
+  - **Pessoas:** porcentagem de quem está em tratamento ou em dia no CELK (últimos 2 anos), avisos de gestantes sem atendimento (e fora da lista do 2I) e de bebês sem 1ª consulta, fila por etapa (A contatar, Em contato, Agendadas, Em tratamento, Em dia, Saíram do mapa), filtros por público e por equipe. **A cor do cartão é a etapa do acompanhamento**; a faixa da Classificação de Risco vai como etiqueta com bolinha e pontos. O cartão abre a gaveta da Classificação de Risco, e os contatos valem lá também.
+  - **Famílias:** uma por código familiar, com quantos foram atendidos e "Chamar a família" pelo WhatsApp.
+  - **Panorama do mapa:** perfil (O, G), idade, tamanho da família, equipes pelo endereço, ruas parecidas para confirmar e os mapas importados.
+- O WhatsApp só aparece para celular; telefone fixo aparece como "fixo".
+- O backup analítico não leva o mapa (NIS, nomes e endereços).
+
+## Equipes pelo endereço (todas as abas)
+
+- A lista de ruas das equipes **120, 121, 122 e 123** do CS Monte Serrat define a equipe de cada pessoa **em todas as abas** (Gestantes, PSE, Crianças, Idosos, Condições de saúde, Classificação de Risco, Ruas e famílias e Bolsa Família).
+- Ordem: **equipe corrigida à mão na gaveta** → **equipe pelo endereço** → equipe que veio no arquivo (Metabase, Monitora). Quando o endereço e o Metabase discordam, vale o endereço, e a Verificação mostra quantas pessoas estão assim. Deixar o campo Equipe com a equipe automática ao salvar a gaveta não vira correção à mão.
+- A comparação da rua ignora acento, maiúscula, o tipo (Rua, Servidão, Travessa, Avenida, Beco, Vila), títulos (General, Professor, Doutor, Desembargador, Monsenhor, Major), "da/de/do", texto depois do nome e erros pequenos de digitação.
+- Ruas divididas: General Rosinha (pares 120, ímpares 122), General Vieira da Rosa (pares 120, ímpares até 1075 na 122), Av. Mauro Ramos (123 e 121 por faixa de número), Clemente Rôvere (pares e ímpares a partir de 150 na 123). Faixa sem "pares" ou "ímpares" vale para a rua toda entre os dois números. Número fora da faixa ou sem número em rua dividida fica em "Sem equipe".
+- Rua com nome parecido demais para juntar sozinha (por exemplo "Servidão Bento") aparece em Bolsa Família › Panorama do mapa como sugestão ("É a Servidão Tio Bento" ou "Não é"). Confirmando, a grafia vale para todo mundo com aquele endereço.
+- Só vale para quem é do CS Monte Serrat: dado de outra unidade não recebe equipe por esta lista.
+- **PSE:** a criança com endereço numa das 4 equipes, em qualquer lugar do app (correção sua, Crianças, Gestantes, Idosos, inclusão à mão ou mapa do Bolsa Família, ligada pelo prontuário, CPF, CNS ou nome + nascimento), já entra em **Meus alunos** com "pelo endereço". Se você desmarcar, ela não volta sozinha.
 
 ## Publicar no Render
 

@@ -62,7 +62,7 @@ O que muda de um teste para outro é **o tipo de variável que cada campo aceita
 |---|---|---|---|
 | Sexo | Categoria | Cadastro da pessoa; sem ele, o `Sexo` do último atendimento no CELK | `sexo` |
 | Faixa etária / Ciclo de vida / Idade | Ordem / Ordem / Número | Idade no fim do período, pelo nascimento; sem nascimento, pela idade do Metabase ou do CELK. Ciclo de vida: 0–2, 3–5, 6–12, 13–17, 18–59, 60–69, 70+ | `faixa_etaria`, `ciclo_vida`, `idade` |
-| Equipe | Categoria | Equipe do cadastro (Metabase, Monitora ou correção sua) | `equipe` |
+| Equipe | Categoria | Correção sua; senão a equipe que sai do endereço pela lista de ruas das equipes 120 a 123 do CS Monte Serrat (desde a 2.63); senão a do cadastro (Metabase ou Monitora) | `equipe` |
 | Mora em rua de alta vulnerabilidade (C10) | Sim/Não · **só quem tem endereço** | Endereço × ruas do C10 (ou área inteira) | `rua_vulneravel` |
 | Está na lista de… | Sim/Não | Você escolhe a lista: CELK, Gestante, PSE (meus alunos), Idoso, Criança, Condição de saúde, Manual | `lista_<nome>` |
 | Gestante no período | Sim/Não | Uma gestação (DUM a DPP) cruza o período | `gestante` |
